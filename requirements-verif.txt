@@ -1,0 +1,8 @@
+# The verification-job pins (CI Python 3.12, linux leg; the committed
+# bytes only reproduce against these - verified against the live PyPI
+# index 2026-09-08).  pyscf wraps Libxc and is the point-check oracle
+# (pylibxc is deliberately not used: the package is no longer published
+# on PyPI; pyscf has no Windows wheels upstream, so the verification
+# step runs on the CI's linux leg only - see tools/verify_pyscf.py).
+pyscf==2.14.0
+numpy==2.5.3

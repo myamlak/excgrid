@@ -1,0 +1,57 @@
+// The excgrid GGA kernel skeleton (fresh authorship; BSD-3-Clause).
+// Emits one excgrid::XcKernelValue function per GGA functional: the energy
+// density, the spin-density derivatives, and the three sigma derivatives.
+// No spin-edge branches: the definitions' Tiny guards keep every expression
+// finite at the spin and gamma edges (the LDA skeleton's exact-limit
+// machinery is not needed for the gradient-corrected forms, whose edge
+// contributions vanish with the spin density).
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+#include <cmath>
+#include <limits>
+
+namespace excgrid {
+
+XcKernelValue <? WriteString(fname); ?>(double rhoA,
+                                       double rhoB,
+                                       double sigmaAa,
+                                       double sigmaAb,
+                                       double sigmaBb)
+{
+<? WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"}, {gab, "sigmaAb"}, {gbb, "sigmaBb"}},
+                                    {e, deDra, deDrb, deGaa, deGab, deGbb},
+                                    {aecsl, adeDracsl, adeDrbcsl, adeGaacsl, adeGabcsl, adeGbbcsl})); ?>
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    XcKernelValue result;
+
+    if (rhoA + rhoB < 2. * eps)
+    {
+        return result;
+    }
+
+<?  ForEach(d, Reverse(aecsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.exc = <? WriteString(ExCppForm(e)); ?>;
+
+<?  ForEach(d, Reverse(adeDracsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vrhoA = <? WriteString(ExCppForm(deDra)); ?>;
+
+<?  ForEach(d, Reverse(adeDrbcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vrhoB = <? WriteString(ExCppForm(deDrb)); ?>;
+
+<?  ForEach(d, Reverse(adeGaacsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaAa = <? WriteString(ExCppForm(deGaa)); ?>;
+
+<?  ForEach(d, Reverse(adeGabcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaAb = <? WriteString(ExCppForm(deGab)); ?>;
+
+<?  ForEach(d, Reverse(adeGbbcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaBb = <? WriteString(ExCppForm(deGbb)); ?>;
+
+    return result;
+}
+
+} // namespace excgrid

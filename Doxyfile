@@ -1,0 +1,43 @@
+# excgrid API reference (the zero-warning gate).
+
+# Gate: zero warnings — any warning fails the target (WARN_AS_ERROR).
+# EXTRACT_ALL must stay NO (undocumented members must be visible, not
+# silently extracted).
+#
+# What the gate does and does not catch, measured against Doxygen 1.18.0
+# (the pinned CI release) rather than assumed: it FAILS on a misspelled
+# \param, on a missing \param of a documented function, on an undocumented
+# member of a documented struct, and on an undocumented class or enum.  It
+# does NOT fail on a public free function that carries no doc comment and
+# no \ingroup — Doxygen reports undocumented members of DOCUMENTED
+# compounds, and such a function belongs to none.  So this is a real hard
+# gate, not a silent publisher, and it is not by itself a "every public
+# declaration is documented" guarantee.  Put every public entry in
+# \ingroup excgrid-kernel and the gap closes.
+#
+# Output goes under build/, never into the source tree: a committed
+# docs/html/ is a build artifact in a source repo.
+
+PROJECT_NAME           = excgrid
+PROJECT_BRIEF          = "Grid + XC-kernel + D3 library"
+PROJECT_NUMBER         = 0.1.0
+
+OUTPUT_DIRECTORY       = build/doxygen
+HTML_OUTPUT            = html
+INPUT                  = include/excgrid docs/mainpage.md
+USE_MDFILE_AS_MAINPAGE = docs/mainpage.md
+FILE_PATTERNS          = *.hpp *.md
+RECURSIVE              = NO
+EXTRACT_ALL            = NO
+EXTRACT_PRIVATE        = NO
+EXTRACT_STATIC         = NO
+EXTRACT_LOCAL_CLASSES  = NO
+
+GENERATE_HTML          = YES
+GENERATE_LATEX         = NO
+GENERATE_TREEVIEW      = YES
+QUIET                  = YES
+WARN_IF_UNDOCUMENTED   = YES
+WARN_IF_DOC_ERROR      = YES
+WARN_NO_PARAMDOC       = YES
+WARN_AS_ERROR          = YES

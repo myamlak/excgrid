@@ -1,0 +1,87 @@
+# Deploys the Doxygen API reference to GitHub Pages on each release tag.
+#
+# Tags-only by design: the published docs always match a released API
+# surface.  Two repository settings live outside this file, and a tag push
+# publishes nothing until both hold.  The Doxygen run is the same
+# zero-warning gate the CI legs execute (Doxygen 1.18.0, the pinned
+# release).
+#
+#   1. Pages source = "GitHub Actions" (Settings -> Pages), which also
+#      requires the repository to be public.  This one is checkable from
+#      inside the job, and the deploy below is gated on it: a repository
+#      that cannot publish SKIPS the deploy and stays green, which is the
+#      state every fresh public cut starts in and the state a private repo
+#      is in always.
+#
+#   2. The github-pages environment admits the tag ref (Settings ->
+#      Environments -> github-pages -> "Deployment branches and tags" ->
+#      Add deployment tag rule "v*").  The environment is created with a
+#      branch rule for main alone, so without the tag rule the platform
+#      REJECTS the job before its first step - "Tag <t> is not allowed to
+#      deploy to github-pages due to environment protection rules" - the
+#      job reports zero steps, and no step log is ever written.  Nothing
+#      in this file can soften that: the rejection precedes every step.
+#      Add the tag rule before the first v-tag is pushed.
+
+name: docs
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v7.0.1
+      - name: Install Doxygen 1.18.0 (pinned release)
+        run: |
+          curl -L -sS -o /tmp/doxygen.tar.gz https://github.com/doxygen/doxygen/releases/download/Release_1_18_0/doxygen-1.18.0.linux.bin.tar.gz
+          tar -xzf /tmp/doxygen.tar.gz -C /tmp
+          echo "$(dirname "$(find /tmp/doxygen-1.18.0 -name doxygen -type f | head -1)")" >> "$GITHUB_PATH"
+      - name: Configure
+        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DEXCGRID_BUILD_TESTS=OFF
+      - name: Docs (zero-warning Doxygen gate)
+        run: cmake --build build --target excgrid-docs
+      # No configure-pages step here.  This job reads none of its outputs
+      # (base_url/base_path feed a base-URL rewrite that a relative Doxygen
+      # site does not need), and with its default enablement:false it fails
+      # the job outright on a repository whose Pages site is switched off -
+      # standing in front of the availability check below, whose whole
+      # purpose is to keep exactly that repository green.
+      - name: Upload artifact
+        uses: actions/upload-pages-artifact@v3
+        with:
+          # Doxygen writes build/doxygen/html (Doxyfile: OUTPUT_DIRECTORY +
+          # HTML_OUTPUT).  This is the directory that CONTAINS index.html -
+          # uploading its parent publishes a site whose root has no index.
+          path: 'build/doxygen/html'
+      - name: Check Pages availability (skips the deploy while the repo is private)
+        id: pages
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh api repos/${{ github.repository }}/pages --silent >/dev/null 2>&1; then
+            echo "available=true" >> "$GITHUB_OUTPUT"
+            echo "Pages enabled - deploying."
+          else
+            echo "available=false" >> "$GITHUB_OUTPUT"
+            echo "Pages unavailable (private repo, or Pages not set to GitHub Actions) - the deploy is skipped; enable Pages after going public and re-run this workflow (or the v-tag push)."
+          fi
+      - name: Deploy to GitHub Pages
+        if: steps.pages.outputs.available == 'true'
+        id: deployment
+        uses: actions/deploy-pages@v4

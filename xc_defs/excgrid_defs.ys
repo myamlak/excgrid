@@ -1,0 +1,465 @@
+// excgrid symbolic functional definitions - fresh authorship for this project
+// (BSD-3-Clause, excgrid).  The formulas are the published literature
+// expressions, encoded symbolically so Yacas derives the first derivatives;
+// per-formula sources are cited in docs/mainpage.md.  This file is the
+// excgrid counterpart of an independent implementation's mechanism, not a
+// copy of its text; that tree is a read-only reference (its license
+// governs only its own tree).
+
+// Numerical guard: keeps spin-edge subexpressions finite during symbolic
+// differentiation (the exact spin-zero limits are handled by the generator's
+// limit substitution, excgrid_generate.ys).
+X'Tiny := 1e-16;
+
+// Dirac/Slater exchange constant, spin-resolved form:
+//   e_x(rhoA, rhoB) = -Cx (rhoA^(4/3) + rhoB^(4/3)),  Cx = (3/4)(6/pi)^(1/3)
+X'Cx := N((3. / 4.) * (6. / Pi)^(1. / 3.));
+
+// Wigner-Seitz radius.
+X'Rs(rho) := (3. / (4. * Pi * rho))^(1. / 3.);
+
+// Fermi wavevector.
+X'KF(rho) := (3. * Pi^2 * rho)^(1. / 3.);
+
+// Per-particle LDA exchange energy density (uniform electron gas).
+X'EpsX(rho) := -3. / 4. * X'KF(rho) / Pi;
+
+// The VWN spin interpolation function f(z); the Tiny guard keeps
+// (1 - z)^(4/3) well-defined at the spin edges during differentiation.
+X'Fz(z) := 1. / 2. * ((1. + z * (1. - X'Tiny))^(4. / 3.) +
+                       (1. - z * (1. - X'Tiny))^(4. / 3.) - 2.) / (2.^(1. / 3.) - 1.);
+
+// f''(0), evaluated symbolically: 4/9 / (2^(1/3) - 1) = 1.709920934161... .
+// A transcription-precision note (2026-09-17), because it looks like one and
+// must not be "fixed": every spin-interpolated kernel here divides the
+// spin-stiffness term by this EXACT value, while Libxc divides by the
+// literature's six-digit 1.709921.  The two differ by 6.6e-8 relative, which
+// is what puts the point check's sub-tolerance floor at ~1.6e-9 on polarized
+// points (where this term is alive) and at 1.6e-16 on unpolarized ones (where
+// it vanishes) - `pw92`'s 8.24e-09 worst and the 8.42e-09 floor under
+// `pw91_c` are both this constant and nothing else, measured by re-running
+// the polarized samples with 1.709921, which reproduces Libxc to 1.7e-16.
+// We carry the more precise of the two, so this is recorded, not changed.
+X'D2Fz0 := N(Eval(WithValue(z, 0, D(z, 2) X'Fz(z))));
+
+// The spin-scaling factor phi(z) (PBE/PW91 correlation gradient terms).
+X'Phi(z) := 1. / 2. * (1. + z * (1. - X'Tiny))^(2. / 3.) +
+            1. / 2. * (1. - z * (1. - X'Tiny))^(2. / 3.);
+
+// The Thomas-Fermi screening wavevector.
+X'KS(rho) := 2. * Sqrt(X'KF(rho) / Pi);
+
+// The PW92/PBE LDA-correlation kernel (Perdew-Wang 1992 parametrization):
+//   G(rs, A, a1, b1..b4) = -2 A (1 + a1 rs) ln(1 + 1 / (2 A (b1 rs^1/2 + ...)))
+X'Gc(r, A, a1, b1, b2, b3, b4) :=
+    -2. * A * (1. + a1 * r) *
+    Ln(1. + 1. / (2. * A * (b1 * r^(1. / 2.) + b2 * r + b3 * r^(3. / 2.) + b4 * r^2)));
+
+// The VWN correlation energy integrand E(A, x0, b, c, x) (Vosko-Wilk-Nusair
+// 1980, eq. 4.4); x = sqrt(rs).
+X'VwnE(A, X0, B, C, x) := [
+    Local(XX, Q);
+    XX(x, b, c) := x^2 + b * x + c;
+    Q(b, c) := Sqrt(4. * c - b^2);
+    A * (Ln(x^2 / XX(x, B, C)) +
+         2. * B * ArcTan(Q(B, C) / (2. * x + B)) / Q(B, C) -
+         B * X0 * (Ln((x - X0)^2 / XX(x, B, C)) +
+                   2. * (B + 2. * X0) * ArcTan(Q(B, C) / (2. * x + B)) / Q(B, C)) /
+         XX(X0, B, C));
+];
+
+// The reduced density gradient for the GGA exchange corrections.
+X'S(rho, gamma) := 1. / 2. * Sqrt(gamma) / (X'KF(rho) * rho + X'Tiny);
+
+// The mPW91-style reduced gradient x = |grad rho| / rho^(4/3).
+X'X(rho, gamma) := Sqrt(gamma) / (rho + X'Tiny)^(4. / 3.);
+
+// The PBE-style reduced gradient t = |grad rho| / (2 phi ks rho).
+X'T(rho, gamma, z) := 1. / 2. * Sqrt(gamma) / (X'Phi(z) * X'KS(rho) * rho + X'Tiny);
+
+// yacas 1.8's built-in ArcSinh is a PROTECTED symbol whose derivative is
+// NOT defined (D(x)X'Asinh(x) stays unevaluated), and neither `:=` nor the
+// Function() form can override it.  The formulas therefore use this
+// user-defined equivalent - the Ln form differentiates through its body
+// and is exact for the non-negative reduced gradients that occur here
+// (x = sqrt(gamma)/rho^(4/3) >= 0, so z + sqrt(1 + z^2) never cancels).
+X'Asinh(z) := Ln(z + Sqrt(1. + z^2));
+
+// ---------------------------------------------------------------------------
+// LDA exchange
+
+X'SlaterExchange(rhoA, rhoB) := -X'Cx * (rhoA^(4. / 3.) + rhoB^(4. / 3.));
+
+// ---------------------------------------------------------------------------
+// LDA correlation
+
+// VWN5: the "full" VWN interpolation-V parametrization (VWN 1980, Table V
+// parameters).  This is what most codes' bare "VWN" means.
+X'Vwn5Correlation(rhoA, rhoB) := [
+    Local(rho, z, x, EcP, EcF, Ac, B2, dEc, Ec);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    x := Sqrt(X'Rs(rho));
+    EcP := X'VwnE(0.0310907, -0.10498, 3.72744, 12.9352, x);
+    EcF := X'VwnE(0.01554535, -0.325, 7.06042, 18.0578, x);
+    Ac := X'VwnE(-1. / (6. * Pi^2), -0.0047584, 1.13107, 13.0045, x);
+    B2 := X'D2Fz0 * (EcF - EcP) / Ac - 1.;
+    dEc := Ac * X'Fz(z) * (1. + B2 * z^4) / X'D2Fz0;
+    Ec := EcP + dEc;
+    rho * Ec;
+];
+
+// VWN3: the RPA-parameter interpolation (VWN 1980, Table I parameters) -
+// a DISTINCT functional from VWN5, the two separately named and never
+// conflated.
+X'Vwn3Correlation(rhoA, rhoB) := [
+    Local(rho, z, x, EcP, EcF, dEc, Ec);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    x := Sqrt(X'Rs(rho));
+    EcP := X'VwnE(0.0310907, -0.409286, 13.072, 42.7198, x);
+    EcF := X'VwnE(0.01554535, -0.743294, 20.1231, 101.578, x);
+    dEc := (EcF - EcP) * X'Fz(z);
+    Ec := EcP + dEc;
+    rho * Ec;
+];
+
+// PW92: the Perdew-Wang 1992 LDA correlation.
+X'Pw92Correlation(rhoA, rhoB) := [
+    Local(rho, z, Ac, EcP, EcF);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    Ac := X'Gc(X'Rs(rho), 0.016887, 0.11125, 10.357, 3.6231, 0.88026, 0.49671);
+    EcP := X'Gc(X'Rs(rho), 0.031091, 0.2137, 7.5957, 3.5876, 1.6382, 0.49294);
+    EcF := X'Gc(X'Rs(rho), 0.015545, 0.20548, 14.1189, 6.1977, 3.3662, 0.62517);
+    rho * (EcP - Ac * X'Fz(z) * (1. - z^4) / X'D2Fz0 +
+           (EcF - EcP) * X'Fz(z) * z^4);
+];
+
+// ---------------------------------------------------------------------------
+// GGA exchange
+
+// Becke 1988: e_x = e_x^LDA - beta sum_sigma rho_sigma^(4/3) x_sigma^2 /
+// (1 + 6 beta x_sigma asinh x_sigma),  x = |grad rho| / rho^(4/3).
+X'Becke88Fx(x, beta) :=
+    -3. / 2. * (3. / (4. * Pi))^(1. / 3.) -
+    beta * x^2 / (1. + 6. * beta * x * X'Asinh(x));
+
+X'Becke88Exchange(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(g, xA, xB, beta);
+    g(x, b) := X'Becke88Fx(x, b);
+    beta := 0.0042;
+    xA := X'X(rhoA, gaa);
+    xB := X'X(rhoB, gbb);
+    rhoA^(4. / 3.) * g(xA, beta) + rhoB^(4. / 3.) * g(xB, beta);
+];
+
+// Perdew-Wang 1991 exchange: Fx(s) with s the reduced gradient.
+X'Pw91Fx(s) :=
+    (1. + 0.19645 * s * X'Asinh(7.7956 * s) + (0.2743 - 0.1508 * Exp(-100. * s^2)) * s^2) /
+    (1. + 0.19645 * s * X'Asinh(7.7956 * s) + 0.004 * s^4);
+
+X'Pw91Exchange(rhoA, rhoB, gaa, gab, gbb) :=
+    rhoA * X'EpsX(2. * rhoA) * X'Pw91Fx(X'S(2. * rhoA, 4. * gaa)) +
+    rhoB * X'EpsX(2. * rhoB) * X'Pw91Fx(X'S(2. * rhoB, 4. * gbb));
+
+// Perdew-Burke-Ernzerhof 1996 exchange: Fx = 1 + kappa - kappa / (1 + mu s^2 / kappa).
+X'PbeFx(s, kappa, mu) := 1. + kappa - kappa / (1. + mu * s^2 / kappa);
+
+X'PbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(kappa, mu);
+    kappa := 0.804;
+    mu := 0.2195149727645171;
+    rhoA * X'EpsX(2. * rhoA) * X'PbeFx(X'S(2. * rhoA, 4. * gaa), kappa, mu) +
+    rhoB * X'EpsX(2. * rhoB) * X'PbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
+];
+
+// revPBE: the PBE exchange form with kappa = 1.245.
+X'RevPbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(kappa, mu);
+    kappa := 1.245;
+    mu := 0.2195149727645171;
+    rhoA * X'EpsX(2. * rhoA) * X'PbeFx(X'S(2. * rhoA, 4. * gaa), kappa, mu) +
+    rhoB * X'EpsX(2. * rhoB) * X'PbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
+];
+
+// RPBE (Hammer-Hansen-Norskov 1999): the PBE exchange form replaced by
+//   Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)),
+// kappa = 0.804, mu = 0.2195149727645171.  The mu is the FULL-PRECISION
+// value rather than the 0.21951 the paper prints (owner ruling 2026-09-13):
+// the truncation is a transcription precision choice and not a distinct
+// variant, libxc carries the same expression with mu = MU_PBE, and the pbe
+// and revpbe rules above already carry that same value.  The kernel's own
+// .ey carries the longer note.
+X'RpbeFx(s, kappa, mu) := 1. + kappa * (1. - Exp(-mu * s^2 / kappa));
+
+X'RpbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(kappa, mu);
+    kappa := 0.804;
+    mu := 0.2195149727645171;
+    rhoA * X'EpsX(2. * rhoA) * X'RpbeFx(X'S(2. * rhoA, 4. * gaa), kappa, mu) +
+    rhoB * X'EpsX(2. * rhoB) * X'RpbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
+];
+
+// PBEsol: the PBE exchange form with mu = 10/81 (the PBEsol paper's
+// gradient expansion choice), kappa = 0.804.
+X'PbeSolExchange(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(kappa, mu);
+    kappa := 0.804;
+    mu := 10. / 81.;
+    rhoA * X'EpsX(2. * rhoA) * X'PbeFx(X'S(2. * rhoA, 4. * gaa), kappa, mu) +
+    rhoB * X'EpsX(2. * rhoB) * X'PbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
+];
+
+// mPW91 (modified PW91, Adamson-Gill-Barthel): the PW91 exchange form with
+// modified constants, expressed through x = |grad rho| / rho^(4/3).  The
+// damping exponent is 1.6455307846, the FULL-PRECISION value rather than the
+// 1.6455 the published form prints (owner ruling 2026-09-14): the truncation
+// is a transcription precision choice and not a distinct variant, and the
+// value was solved out of libxc's own numbers, identically at every
+// well-conditioned sample point (the fit is in the lane record).
+X'MPw91Fx(x) :=
+    (0.00426 * x^2 -
+     (0.00426 - 5. * (36. * Pi)^(-5. / 3.)) * x^2 * Exp(-1.6455307846 * x^2) -
+     0.000001 * x^3.72) /
+    (1. + 6. * 0.00426 * x * X'Asinh(x) +
+     0.000001 * x^3.72 * 2. * (4. * Pi)^(1. / 3.) / (3.^(4. / 3.)));
+
+X'MPw91Exchange(rhoA, rhoB, gaa, gab, gbb) :=
+    X'SlaterExchange(rhoA, rhoB) -
+    rhoA^(4. / 3.) * X'MPw91Fx(X'X(rhoA, gaa)) -
+    rhoB^(4. / 3.) * X'MPw91Fx(X'X(rhoB, gbb));
+
+// ---------------------------------------------------------------------------
+// GGA correlation
+
+// Perdew-Burke-Ernzerhof 1996 correlation.
+X'PbeCorrBeta := 0.06672455060314922;
+
+X'PbeCorrGamma := N((1. - Ln(2.)) / Pi^2);
+
+X'PbeCorrEc(rho, z) := [
+    Local(Ac, EcP, EcF);
+    Ac := X'Gc(X'Rs(rho), 0.0168869, 0.11125, 10.357, 3.6231, 0.88026, 0.49671);
+    EcP := X'Gc(X'Rs(rho), 0.0310907, 0.2137, 7.5957, 3.5876, 1.6382, 0.49294);
+    EcF := X'Gc(X'Rs(rho), 0.01554535, 0.20548, 14.1189, 6.1977, 3.3662, 0.62517);
+    EcP - Ac * X'Fz(z) * (1. - z^4) / X'D2Fz0 + (EcF - EcP) * X'Fz(z) * z^4;
+];
+
+X'PbeCorrA(rho, z) :=
+    X'PbeCorrBeta /
+    (X'PbeCorrGamma * (Exp(-X'PbeCorrEc(rho, z) / (X'PbeCorrGamma * X'Phi(z)^3)) - 1.));
+
+X'PbeCorrH(rho, gamma, z) := [
+    Local(phi3, t2, a);
+    phi3 := X'Phi(z)^3;
+    t2 := X'T(rho, gamma, z)^2;
+    a := X'PbeCorrA(rho, z);
+    X'PbeCorrGamma * phi3 *
+    Ln(1. + X'PbeCorrBeta * t2 * (1. + a * t2) /
+            (X'PbeCorrGamma * (1. + a * t2 + (a * t2)^2)));
+];
+
+X'PbeCorrelation(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(rho, z, gamma);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    gamma := gaa + 2. * gab + gbb;
+    rho * (X'PbeCorrEc(rho, z) + X'PbeCorrH(rho, gamma, z));
+];
+
+// Lee-Yang-Parr 1988 correlation (the published four-term form).
+X'LypCorrelation(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(rho, rho13, a, b, c, d, omega, delta);
+    rho := rhoA + rhoB;
+    rho13 := rho^(1. / 3.);
+    a := 0.04918;
+    b := 0.132;
+    c := 0.2533;
+    d := 0.349;
+    omega := Exp(-c / rho13) / (1. + d / rho13) * rho^(-11. / 3.);
+    delta := c / rho13 + (d / rho13) / (1. + d / rho13);
+    -(4. * a) / (1. + d / rho13) * (rhoA * rhoB) / rho -
+    2.^(11. / 3.) * 3. / 10. * (3. * Pi^2)^(2. / 3.) * a * b * omega * rhoA * rhoB *
+        (rhoA^(8. / 3.) + rhoB^(8. / 3.)) -
+    a * b * omega * (1. / 9. * rhoA * rhoB * (1. - 3. * delta - (delta - 11.) * rhoA / rho) - rhoB^2) * gaa -
+    a * b * omega * (1. / 9. * rhoA * rhoB * (47. - 7. * delta) - 4. / 3. * rho^2) * gab -
+    a * b * omega * (1. / 9. * rhoA * rhoB * (1. - 3. * delta - (delta - 11.) * rhoB / rho) - rhoA^2) * gbb;
+];
+
+// Perdew-Wang 1991 correlation (the 1992 parametrization: PW92 LDA piece +
+// the H0/H1 gradient terms).
+X'Pw91CorrAlpha := 0.09;
+
+X'Pw91CorrCc0 := 0.004235;
+
+X'Pw91CorrCx := -0.001667;
+
+X'Pw91CorrNu := N(16. * (3. * Pi^2)^(1. / 3.) / Pi);
+
+X'Pw91CorrBeta := X'Pw91CorrNu * X'Pw91CorrCc0;
+
+X'Pw91CorrEc(rho, z) := [
+    Local(Ac, EcP, EcF);
+    Ac := X'Gc(X'Rs(rho), 0.016887, 0.11125, 10.357, 3.6231, 0.88026, 0.49671);
+    EcP := X'Gc(X'Rs(rho), 0.031091, 0.2137, 7.5957, 3.5876, 1.6382, 0.49294);
+    EcF := X'Gc(X'Rs(rho), 0.015545, 0.20548, 14.1189, 6.1977, 3.3662, 0.62517);
+    EcP - Ac * X'Fz(z) * (1. - z^4) / X'D2Fz0 + (EcF - EcP) * X'Fz(z) * z^4;
+];
+
+X'Pw91CorrA(rho, z) :=
+    2. * X'Pw91CorrAlpha / X'Pw91CorrBeta /
+    (Exp(-2. * X'Pw91CorrAlpha * X'Pw91CorrEc(rho, z) /
+         (X'Phi(z)^3 * X'Pw91CorrBeta^2)) - 1.);
+
+X'Pw91CorrCc(rho) := [
+    Local(r);
+    r := X'Rs(rho);
+    (2.568 + 23.266 * r + 0.007389 * r^2) /
+        (1000. * (1. + 8.723 * r + 0.472 * r^2 + 0.07389 * r^3)) - X'Pw91CorrCx;
+];
+
+X'Pw91CorrH0(rho, gamma, z) := [
+    Local(phi3, t2, a);
+    phi3 := X'Phi(z)^3;
+    t2 := X'T(rho, gamma, z)^2;
+    a := X'Pw91CorrA(rho, z);
+    1. / 2. * phi3 * X'Pw91CorrBeta^2 *
+    Ln(1. + 2. * X'Pw91CorrAlpha * t2 * (1. + a * t2) /
+            (X'Pw91CorrBeta * (1. + a * t2 + (a * t2)^2))) / X'Pw91CorrAlpha;
+];
+
+X'Pw91CorrH1(rho, gamma, z) := [
+    Local(phi3, phi4, t2);
+    phi3 := X'Phi(z)^3;
+    phi4 := X'Phi(z)^4;
+    t2 := X'T(rho, gamma, z)^2;
+    X'Pw91CorrNu * (X'Pw91CorrCc(rho) - X'Pw91CorrCc0 - 3. / 7. * X'Pw91CorrCx) *
+    phi3 * t2 *
+    Exp(-100. * phi4 * X'KS(rho)^2 * t2 / X'KF(rho)^2);
+];
+
+X'Pw91Correlation(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(rho, z, gamma);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    gamma := gaa + 2. * gab + gbb;
+    rho * (X'Pw91CorrEc(rho, z) + X'Pw91CorrH0(rho, gamma, z) + X'Pw91CorrH1(rho, gamma, z));
+];
+
+// Perdew 1986 correlation (the gradient correction on the Perdew-Zunger
+// LDA piece; parameters from the P86 paper - not in the reference tree, so
+// sourced fresh from the paper itself).
+//
+// ALL THREE of the terms this rule used to carry differently from the paper
+// were corrected on 2026-09-17, against libxc's own authored source
+// (maple/gga_exc/gga_c_p86.mpl at 7.0.0, plus the readable hand-written 4.0.2
+// body) and the paper's printed equations.  They were transcription defects,
+// not an alternative reading, and each is named where it lives below:
+//   1. the LDA piece is the Perdew-Zunger 1981 parametrization the paper
+//      carries and libxc's `lda_c_pz` implements - NOT the VWN table-I (RPA)
+//      one this rule used to substitute, which is 29% away at rs = 1.34 and
+//      is not the surface the paper's f = 0.11 was fitted on;
+//   2. C(infinity) in the damping exponent is the INFINITE-DENSITY limit
+//      (rho -> inf, rs -> 0) of C(rho) below - 0.004235, not the rs -> inf
+//      limit 0.001667 this rule used to carry (eq. 9 of the paper);
+//   3. the gradient term is divided by the paper's delta(z) (eq. 4), which
+//      the rule had no denominator for.
+// PZ81 is piecewise at rs = 1, so this is the tree's only branch-carrying
+// kernel; the condition and its source are stated in `p86_correlation.ey`,
+// and the emitted shape is documented in `excgrid_gga_piecewise_skeleton.ey`.
+X'P86F := 0.11;
+
+X'P86C1 := 0.001667;
+
+X'P86C2 := 0.002568;
+
+X'P86C3 := 0.023266;
+
+X'P86C4 := 7.389e-6;
+
+X'P86C5 := 8.723;
+
+X'P86C6 := 0.472;
+
+X'P86C7 := 0.07389;
+
+X'P86Cc(rho) := [
+    Local(r);
+    r := X'Rs(rho);
+    X'P86C1 + (X'P86C2 + X'P86C3 * r + X'P86C4 * r^2) /
+              (1. + X'P86C5 * r + X'P86C6 * r^2 + X'P86C7 * r^3);
+];
+
+// C(infinity) of the paper's eq. 9: the INFINITE-DENSITY limit of C(rho)
+// above (rho -> inf, rs -> 0), i.e. C1 + C2 = 0.004235.  The exponent's
+// argument is the density, so this is the constant term of the numerator,
+// not the rs -> inf limit C1 alone.
+X'P86Cinf := X'P86C1 + X'P86C2;
+
+// The paper's spin factor delta(z) (eq. 4), which divides the gradient term:
+//   delta = sqrt(((1+z)^(5/3) + (1-z)^(5/3)) / 2),  z = (rhoA-rhoB)/rho.
+// The Tiny guard matches X'Fz/X'Phi and keeps the spin-edge subexpressions
+// finite during symbolic differentiation.
+X'P86DD(z) := Sqrt(1. / 2. * ((1. + z * (1. - X'Tiny))^(5. / 3.) +
+                              (1. - z * (1. - X'Tiny))^(5. / 3.)));
+
+// The Perdew-Zunger 1981 LDA correlation piece (Perdew & Zunger, Phys. Rev.
+// B 23, 5048 (1981)), piecewise at rs = 1 - the LDA surface the P86 paper's
+// gradient correction is defined on, and what libxc's `gga_c_p86` calls
+// internally as `lda_c_pz`:
+//   rs >= 1 :  gamma / (1 + beta1 sqrt(rs) + beta2 rs)
+//   rs <  1 :  a ln rs + b + c rs ln rs + d rs
+// The spin interpolation is the same f(z) the VWN forms use, so it is X'Fz;
+// libxc's `lda_c_pz` interpolates identically (its `f_pz` rule).
+X'Pz81LowUnpolarized(rs) := -0.1423 / (1. + 1.0529 * Sqrt(rs) + 0.3334 * rs);
+
+X'Pz81LowFerro(rs) := -0.0843 / (1. + 1.3981 * Sqrt(rs) + 0.2611 * rs);
+
+X'Pz81HighUnpolarized(rs) := 0.0311 * Ln(rs) - 0.048 + 0.0020 * rs * Ln(rs) - 0.0116 * rs;
+
+X'Pz81HighFerro(rs) := 0.01555 * Ln(rs) - 0.0269 + 0.0007 * rs * Ln(rs) - 0.0048 * rs;
+
+X'Pz81EcLow(rho, z) := [
+    Local(rs, ep, ef);
+    rs := X'Rs(rho);
+    ep := X'Pz81LowUnpolarized(rs);
+    ef := X'Pz81LowFerro(rs);
+    ep + (ef - ep) * X'Fz(z);
+];
+
+X'Pz81EcHigh(rho, z) := [
+    Local(rs, ep, ef);
+    rs := X'Rs(rho);
+    ep := X'Pz81HighUnpolarized(rs);
+    ef := X'Pz81HighFerro(rs);
+    ep + (ef - ep) * X'Fz(z);
+];
+
+// e_c^P86 = rho [e_c^PZ + e^{-Phi} C(rho) |grad rho|^2 / (delta(z) rho^(7/3))],
+// Phi = 1.745 f C(inf)/C(rho) |grad rho| / rho^(7/6),
+// C(inf) = C1 + C2 = 0.004235 (the infinite-density limit, not C1 alone).
+// The gradient half is identical on both sides of rs = 1, so it is one rule
+// and the two branches differ only in which PZ81 piece they sit on.
+X'P86Gradient(rho, z, gamma) := [
+    Local(cc, phi);
+    cc := X'P86Cc(rho);
+    phi := 1.745 * X'P86F * X'P86Cinf / cc * Sqrt(gamma) / rho^(7. / 6.);
+    Exp(-phi) * cc * gamma / rho^(7. / 3.) / X'P86DD(z);
+];
+
+X'P86CorrelationLow(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(rho, z, gamma);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    gamma := gaa + 2. * gab + gbb;
+    rho * (X'Pz81EcLow(rho, z) + X'P86Gradient(rho, z, gamma));
+];
+
+X'P86CorrelationHigh(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(rho, z, gamma);
+    rho := rhoA + rhoB;
+    z := (rhoA - rhoB) / rho;
+    gamma := gaa + 2. * gab + gbb;
+    rho * (X'Pz81EcHigh(rho, z) + X'P86Gradient(rho, z, gamma));
+];

@@ -1,0 +1,18 @@
+// excgrid codegen source: the Perdew-Wang 1991 GGA correlation functional
+// (the 1992 parametrization: the PW92 LDA piece + the H0/H1 gradient
+// terms).  Fresh authorship; formulas from the PW91/PW92 papers
+// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'Pw91Correlation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("Pw91Correlation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

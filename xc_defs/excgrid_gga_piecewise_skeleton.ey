@@ -1,0 +1,106 @@
+// The excgrid GGA PIECEWISE-kernel skeleton (fresh authorship; BSD-3-Clause).
+//
+// WHY THIS SKELETON EXISTS.  Every other kernel in this tree is one
+// straight-line expression, and the GGA skeleton's own note says so: the
+// formulas' Tiny guards keep every expression finite at the spin and gamma
+// edges, so no branches are needed.  That is true of every functional here
+// EXCEPT the Perdew-Zunger 1981 LDA piece (`lda_c_pz`, Perdew & Zunger,
+// Phys. Rev. B 23, 5048 (1981)), which the P86 correlation is defined on:
+// PZ81 is genuinely piecewise at rs = 1 -
+//
+//   rs >= 1 :  ec = gamma / (1 + beta1 sqrt(rs) + beta2 rs)
+//   rs <  1 :  ec = a ln rs + b + c rs ln rs + d rs
+//
+// - two different analytic forms, not one expression with a removable
+// singularity, so NO choice of guard makes it straight-line.  The two
+// branches meet at rs = 1 to about 3e-5 (they are continuous but not
+// smooth there), which is why the split is a real branch and not a
+// cosmetic one.
+//
+// THE CONTRACT.  A piecewise kernel is emitted as two complete branch bodies
+// inside `if (cond) { ... } else { ... }`, each branch carrying its own CSE
+// declarations in its OWN braces, exactly as the LDA skeleton already scopes
+// its spin-edge branches.  `tools/regenerate.py`'s temporary pruner computes
+// reachability per C++ scope, so the two branches' tag namespaces may collide
+// (both branches declare `C1`) and each branch prunes independently.
+// `cond` is evaluated once, from the kernel arguments, and must select the
+// branch that the definition's first expression binds - the generator's
+// `ExPiecewiseGgaGenerate` takes them in that order and does not reorder.
+// A kernel author adding a piecewise form must therefore state the boundary
+// and its source in the `.ey` beside the condition, as `p86_correlation.ey`
+// does; nothing here infers it.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+#include <cmath>
+#include <limits>
+
+namespace excgrid {
+
+XcKernelValue <? WriteString(fname); ?>(double rhoA,
+                                       double rhoB,
+                                       double sigmaAa,
+                                       double sigmaAb,
+                                       double sigmaBb)
+{
+<? WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"}, {gab, "sigmaAb"}, {gbb, "sigmaBb"}},
+                                    {e1, deDra1, deDrb1, deGaa1, deGab1, deGbb1,
+                                     e2, deDra2, deDrb2, deGaa2, deGab2, deGbb2},
+                                    {aecsl1, adeDracsl1, adeDrbcsl1, adeGaacsl1, adeGabcsl1, adeGbbcsl1,
+                                     aecsl2, adeDracsl2, adeDrbcsl2, adeGaacsl2, adeGabcsl2, adeGbbcsl2})); ?>
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    XcKernelValue result;
+
+    if (rhoA + rhoB < 2. * eps)
+    {
+        return result;
+    }
+
+    if (<? WriteString(ExCppForm(pwCond)); ?>)
+    {
+<?  ForEach(d, Reverse(aecsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.exc = <? WriteString(ExCppForm(e1)); ?>;
+
+<?  ForEach(d, Reverse(adeDracsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoA = <? WriteString(ExCppForm(deDra1)); ?>;
+
+<?  ForEach(d, Reverse(adeDrbcsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoB = <? WriteString(ExCppForm(deDrb1)); ?>;
+
+<?  ForEach(d, Reverse(adeGaacsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaAa = <? WriteString(ExCppForm(deGaa1)); ?>;
+
+<?  ForEach(d, Reverse(adeGabcsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaAb = <? WriteString(ExCppForm(deGab1)); ?>;
+
+<?  ForEach(d, Reverse(adeGbbcsl1)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaBb = <? WriteString(ExCppForm(deGbb1)); ?>;
+    }
+    else
+    {
+<?  ForEach(d, Reverse(aecsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.exc = <? WriteString(ExCppForm(e2)); ?>;
+
+<?  ForEach(d, Reverse(adeDracsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoA = <? WriteString(ExCppForm(deDra2)); ?>;
+
+<?  ForEach(d, Reverse(adeDrbcsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoB = <? WriteString(ExCppForm(deDrb2)); ?>;
+
+<?  ForEach(d, Reverse(adeGaacsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaAa = <? WriteString(ExCppForm(deGaa2)); ?>;
+
+<?  ForEach(d, Reverse(adeGabcsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaAb = <? WriteString(ExCppForm(deGab2)); ?>;
+
+<?  ForEach(d, Reverse(adeGbbcsl2)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vsigmaBb = <? WriteString(ExCppForm(deGbb2)); ?>;
+    }
+
+    return result;
+}
+
+} // namespace excgrid

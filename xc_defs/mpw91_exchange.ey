@@ -1,0 +1,23 @@
+// excgrid codegen source: the mPW91 (modified PW91) GGA exchange
+// functional (Adamson-Gill-Barthel).  Fresh authorship; the form is the
+// published one (docs/mainpage.md references), and its damping exponent is
+// 1.6455307846 - the FULL-PRECISION value, not the 1.6455 the published form
+// prints.  Owner ruling 2026-09-14: the truncation was a transcription
+// precision choice, not a distinct variant of mPW91, and the value was
+// solved out of the oracle's own numbers (identically at every
+// well-conditioned sample point; the fit is in the lane record and the
+// comparison in tools/verify_pyscf.py).  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'MPw91Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("MPw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

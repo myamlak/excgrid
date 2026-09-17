@@ -1,0 +1,14 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+title: excgrid
+version: 0.1.0
+authors:
+  - family-names: Makowski
+    given-names: Marcin
+license: BSD-3-Clause
+repository-code: "https://github.com/myamlak/excgrid"
+abstract: >-
+  A standalone grid + exchange-correlation kernel + D3-dispersion library:
+  molecular block-grid construction (Murray-Handy-Laming radial,
+  Lebedev-Laikov angular, Becke/SSF partition) and Yacas-code-generated
+  LDA/GGA/hybrid energy-density kernels with first derivatives.

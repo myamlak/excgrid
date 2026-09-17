@@ -1,0 +1,105 @@
+// ExCppForm: convert Yacas objects to C++ source text - the excgrid
+// printer, fresh-authored for this project (the yacas-standard idiom
+// of rule-based form printing; that of an independent implementation is
+// the design precedent, not the text).
+
+RuleBase("ExCppForm", {expression});
+RuleBase("ExCppForm", {expression, precedence});
+
+ExCppFormMaxPrec() := 60000;
+
+Function("ExCppFormBracketIf", {pred, string})
+[
+    Check(IsBoolean(pred) And IsString(string),
+          "ExCppForm internal error: non-boolean and/or non-string argument");
+    If(pred, ConcatStrings("(", string, ")"), string);
+];
+
+100 # ExCppForm(_x) <-- ExCppForm(x, ExCppFormMaxPrec());
+110 # ExCppForm(x_IsInteger, _p) <-- String(x);
+111 # ExCppForm(x_IsZero, _p) <-- "0.";
+112 # ExCppForm(x_IsNumber, _p) <-- String(x);
+200 # ExCppForm(x_IsAtom, _p) <-- String(x);
+100 # ExCppForm(x_IsString, _p) <-- ConcatStrings("\"", x, "\"");
+
+// Binary arithmetic with precedence-driven bracketing.  yacas 1.8 gives
+// equal OpPrecedence/OpLeftPrecedence/OpRightPrecedence per operator,
+// so the operand precedences are set STRICTLY BELOW the levels that
+// need re-bracketing: sums bracket inside sums, products AND sums
+// bracket inside products and divisors (a/(b*c) must never print as
+// a/b*c - the whole class of bug the unary-minus fix addresses).
+// Extra brackets on nested products are accepted noise (clang-format
+// keeps them); correctness is the gate.
+
+100 # ExCppForm(_x + _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("+"),
+        ConcatStrings(ExCppForm(x, OpPrecedence("+") - 1), " + ",
+                      ExCppForm(y, OpPrecedence("+") - 1)));
+
+100 # ExCppForm(_x - _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("+"),
+        ConcatStrings(ExCppForm(x, OpPrecedence("+") - 1), " - ",
+                      ExCppForm(y, OpPrecedence("+") - 1)));
+
+100 # ExCppForm(_x * _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("*"),
+        ConcatStrings(ExCppForm(x, OpPrecedence("+") - 1), " * ",
+                      ExCppForm(y, OpPrecedence("+") - 1)));
+
+100 # ExCppForm(_x / _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("*"),
+        ConcatStrings(ExCppForm(x, OpPrecedence("+") - 1), " / ",
+                      ExCppForm(y, OpPrecedence("*") - 1)));
+
+// The unary signs: the operand prints at one precedence BELOW the sum
+// level, so a sum operand re-brackets - yacas 1.8's OpRightPrecedence
+// equals OpPrecedence, which would print -(a + b) as "-a + b".
+100 # ExCppForm(+ _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("+"),
+        ConcatStrings(" + ", ExCppForm(y, OpPrecedence("+") - 1)));
+
+100 # ExCppForm(- _y, _p) <--
+    ExCppFormBracketIf(p < OpPrecedence("+"),
+        ConcatStrings(" - ", ExCppForm(y, OpPrecedence("+") - 1)));
+
+// Powers print as std::pow; the base and exponent are never bracketed.
+100 # ExCppForm(_x ^ _y, _p) <--
+    ExCppFormBracketIf(p <= OpPrecedence("^"),
+        ConcatStrings("std::pow(", ExCppForm(x, ExCppFormMaxPrec()), ", ",
+                      ExCppForm(y, ExCppFormMaxPrec()), ")"));
+
+// Ordering comparisons and their negation, needed by a PIECEWISE kernel's
+// branch condition (the piecewise skeleton prints one as the `if (...)` test).
+// yacas 1.8 parses every ordering comparison into the `<` head - `a >= b`
+// arrives here as Not(a < b), which is why both rules are needed - and both
+// operands print at maximum precedence, so an arithmetic operand never needs
+// re-bracketing against a relational.
+100 # ExCppForm(_x < _y, _p) <--
+    ConcatStrings(ExCppForm(x, ExCppFormMaxPrec()), " < ",
+                  ExCppForm(y, ExCppFormMaxPrec()));
+
+100 # ExCppForm(Not _x, _p) <--
+    ConcatStrings("!(", ExCppForm(x, ExCppFormMaxPrec()), ")");
+
+// The assignment operator (the CSE assignment lists print as `cN = expr`).
+120 # ExCppForm(expr_IsFunction, _p) _(NrArgs(expr) = 2 And Type(expr) = ":=") <--
+    ConcatStrings(ExCppForm(Listify(expr)[2], ExCppFormMaxPrec()), " = ",
+                  ExCppForm(Listify(expr)[3], ExCppFormMaxPrec()));
+
+LocalSymbols(exCppFormMathFunctions) [
+    exCppFormMathFunctions :=
+    {
+      {"Sqrt", "std::sqrt"}, {"Exp", "std::exp"}, {"Ln", "std::log"},
+      {"ArcSinh", "std::asinh"}, {"ArcTan", "std::atan"}, {"Abs", "std::abs"},
+      {"Cos", "std::cos"}, {"Sin", "std::sin"}, {"ArcCos", "std::acos"},
+      {"ArcSin", "std::asin"}, {"Tan", "std::tan"}, {"Max", "std::max"},
+      {"Min", "std::min"}
+    };
+
+    ExCppFormMathFunctions() := exCppFormMathFunctions;
+];
+
+120 # ExCppForm(expr_IsFunction, _p) _
+    (NrArgs(expr) = 1 And Contains(AssocIndices(ExCppFormMathFunctions()), Type(expr))) <--
+    ConcatStrings(ExCppFormMathFunctions()[Type(expr)], "(",
+                  ExCppForm(Listify(expr)[2], ExCppFormMaxPrec()), ")");

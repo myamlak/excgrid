@@ -1,0 +1,19 @@
+// excgrid codegen source: the PBEsol GGA exchange functional (the PBE
+// exchange form with mu = 10/81).  The formula is sourced from the PBEsol
+// paper - J. P. Perdew et al., Phys. Rev. Lett. 100 (2008) 136406, listed
+// with the other functional citations in docs/mainpage.md.  Regenerate
+// with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'PbeSolExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

@@ -1,0 +1,25 @@
+// excgrid codegen source: the Hammer-Hansen-Norskov 1999 revised PBE GGA
+// exchange functional (RPBE).  Fresh authorship.  The enhancement factor
+// Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)) has kappa = 0.804 and
+// mu = 0.2195149727645171 - the FULL-PRECISION value, not the 0.21951 the
+// paper prints.  Owner ruling 2026-09-13: the truncation was a transcription
+// precision choice, not a distinct variant of RPBE, libxc's kernel is
+// algebraically the same expression with mu = MU_PBE, and this tree's own
+// pbe and revpbe rules already carry that value - so matching it is internal
+// consistency, not adopting another code's definition.  The form itself is
+// still the published enhancement factor.  Verified against the oracle by
+// excgrid/tools/verify_pyscf.py.  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'RpbeExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("RpbeExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

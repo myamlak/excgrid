@@ -1,0 +1,237 @@
+// The excgrid codegen engine: symbolic differentiation + common-subexpression
+// elimination + skeleton expansion, fresh-authored for this project.
+// An independent implementation's generator is the MECHANISM precedent
+// (differentiate, CSE, substitute the spin-edge limit subexpressions,
+// PatchLoad a C++ skeleton);
+// this engine is deliberately SMALLER: it emits the order-1 tier only - the
+// energy density and the first derivatives (vrho_*, vsigma_*) - because plain
+// Vxc assembly consumes first derivatives only; the second/third
+// derivative tiers are a mechanical extension for the analytic-gradient track.
+
+Use("excgrid_cpp_form.ys");
+
+// Replaces each tagged subexpression (lhs, rhs) pair of a CSE list inside
+// the expression - this is what lets the rhoB = 0 limit expressions flow
+// into the derivative code instead of the Tiny-guarded edge values.
+// (The Function() declaration form: `:=` with pattern arguments is not
+// accepted by yacas's -pc mode.)
+Function("ExSubstituteTagged", {sl, e})
+[
+    Local(r);
+    r := e;
+    ForEach(i, sl) [ r := Subst(i[2], i[1]) r; ];
+    r;
+];
+
+// Rebuilds a CSE assignment list for the skeleton: the yacas CSE tags
+// (C1, C2, ...) keep their names on both sides - the skeleton declares
+// `const double C1 = ...` and the reduced expressions reference C1
+// directly (a scheme proven in the reference implementation's generator; a
+// rename would have to reach both sides or the emitted code would not compile).
+Function("ExAssignments", {sl})
+[
+    Local(r);
+    r := {};
+    ForEach(i, sl) [ Push(r, UnList({:=, i[1], i[2]})); ];
+    r;
+];
+
+// Does any atom of `tags` occur in `e`?  The probe is exact atom matching, so
+// the argument sigmaAb never matches sigmaAa or sigmaBb.
+Function("ExAtomOccurs", {tag, e}) [
+    ExCppForm(Subst(tag, ExUnusedProbe) e, ExCppFormMaxPrec()) != ExCppForm(e, ExCppFormMaxPrec());
+];
+
+Function("ExAnyAtomOccurs", {tags, e})
+[
+    Local(found);
+    found := False;
+    ForEach(t, tags) [ If (ExAtomOccurs(t, e), found := True); ];
+    found;
+];
+
+// Does the kernel read this argument?  Checked against the printed expressions
+// AND against the emitted declarations, because the argument appears inside the
+// CSE assignments rather than in the reduced expressions themselves.
+Function("ExParamIsUsed", {sym, exprs, lists})
+[
+    Local(used);
+    used := False;
+    ForEach(x, exprs) [ If (ExAtomOccurs(sym, x), used := True); ];
+    ForEach(sl, lists) [
+        ForEach(d, sl) [ If (ExAtomOccurs(sym, Listify(d)[3]), used := True); ];
+    ];
+    used;
+];
+
+// The silence statements for the arguments a kernel never reads: a
+// spin-unpolarised exchange form never touches sigmaAb, and MSVC reports every
+// such argument as C4100.  A void cast in the body is the one-line form -
+// annotating the parameter itself would reflow the shared signature into one
+// parameter per line, which is the larger diff the annotation was meant to avoid.
+Function("ExUnusedParamSilence", {params, exprs, lists})
+[
+    Local(out);
+    out := "";
+    ForEach(p, params) [
+        If (Not ExParamIsUsed(p[1], exprs, lists),
+            out := ConcatStrings(out, "    (void)", p[2], ";", Nl()));
+    ];
+    out;
+];
+
+RuleBaseListed("ExKernelGenerate", {fname, e, args});
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction, {ra_IsAtom, rb_IsAtom}) <--
+    ExLdaGenerate(fname, e, ra, rb);
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom}) <--
+    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb);
+
+ExLdaGenerate(fname, e, ra, rb) := [
+    // The exact spin-zero limits (the Tiny guard inside the formulas keeps
+    // them finite; the explicit limits give the EXACT one-spin edge values).
+    leA := WithValue(ra, 0, e);
+    If(leA = Undefined, leA := Limit(ra, 0, Right) e);
+    leB := WithValue(rb, 0, e);
+    If(leB = Undefined, leB := Limit(rb, 0, Right) e);
+
+    deDra := Deriv(ra) e;
+    deDrb := Deriv(rb) e;
+
+    {e, ecsl} := CSE(e);
+    {leA, leAcsl} := CSE(leA);
+    {leB, leBcsl} := CSE(leB);
+
+    // Express each spin derivative through the OTHER spin's zero-limit
+    // subexpressions, so the emitted code is exact at the spin edges.
+    deDra := ExSubstituteTagged(leBcsl, deDra);
+    deDrb := ExSubstituteTagged(leAcsl, deDrb);
+
+    {deDra, deDracsl} := CSE(deDra);
+    {deDrb, deDrbcsl} := CSE(deDrb);
+
+    aecsl := ExAssignments(ecsl);
+    aleAcsl := ExAssignments(leAcsl);
+    aleBcsl := ExAssignments(leBcsl);
+    adeDracsl := ExAssignments(deDracsl);
+    adeDrbcsl := ExAssignments(deDrbcsl);
+
+    PatchLoad("excgrid_lda_skeleton.ey");
+];
+
+ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb) := [
+    deDra := Deriv(ra) e;
+    deDrb := Deriv(rb) e;
+    deGaa := Deriv(gaa) e;
+    deGab := Deriv(gab) e;
+    deGbb := Deriv(gbb) e;
+
+    {e, ecsl} := CSE(e);
+
+    // Express the density derivatives through the energy density's common
+    // subexpressions (keeps the emitted code compact; the Tiny guards make
+    // the gamma -> 0 and spin-edge values finite, so no limit branches are
+    // needed in the GGA skeleton).
+    deDra := ExSubstituteTagged(ecsl, deDra);
+    deDrb := ExSubstituteTagged(ecsl, deDrb);
+
+    {deDra, deDracsl} := CSE(deDra);
+    {deDrb, deDrbcsl} := CSE(deDrb);
+    {deGaa, deGaacsl} := CSE(deGaa);
+    {deGab, deGabcsl} := CSE(deGab);
+    {deGbb, deGbbcsl} := CSE(deGbb);
+
+    aecsl := ExAssignments(ecsl);
+    adeDracsl := ExAssignments(deDracsl);
+    adeDrbcsl := ExAssignments(deDrbcsl);
+    adeGaacsl := ExAssignments(deGaacsl);
+    adeGabcsl := ExAssignments(deGabcsl);
+    adeGbbcsl := ExAssignments(deGbbcsl);
+
+    PatchLoad("excgrid_gga_skeleton.ey");
+];
+
+// One branch of a piecewise GGA kernel, built exactly as ExGgaGenerate builds
+// the straight-line one: the energy, the five first derivatives, the density
+// derivatives expressed through the energy's common subexpressions, and the
+// six assignment lists.  Returned as one 12-element list so the caller can
+// bind a whole branch at a time under its own names.
+ExPiecewiseBranch(e, ra, rb, gaa, gab, gbb) := [
+    Local(deDra, deDrb, deGaa, deGab, deGbb);
+    deDra := Deriv(ra) e;
+    deDrb := Deriv(rb) e;
+    deGaa := Deriv(gaa) e;
+    deGab := Deriv(gab) e;
+    deGbb := Deriv(gbb) e;
+
+    {e, ecsl} := CSE(e);
+    deDra := ExSubstituteTagged(ecsl, deDra);
+    deDrb := ExSubstituteTagged(ecsl, deDrb);
+
+    {deDra, deDracsl} := CSE(deDra);
+    {deDrb, deDrbcsl} := CSE(deDrb);
+    {deGaa, deGaacsl} := CSE(deGaa);
+    {deGab, deGabcsl} := CSE(deGab);
+    {deGbb, deGbbcsl} := CSE(deGbb);
+
+    {e, ExAssignments(ecsl),
+     deDra, ExAssignments(deDracsl),
+     deDrb, ExAssignments(deDrbcsl),
+     deGaa, ExAssignments(deGaacsl),
+     deGab, ExAssignments(deGabcsl),
+     deGbb, ExAssignments(deGbbcsl)};
+];
+
+// The piecewise GGA entry point.  `cond` selects the FIRST branch when true;
+// the two expressions must be the same functional on either side of the
+// boundary the condition tests (see excgrid_gga_piecewise_skeleton.ey for the
+// contract, and p86_correlation.ey for the only user so far).
+// The branch names (1 for the condition-true side, 2 for the else side) are
+// what the skeleton's PatchLoad scope reads.
+ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb) := [
+    Local(b1, b2);
+
+    b1 := ExPiecewiseBranch(eLow, ra, rb, gaa, gab, gbb);
+    e1 := b1[1];
+    aecsl1 := b1[2];
+    deDra1 := b1[3];
+    adeDracsl1 := b1[4];
+    deDrb1 := b1[5];
+    adeDrbcsl1 := b1[6];
+    deGaa1 := b1[7];
+    adeGaacsl1 := b1[8];
+    deGab1 := b1[9];
+    adeGabcsl1 := b1[10];
+    deGbb1 := b1[11];
+    adeGbbcsl1 := b1[12];
+
+    b2 := ExPiecewiseBranch(eHigh, ra, rb, gaa, gab, gbb);
+    e2 := b2[1];
+    aecsl2 := b2[2];
+    deDra2 := b2[3];
+    adeDracsl2 := b2[4];
+    deDrb2 := b2[5];
+    adeDrbcsl2 := b2[6];
+    deGaa2 := b2[7];
+    adeGaacsl2 := b2[8];
+    deGab2 := b2[9];
+    adeGabcsl2 := b2[10];
+    deGbb2 := b2[11];
+    adeGbbcsl2 := b2[12];
+
+    pwCond := cond;
+
+    PatchLoad("excgrid_gga_piecewise_skeleton.ey");
+];
+
+// The piecewise entry point the `.ey` calls.  `args` arrives as the atom list
+// in the same order ExKernelGenerate takes it, and is unpacked here rather
+// than pattern-matched in the formal argument list: yacas 1.8 refuses to
+// create a `:=` function whose parameter is a list pattern ("Could not create
+// user function", measured), while indexing the bound list works.
+ExPiecewiseKernelGenerate(fname, cond, eLow, eHigh, args) := [
+    ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh,
+                           args[1], args[2], args[3], args[4], args[5]);
+];

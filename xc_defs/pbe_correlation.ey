@@ -1,0 +1,17 @@
+// excgrid codegen source: the Perdew-Burke-Ernzerhof 1996 GGA correlation
+// functional.  Fresh authorship; formula from the PBE paper
+// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'PbeCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

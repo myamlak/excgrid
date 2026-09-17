@@ -1,0 +1,17 @@
+// excgrid codegen source: the PW92 LDA correlation functional
+// (Perdew-Wang 1992).  Fresh authorship; formula from the PW92 paper
+// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'Pw92Correlation(rhoA, rhoB);
+
+    ExKernelGenerate("Pw92Correlation", e, rhoA, rhoB);
+?>

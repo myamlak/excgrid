@@ -1,0 +1,30 @@
+// excgrid codegen source: the Perdew 1986 GGA correlation functional (the
+// gradient correction on the Perdew-Zunger LDA piece).  Transcribed from the
+// printed paper - J. P. Perdew, Phys. Rev. B 33, 8822 (1986) (docs/mainpage.md
+// references) - not from another tree.
+// Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    // The PZ81 LDA piece this functional is defined on is PIECEWISE at
+    // rs = 1 (Perdew & Zunger, Phys. Rev. B 23, 5048 (1981)): a rational
+    // gamma/(1 + beta1 sqrt(rs) + beta2 rs) above, a logarithmic
+    // a ln rs + b + c rs ln rs + d rs below.  The boundary and the test are
+    // the ones libxc's `lda_c_pz` uses (`my_piecewise3(x >= 1, ec_low,
+    // ec_high)`), so this kernel carries the tree's only branch; the emitted
+    // shape and its contract are documented in
+    // `excgrid_gga_piecewise_skeleton.ey`.
+    cond := X'Rs(rhoA + rhoB) >= 1.;
+    eLow := X'P86CorrelationLow(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+    eHigh := X'P86CorrelationHigh(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExPiecewiseKernelGenerate("P86Correlation", cond, eLow, eHigh,
+                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb});
+?>
