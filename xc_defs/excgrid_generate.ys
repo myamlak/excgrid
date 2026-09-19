@@ -23,6 +23,160 @@ Function("ExSubstituteTagged", {sl, e})
     r;
 ];
 
+// --- Cancelling the removable radical in a gradient derivative -------------
+//
+// The GGA reduced gradients are all proportional to Sqrt(gamma):
+//   X'S(rho, gamma) = 1/2 Sqrt(gamma) / (KF rho + Tiny)   and likewise X'X, X'T.
+// Differentiating any of them w.r.t. gamma therefore leaves
+//   dF/dgamma = (dF/ds) * (ds/dgamma),
+// where dF/ds carries one Sqrt(gamma) (the enhancement is even in s, so
+// dF/ds vanishes at s = 0 like s does) and ds/dgamma carries 1/Sqrt(gamma).
+// Yacas multiplies the two into a single fraction and does NOT cancel the
+// shared Sqrt(gamma), so the emitted quotient is 0/0 at gamma == 0 and the
+// kernel returns NaN there even though the limit is finite and nonzero.
+//
+// This is a REMOVABLE singularity, so the repair is the cancellation and not a
+// guard: the shared factor is an exact subtree of both products, and dividing
+// it out leaves the analytic derivative.  A clamp would put an invented number
+// at the corner; a limit branch would leave the indeterminate quotient in the
+// emitted code and contradict the skeleton's no-branch design.  Measured
+// 2026-09-18: the reduced form's value at gamma = 0 agrees BIT FOR BIT with
+// what the shipped expression already returns at gamma = 5e-324, so the
+// cancellation defines the one undefined point and invents nothing.
+//
+// The transform is deliberately non-recursive and applies only at a top-level
+// division (optionally behind the sign): that is exactly the exchange shape,
+// and a correlation derivative - a sum at the top - is returned unchanged
+// rather than rewritten into a form this generator would not have produced.
+// Cancelling at nested divisions would need a general algebraic simplifier;
+// yacas' Simplify() is one, and it does not terminate on these expressions
+// (measured: > 240 s on the pbe exchange derivative), which is why the
+// transform is a targeted factor cancellation and not a Simplify() call.
+
+// Is the listify'd node `l` the binary operator node `t`?
+Function("ExOpIs", {l, t})
+[
+    If ((Length(l) = 3), (UnList({l[1], ExU, ExV}) = t), False);
+];
+
+// Does the flat factor list `l` contain the factor `x`?
+Function("ExHas", {l, x})
+[
+    Local(hit);
+    hit := False;
+    ForEach(i, l) [ If ((i = x), hit := True); ];
+    hit;
+];
+
+// The factors of a product node, flattened out of yacas' binary Times nesting.
+Function("ExFlatFactors", {e})
+[
+    Local(l);
+    If (IsAtom(e), {e},
+        [
+            l := Listify(e);
+            If (ExOpIs(l, ExU*ExV), Concat(ExFlatFactors(l[2]), ExFlatFactors(l[3])), {e});
+        ]
+    );
+];
+
+// A binary product of two factors, with the identity folded out so that a
+// one-factor list rebuilds as the factor itself.
+Function("ExMul", {a, b})
+[
+    If ((a = 1), b, If ((b = 1), a, UnList({*, a, b})));
+];
+
+// A binary product of a factor list (right-nested, never a multi-argument
+// Times node - yacas does not normalize those and the printer emits them as a
+// function call rather than as an operator expression).
+Function("ExFoldProduct", {l})
+[
+    Local(r);
+    r := 1;
+    ForEach(i, l) [ r := ExMul(r, i); ];
+    r;
+];
+
+// Cancel the factors a division's numerator and denominator share.  A node
+// that is not a division comes back unchanged, and so does a division that
+// shares nothing: rebuilding it when there is nothing to cancel would
+// re-associate the product, and floating-point multiplication is not
+// associative, so an unnecessary rebuild would move values it had no reason to
+// touch.  The guard is what keeps the regeneration set down to the kernels the
+// defect actually reaches.
+Function("ExCancelSharedFactors", {e})
+[
+    Local(l, nf, df, kn, kd);
+    l := Listify(e);
+    If (ExOpIs(l, ExU/ExV),
+        [
+            nf := ExFlatFactors(l[2]);
+            df := ExFlatFactors(l[3]);
+            kn := {}; kd := {};
+            ForEach(a, nf) [ If (Not ExHas(df, a), Push(kn, a)); ];
+            ForEach(b, df) [ If (Not ExHas(nf, b), Push(kd, b)); ];
+            If ((Length(kn) = Length(nf)) And (Length(kd) = Length(df)),
+                e,
+                UnList({/, ExFoldProduct(kn), ExFoldProduct(kd)}));
+        ],
+        e
+    );
+];
+
+// The walk itself, written out rather than handed to yacas' Apply().
+//
+// Apply() is NOT a tree rewriter and must not be used as one here, measured:
+// Apply(id, -a/b) returns a/b - the unary minus is dropped - and
+// Apply(id, c - d*e) returns id(c, d*e), i.e. the binary operator node is
+// replaced by a call to the function.  Either one silently corrupts a
+// derivative, and the first one did: an Apply-based version of this function
+// emitted vsigmaAa with its sign stripped.
+//
+// The entry point for a derivative: step over an optional leading sign, then
+// cancel at the division beneath it.
+//
+// DELIBERATELY NOT RECURSIVE, and the recursion was measured rather than
+// assumed away (2026-09-18).  A recursive walk that cancels at every division
+// in the tree was built, verified correct on the pbe and becke88 shapes, and
+// then rejected on a regression it caused:
+//
+//   * It changed ten generated files against this function's four, and it
+//     BROKE `pbe_correlation` and `pw91_correlation`.  Their vsigma came back
+//     exactly 4x too large at every sampled sigma (measured: ratio 4.000 at
+//     sigma_total 0.001 through 0.1, drifting to 4.16 at 5.0), because the
+//     shared radial in those derivatives is not a plain factor of one quotient
+//     - it sits inside a chain of temporaries where the numerator and the
+//     denominator do not carry it the same number of times, and a syntactic
+//     factor cancellation is simply invalid there.  The suite caught it:
+//     `KernelTest.GgaFiniteDifference` failed on the correlation kernels while
+//     `exc` and both `vrho` channels stayed bit-identical everywhere.
+//   * It did not fix what it was added for.  becke88, pw91 and mpw91 still
+//     return NaN at an exactly zero sigma, and inspecting the emitted code
+//     says why: their second singular site is `asinh(x) / sqrt(sigma)`, i.e.
+//     `C111 / (2 * C102)` with `C111 = log(x + sqrt(1 + x^2))`.  The numerator
+//     vanishes like `x` but is NOT a product carrying the radical, so there is
+//     no common FACTOR to cancel and no cancellation can reach it.  Reaching
+//     that shape needs `asinh(x)/x` written as a function of `x^2`, or a limit
+//     branch - a different change from this one.
+//
+// So the recursion bought two broken kernels and one genuinely-fixed shape
+// that a non-recursive cancellation does not reach anyway.  It stays out.
+Function("ExCancelRadical", {e})
+[
+    Local(l);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 2),
+                If ((UnList({l[1], ExU}) = -ExU),
+                    UnList({l[1], ExCancelSharedFactors(l[2])}),
+                    e),
+                ExCancelSharedFactors(e));
+        ]
+    );
+];
+
 // Rebuilds a CSE assignment list for the skeleton: the yacas CSE tags
 // (C1, C2, ...) keep their names on both sides - the skeleton declares
 // `const double C1 = ...` and the reduced expressions reference C1
@@ -128,12 +282,24 @@ ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb) := [
     deGab := Deriv(gab) e;
     deGbb := Deriv(gbb) e;
 
+    // Cancel the removable Sqrt(gamma) the chain rule leaves in both halves of
+    // each sigma derivative.  Without this the emitted quotient is 0/0 at
+    // gamma == 0 and the kernel returns NaN at an exactly zero gradient, where
+    // the derivative has a finite nonzero limit (ExCancelRadical carries the
+    // measurement).  Carried out BEFORE the CSE so the factor cancels as the
+    // subtree it is, rather than as two temporaries that no longer look equal.
+    deGaa := ExCancelRadical(deGaa);
+    deGab := ExCancelRadical(deGab);
+    deGbb := ExCancelRadical(deGbb);
+
     {e, ecsl} := CSE(e);
 
     // Express the density derivatives through the energy density's common
-    // subexpressions (keeps the emitted code compact; the Tiny guards make
-    // the gamma -> 0 and spin-edge values finite, so no limit branches are
-    // needed in the GGA skeleton).
+    // subexpressions (keeps the emitted code compact).  The Tiny guards keep
+    // the spin edges finite - KF(rho)*rho + Tiny and (rho + Tiny)^(4/3) cannot
+    // be zero - but they say nothing about the gamma edge: no guard is applied
+    // to gamma, and Sqrt(gamma) is exactly zero at gamma == 0.  The gamma edge
+    // is handled by the cancellation above, not by a guard.
     deDra := ExSubstituteTagged(ecsl, deDra);
     deDrb := ExSubstituteTagged(ecsl, deDrb);
 
@@ -165,6 +331,11 @@ ExPiecewiseBranch(e, ra, rb, gaa, gab, gbb) := [
     deGaa := Deriv(gaa) e;
     deGab := Deriv(gab) e;
     deGbb := Deriv(gbb) e;
+
+    // Same cancellation as the straight-line path, so the two agree.
+    deGaa := ExCancelRadical(deGaa);
+    deGab := ExCancelRadical(deGab);
+    deGbb := ExCancelRadical(deGbb);
 
     {e, ecsl} := CSE(e);
     deDra := ExSubstituteTagged(ecsl, deDra);

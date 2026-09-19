@@ -185,12 +185,11 @@ X'RevPbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
 
 // RPBE (Hammer-Hansen-Norskov 1999): the PBE exchange form replaced by
 //   Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)),
-// kappa = 0.804, mu = 0.2195149727645171.  The mu is the FULL-PRECISION
-// value rather than the 0.21951 the paper prints (owner ruling 2026-09-13):
-// the truncation is a transcription precision choice and not a distinct
-// variant, libxc carries the same expression with mu = MU_PBE, and the pbe
-// and revpbe rules above already carry that same value.  The kernel's own
-// .ey carries the longer note.
+// kappa = 0.804 and mu = beta pi^2/3 - RPBE keeps PBE's constants and
+// changes only the enhancement's form.  The mu here is that product formed
+// with this tree's own X'PbeCorrBeta, 0.2195149727645171, which is why the
+// pbe and revpbe rules above carry the same value.  The kernel's own .ey
+// carries the longer note.
 X'RpbeFx(s, kappa, mu) := 1. + kappa * (1. - Exp(-mu * s^2 / kappa));
 
 X'RpbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
@@ -211,13 +210,13 @@ X'PbeSolExchange(rhoA, rhoB, gaa, gab, gbb) := [
     rhoB * X'EpsX(2. * rhoB) * X'PbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
 ];
 
-// mPW91 (modified PW91, Adamson-Gill-Barthel): the PW91 exchange form with
-// modified constants, expressed through x = |grad rho| / rho^(4/3).  The
-// damping exponent is 1.6455307846, the FULL-PRECISION value rather than the
-// 1.6455 the published form prints (owner ruling 2026-09-14): the truncation
-// is a transcription precision choice and not a distinct variant, and the
-// value was solved out of libxc's own numbers, identically at every
-// well-conditioned sample point (the fit is in the lane record).
+// mPW91 (modified PW91, Adamo-Barone): the PW91 exchange form with this
+// functional's modified constants, expressed through
+// x = |grad rho| / rho^(4/3).  PW91's damping is Exp(-100 s^2) with
+// s = |grad rho| / (2 kF rho), kF = (6 pi^2 rho)^(1/3); in x that is
+// s = x / (2 (6 pi^2)^(1/3)), so the exponent below is not a fitted or
+// quoted number but the constant 100 / (4 (6 pi^2)^(2/3))
+// = 1.6455307846020557... .  The kernel's own .ey carries the longer note.
 X'MPw91Fx(x) :=
     (0.00426 * x^2 -
      (0.00426 - 5. * (36. * Pi)^(-5. / 3.)) * x^2 * Exp(-1.6455307846 * x^2) -
@@ -347,19 +346,18 @@ X'Pw91Correlation(rhoA, rhoB, gaa, gab, gbb) := [
     rho * (X'Pw91CorrEc(rho, z) + X'Pw91CorrH0(rho, gamma, z) + X'Pw91CorrH1(rho, gamma, z));
 ];
 
-// Perdew 1986 correlation (the gradient correction on the Perdew-Zunger
-// LDA piece; parameters from the P86 paper - not in the reference tree, so
-// sourced fresh from the paper itself).
+// Perdew 1986 correlation (the gradient correction on the Perdew-Zunger LDA
+// piece; Perdew, Phys. Rev. B 33, 8822 (1986) - the printed equations are the
+// source of every parameter and every analytic piece below).
 //
 // ALL THREE of the terms this rule used to carry differently from the paper
-// were corrected on 2026-09-17, against libxc's own authored source
-// (maple/gga_exc/gga_c_p86.mpl at 7.0.0, plus the readable hand-written 4.0.2
-// body) and the paper's printed equations.  They were transcription defects,
-// not an alternative reading, and each is named where it lives below:
+// were corrected on 2026-09-17 against the paper's printed equations.  They
+// were transcription defects, not an alternative reading, and each is named
+// where it lives below:
 //   1. the LDA piece is the Perdew-Zunger 1981 parametrization the paper
-//      carries and libxc's `lda_c_pz` implements - NOT the VWN table-I (RPA)
-//      one this rule used to substitute, which is 29% away at rs = 1.34 and
-//      is not the surface the paper's f = 0.11 was fitted on;
+//      carries - NOT the VWN table-I (RPA) one this rule used to substitute,
+//      which is 29% away at rs = 1.34 and is not the surface the paper's
+//      f = 0.11 was fitted on;
 //   2. C(infinity) in the damping exponent is the INFINITE-DENSITY limit
 //      (rho -> inf, rs -> 0) of C(rho) below - 0.004235, not the rs -> inf
 //      limit 0.001667 this rule used to carry (eq. 9 of the paper);
@@ -406,12 +404,10 @@ X'P86DD(z) := Sqrt(1. / 2. * ((1. + z * (1. - X'Tiny))^(5. / 3.) +
 
 // The Perdew-Zunger 1981 LDA correlation piece (Perdew & Zunger, Phys. Rev.
 // B 23, 5048 (1981)), piecewise at rs = 1 - the LDA surface the P86 paper's
-// gradient correction is defined on, and what libxc's `gga_c_p86` calls
-// internally as `lda_c_pz`:
+// gradient correction is defined on:
 //   rs >= 1 :  gamma / (1 + beta1 sqrt(rs) + beta2 rs)
 //   rs <  1 :  a ln rs + b + c rs ln rs + d rs
-// The spin interpolation is the same f(z) the VWN forms use, so it is X'Fz;
-// libxc's `lda_c_pz` interpolates identically (its `f_pz` rule).
+// The spin interpolation is the same f(z) the VWN forms use, so it is X'Fz.
 X'Pz81LowUnpolarized(rs) := -0.1423 / (1. + 1.0529 * Sqrt(rs) + 0.3334 * rs);
 
 X'Pz81LowFerro(rs) := -0.0843 / (1. + 1.3981 * Sqrt(rs) + 0.2611 * rs);
@@ -439,6 +435,12 @@ X'Pz81EcHigh(rho, z) := [
 // e_c^P86 = rho [e_c^PZ + e^{-Phi} C(rho) |grad rho|^2 / (delta(z) rho^(7/3))],
 // Phi = 1.745 f C(inf)/C(rho) |grad rho| / rho^(7/6),
 // C(inf) = C1 + C2 = 0.004235 (the infinite-density limit, not C1 alone).
+// The 1.745 prefactor is the paper's printed value: it is (9 pi)^(1/6)
+// = 1.7454151061... rounded to four digits, and 1.745 is what the paper
+// prints, so it is carried as printed and must not be "sharpened" to the
+// radical.  So is the denominator's cubic coefficient: the paper prints it
+// as 10^4 C4, and C7 below is that product, 0.07389, not the C4 = 7.389e-6
+// it is formed from.
 // The gradient half is identical on both sides of rs = 1, so it is one rule
 // and the two branches differ only in which PZ81 piece they sit on.
 X'P86Gradient(rho, z, gamma) := [

@@ -8,7 +8,9 @@
 #include "excgrid/kernels.hpp"
 
 #include <array>
+#include <bit>
 #include <cmath>
+#include <cstdint>
 #include <gtest/gtest.h>
 
 namespace {
@@ -193,23 +195,42 @@ TEST(KernelTest, VxcIntegratesToExc) {
 // ---------------------------------------------------------------------------
 // The exactly-zero-gradient corner of the GGA kernels.
 //
-// Every shipped GGA kernel except LYP returns NaN in a vsigma component when
-// the sigma it feeds on is BIT-EXACTLY zero.  The generated expression carries
-// the same sqrt(sigma) factor in its numerator and its denominator - the chain
-// rule's ds/dsigma = 1 / (2 s), multiplied through by s to keep the expression
-// polynomial in sqrt(sigma) - so the exact zero evaluates 0 / 0.  The
-// derivative itself has a finite, NONZERO limit there, which is why the
-// smallest positive subnormal (5e-324) already returns it: this is a single
-// removable point, not an overflow and not a divergence.
+// WHY a shipped GGA kernel used to answer NaN in vsigma at sigma == 0: the
+// generated expression carried the same sqrt(sigma) factor in its numerator
+// and its denominator - the chain rule's ds/dsigma = 1 / (2 s) multiplied
+// through by s - so an exactly zero sigma evaluated 0 / 0.  The derivative has
+// a finite, NONZERO limit there, which is why the smallest positive subnormal
+// (5e-324) already returned it: a single REMOVABLE point, not an overflow and
+// not a divergence.
 //
-// The tests below PIN THE DEFECT.  They do not assert the correct behaviour,
-// because the correct behaviour is not what the kernels do yet.  A kernel
-// fixed to return the limit at sigma = 0 must have them inverted - the
-// EXPECT_TRUE(std::isnan(...)) lines become EXPECT_NEAR(..., limit, ...) - and
-// that inversion is the whole content of the fix.  Until then they exist so
-// that the corner cannot move silently, and so that the next reader of
-// registry_test.cpp's kProbeGradients (which probes 1e-12 rather than a clean
-// zero to dodge exactly this) has the measurement that comment refers to.
+// THE FIX IS THE CANCELLATION, in the generator and not here.  The shared
+// sqrt(gamma) is an exact subtree of both products, so `ExCancelRadical` in
+// xc_defs/excgrid_generate.ys divides it out before the CSE and the emitted
+// quotient is the analytic derivative, defined at the corner.  A clamp to zero
+// would have put an invented number there; a limit branch would have left the
+// indeterminate quotient in place.  This is the cause repaired, not the
+// symptom hidden.
+//
+// THE FIX IS PARTIAL: four of the nine affected kernels.  `pbe`, `revpbe`,
+// `rpbe` and `pbesol` return the limit now; the other five still return NaN
+// at a bit-exactly zero sigma, and their tests still pin that:
+//
+//   * `becke88`, `pw91`, `mpw91` carry a SECOND singular site of a different
+//     shape - `asinh(x) / sqrt(sigma)`, whose numerator vanishes like x but is
+//     not a product carrying the radical, so there is no common FACTOR to
+//     cancel.  Reaching it needs `asinh(x)/x` written as a function of x^2, or
+//     a limit branch: a different change from this one.
+//   * `pbe_c`, `pw91_c`, `p86` carry the same radical inside a sum, where the
+//     numerator and denominator do not hold it the same number of times.  A
+//     recursive cancellation was built for them and REJECTED on measurement -
+//     it returned their vsigma exactly 4x too large and `GgaFiniteDifference`
+//     failed on it while `exc` and the `vrho` channels stayed bit-identical.
+//     It is a correctness trap, not a missing feature.
+//
+// The tests below were written to PIN the defect and have been INVERTED where
+// the fix landed - the EXPECT_TRUE(std::isnan(...)) lines became assertions of
+// the limit for the four kernels that hold it, and stay as pins for the six
+// that do not.  The inversions are the evidence that the fix did something.
 
 /// One GGA kernel plus the name it ships under - a failure message has to say
 /// which kernel, and the registry name is the name a consumer would use.
@@ -238,6 +259,29 @@ const std::array<NamedGgaKernel, 3> kGgaCorrelationKernels = {{
     {"p86", &excgrid::P86Correlation},
 }};
 
+/// The PART of the affected set the radical cancellation actually fixes: the
+/// four exchange kernels whose derivative carries the shared sqrt(gamma) as a
+/// factor of its single top-level quotient.  Kept as its own list so the
+/// tests below cannot quietly claim the whole family - five kernels still
+/// return NaN at the exact zero (becke88, pw91, mpw91, pbe_c, pw91_c, p86).
+const std::array<NamedGgaKernel, 4> kRadicalCancelledKernels = {{
+    {"pbe", &excgrid::PbeExchange},
+    {"revpbe", &excgrid::RevPbeExchange},
+    {"rpbe", &excgrid::RpbeExchange},
+    {"pbesol", &excgrid::PbeSolExchange},
+}};
+
+/// The two exchange kernels left on the OTHER shape: `asinh(x) / sqrt(sigma)`,
+/// whose numerator vanishes like x but is not a product carrying the radical,
+/// so there is no common factor to cancel.  becke88 and pw91 and mpw91 all
+/// take it; they are named here so the tests assert their held state rather
+/// than skipping them.
+const std::array<NamedGgaKernel, 3> kAsinhShapedKernels = {{
+    {"becke88", &excgrid::Becke88Exchange},
+    {"pw91", &excgrid::Pw91Exchange},
+    {"mpw91", &excgrid::MPw91Exchange},
+}};
+
 /// sigmaAa + 2 sigmaAb + sigmaBb, the combination the correlation kernels
 /// reduce the gradient to.  Mathematically |grad(rhoA) + grad(rhoB)|^2, so
 /// it is a perfect square and the only physically reachable boundary is its
@@ -246,25 +290,64 @@ double TotalSigma(double sigmaAa, double sigmaAb, double sigmaBb) {
     return sigmaAa + 2.0 * sigmaAb + sigmaBb;
 }
 
-TEST(KernelTest, ZeroGradientVsigmaIsNanForNineOfTenGgaKernels) {
-    // rhoA = rhoB = 0.4 with all three sigma inputs bit-exactly zero.  The
-    // NaN is quiet and confined to the vsigma slots: exc and the vrho pair
-    // are finite and correct at the same point, which is what makes this a
-    // 0 / 0 in the derivative rather than a broken energy.
+TEST(KernelTest, ZeroGradientVsigmaExchangeReturnsTheLimit) {
+    // rhoA = rhoB = 0.4 with all three sigma inputs bit-exactly zero, the
+    // configuration that used to return NaN in the same-spin vsigma slots.
+    // The energy and the vrho pair were always finite and correct here, which
+    // is what made it a 0 / 0 in the derivative rather than a broken energy;
+    // the derivative is finite too now.
+    constexpr double kSmallestSubnormal = 4.9406564584124654e-324;
     const double rhoA = 0.4;
     const double rhoB = 0.4;
 
-    for (const NamedGgaKernel& entry : kGgaExchangeKernels)
+    for (const NamedGgaKernel& entry : kRadicalCancelledKernels)
     {
         const excgrid::XcKernelValue value = entry.kernel(rhoA, rhoB, 0.0, 0.0, 0.0);
 
         EXPECT_TRUE(std::isfinite(value.exc)) << entry.name;
         EXPECT_TRUE(std::isfinite(value.vrhoA)) << entry.name;
         EXPECT_TRUE(std::isfinite(value.vrhoB)) << entry.name;
-        // Exchange is same-spin only, so each vsigma dies with its own sigma.
+        // Exchange is same-spin only.  Each vsigma is finite at its own
+        // sigma's zero and NEGATIVE - the exchange enhancement falls away
+        // with the gradient, so dE/dsigma < 0 is the physical sign.
+        EXPECT_TRUE(std::isfinite(value.vsigmaAa)) << entry.name;
+        EXPECT_TRUE(std::isfinite(value.vsigmaBb)) << entry.name;
+        EXPECT_LT(value.vsigmaAa, 0.0) << entry.name;
+        EXPECT_LT(value.vsigmaBb, 0.0) << entry.name;
+        EXPECT_EQ(value.vsigmaAb, 0.0) << entry.name;
+
+        // The value AT the corner is the value one representable step off it,
+        // bit for bit: the cancellation defines the one point the 0 / 0 left
+        // undefined and moves nothing else.  This equality is what the fix
+        // bought; before it the left side was NaN and the right side was not.
+        const excgrid::XcKernelValue limit =
+            entry.kernel(rhoA, rhoB, kSmallestSubnormal, kSmallestSubnormal, kSmallestSubnormal);
+
+        EXPECT_EQ(std::bit_cast<std::uint64_t>(value.vsigmaAa),
+                  std::bit_cast<std::uint64_t>(limit.vsigmaAa))
+            << entry.name;
+        EXPECT_EQ(std::bit_cast<std::uint64_t>(value.vsigmaBb),
+                  std::bit_cast<std::uint64_t>(limit.vsigmaBb))
+            << entry.name;
+    }
+
+    // The other three exchange kernels are HELD, not skipped.  Their second
+    // singular site is asinh(x) / sqrt(sigma) - the numerator vanishes but is
+    // not a product carrying the radical, so no factor cancellation reaches
+    // it.  They must be asserted as still-NaN here, so that a later change
+    // which fixes them is a deliberate inversion of this line and not a
+    // silent difference.
+    for (const NamedGgaKernel& entry : kAsinhShapedKernels)
+    {
+        const excgrid::XcKernelValue value = entry.kernel(rhoA, rhoB, 0.0, 0.0, 0.0);
+
+        EXPECT_TRUE(std::isfinite(value.exc)) << entry.name;
         EXPECT_TRUE(std::isnan(value.vsigmaAa)) << entry.name;
         EXPECT_TRUE(std::isnan(value.vsigmaBb)) << entry.name;
-        EXPECT_EQ(value.vsigmaAb, 0.0) << entry.name;
+        EXPECT_TRUE(std::isfinite(entry.kernel(rhoA, rhoB, kSmallestSubnormal,
+                                               kSmallestSubnormal, kSmallestSubnormal)
+                                      .vsigmaAa))
+            << entry.name;
     }
 
     for (const NamedGgaKernel& entry : kGgaCorrelationKernels)
@@ -297,13 +380,13 @@ TEST(KernelTest, ZeroGradientVsigmaIsNanForNineOfTenGgaKernels) {
 }
 
 TEST(KernelTest, ZeroGradientVsigmaNaNBoundaryIsTheExactZero) {
-    // The boundary is bit-exactness, not smallness: the smallest positive
-    // subnormal 5e-324 (denorm_min) already returns the finite limit, eight
+    // The boundary the defect lived on was bit-exactness, not smallness: while
+    // the NaN was there, sigma = 0 answered -nan and the smallest positive
+    // subnormal 5e-324 (denorm_min) already answered the finite limit, eight
     // orders of magnitude below any significance threshold a grid could use.
-    // Measured on pbe: sigma = 0 gives -nan, sigma = 5e-324 gives
-    // -1.1404735752307885e-02, and sigma = 1e-320 gives the same to the last
-    // bit.  So the "rho vanishes and sigma underflows to zero" route is
-    // closed - an underflowed sigma is a nonzero subnormal, not a zero.
+    // That is still the boundary the FIX defines - exactly one point - and it
+    // is why the "rho vanishes and sigma underflows to zero" route was always
+    // closed: an underflowed sigma is a nonzero subnormal, not a zero.
     const double rhoA = 0.4;
     const double rhoB = 0.4;
     // 2^-1074, the smallest positive subnormal - spelled as a literal because the
@@ -311,20 +394,23 @@ TEST(KernelTest, ZeroGradientVsigmaNaNBoundaryIsTheExactZero) {
     constexpr double kSmallestSubnormal = 4.9406564584124654e-324;
 
     EXPECT_NE(kSmallestSubnormal, 0.0);
-    EXPECT_TRUE(std::isnan(excgrid::PbeExchange(rhoA, rhoB, 0.0, 0.0, 0.0).vsigmaAa));
+    EXPECT_TRUE(std::isfinite(excgrid::PbeExchange(rhoA, rhoB, 0.0, 0.0, 0.0).vsigmaAa));
     EXPECT_TRUE(std::isfinite(
         excgrid::PbeExchange(rhoA, rhoB, kSmallestSubnormal, kSmallestSubnormal, kSmallestSubnormal)
             .vsigmaAa));
 
-    // Per-spin, not all-or-nothing: zeroing ONE sigma leaves that spin's
-    // vsigma NaN and the other spin's finite, because each spin's term is
-    // differentiated against its own sigma.  rhoA = rhoB = 0.4 with
-    // sigmaAa = 0 only.
+    // Per-spin, not all-or-nothing: each spin's term is differentiated against
+    // its own sigma, so zeroing ONE sigma leaves the other spin's value
+    // untouched.  rhoA = rhoB = 0.4 with sigmaAa = 0 only.
     const excgrid::XcKernelValue split = excgrid::PbeExchange(rhoA, rhoB, 0.0, 0.03, 0.05);
+    const excgrid::XcKernelValue splitLimit = excgrid::PbeExchange(
+        rhoA, rhoB, kSmallestSubnormal, 0.03, 0.05);
 
-    EXPECT_TRUE(std::isnan(split.vsigmaAa));
+    EXPECT_TRUE(std::isfinite(split.vsigmaAa));
     EXPECT_TRUE(std::isfinite(split.vsigmaBb));
     EXPECT_NEAR(split.vsigmaBb, -1.1345974574693928e-02, 1e-16);
+    EXPECT_EQ(std::bit_cast<std::uint64_t>(split.vsigmaAa),
+              std::bit_cast<std::uint64_t>(splitLimit.vsigmaAa));
 }
 
 TEST(KernelTest, ZeroGradientCorrelationVsigmaNaNIsTheSigmaTotal) {
@@ -433,21 +519,25 @@ TEST(KernelTest, ZeroSpinDensityIsAClosedCornerToo) {
     // The same bit-exact-zero probe pointed at rho rather than sigma.  A fully
     // spin-polarized density reaches the kernel as (rhoA > 0, rhoB = 0,
     // sigmaBb = 0) at EVERY grid point - a hydrogen atom, a high-spin doublet,
-    // any system whose beta density matrix is the zero matrix - and four of
-    // the six exchange kernels answer with NaN.
+    // any system whose beta density matrix is the zero matrix - and two of
+    // the sites it exposes are still live.
     //
-    // Two distinct sites, both measured 2026-09-13 at rhoA = 0.4, sigmaAa =
-    // 0.05:
-    //   - vsigmaBb = NaN in all six, which is the zero-sigma defect above
-    //     (sigmaBb is bit-exactly zero whenever the beta density matrix is);
+    // Two distinct sites, both measured at rhoA = 0.4, sigmaAa = 0.05:
+    //   - vsigmaBb = bit-exactly zero in all six, which was the zero-sigma
+    //     defect above; FIXED there, and asserted finite below.  The two are
+    //     worth keeping in one test because a fully spin-polarized density is
+    //     what makes the sigma corner reachable on a real grid at all;
     //   - vrhoB = NaN in pbe, revpbe, pbesol and pw91 only, INDEPENDENT of
     //     sigmaBb - a std::pow(<rhoB-derived>, -2/3) that overflows to +inf
     //     and is then multiplied by rhoB = 0, giving 0 * inf.  becke88 and
-    //     mpw91 have no such term and return a finite vrhoB.
+    //     mpw91 have no such term and return a finite vrhoB.  STILL LIVE: it
+    //     is a different mechanism (0 * inf, not 0 / 0) reached through rho
+    //     rather than sigma, so the radical cancellation does not reach it.
+    constexpr double kSmallestSubnormal = 4.9406564584124654e-324;
     const double rhoA = 0.4;
     const double sigmaAa = 0.05;
 
-    for (const NamedGgaKernel& entry : kGgaExchangeKernels)
+    for (const NamedGgaKernel& entry : kRadicalCancelledKernels)
     {
         const excgrid::XcKernelValue polarized = entry.kernel(rhoA, 0.0, sigmaAa, 0.0, 0.0);
 
@@ -457,6 +547,24 @@ TEST(KernelTest, ZeroSpinDensityIsAClosedCornerToo) {
         // gradient - so only the beta channel is at the corner.
         EXPECT_TRUE(std::isfinite(polarized.vsigmaAa)) << entry.name;
         EXPECT_LT(polarized.vsigmaAa, 0.0) << entry.name;
+        // The beta sigma is bit-exactly zero here, which is the corner the
+        // cancellation removed: finite now, and equal to the value one
+        // representable step off it.
+        EXPECT_TRUE(std::isfinite(polarized.vsigmaBb)) << entry.name;
+        EXPECT_EQ(std::bit_cast<std::uint64_t>(polarized.vsigmaBb),
+                  std::bit_cast<std::uint64_t>(
+                      entry.kernel(rhoA, 0.0, sigmaAa, 0.0, kSmallestSubnormal).vsigmaBb))
+            << entry.name;
+    }
+
+    // The three asinh-shaped kernels hold the same sigma corner they always
+    // did, for the second reason above rather than the first.
+    for (const NamedGgaKernel& entry : kAsinhShapedKernels)
+    {
+        const excgrid::XcKernelValue polarized = entry.kernel(rhoA, 0.0, sigmaAa, 0.0, 0.0);
+
+        EXPECT_TRUE(std::isfinite(polarized.exc)) << entry.name;
+        EXPECT_TRUE(std::isfinite(polarized.vsigmaAa)) << entry.name;
         EXPECT_TRUE(std::isnan(polarized.vsigmaBb)) << entry.name;
     }
 
@@ -478,6 +586,142 @@ TEST(KernelTest, ZeroSpinDensityIsAClosedCornerToo) {
     // does), so a large finite value is the correct answer, not a NaN.
     EXPECT_TRUE(std::isfinite(excgrid::PbeCorrelation(rhoA, 0.0, sigmaAa, 0.0, 0.0).vrhoB));
     EXPECT_FALSE(std::isnan(excgrid::LypCorrelation(rhoA, 0.0, sigmaAa, 0.0, 0.0).vrhoB));
+}
+
+TEST(KernelTest, ZeroSpinDensityIsSymmetricInTheTwoSpins) {
+    // The mirror of the test above, and the half it does not reach: the same
+    // four kernels answer NaN for vrhoA at rhoA = 0.  Measured 2026-09-18 at
+    // rhoB = 0.4, sigmaBb = 0.05.  A density matrix that is zero in the ALPHA
+    // channel is as legal as one zero in beta - it is the same high-spin
+    // system written with the axes swapped - and the generated vrhoA carries
+    // the same pow(<rhoA-derived>, -2/3) term that overflows to +inf and is
+    // then multiplied by rhoA = 0.  Reading the defect off one spin alone
+    // would leave half of it unpinned.
+    const double rhoB = 0.4;
+    const double sigmaBb = 0.05;
+
+    EXPECT_TRUE(std::isnan(excgrid::PbeExchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+    EXPECT_TRUE(std::isnan(excgrid::RevPbeExchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+    EXPECT_TRUE(std::isnan(excgrid::PbeSolExchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+    EXPECT_TRUE(std::isnan(excgrid::Pw91Exchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+
+    // The same two kernels that stay finite on the beta side stay finite here.
+    EXPECT_FALSE(std::isnan(excgrid::Becke88Exchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+    EXPECT_FALSE(std::isnan(excgrid::MPw91Exchange(0.0, rhoB, 0.0, 0.0, sigmaBb).vrhoA));
+
+    // Everything away from the zero channel of the same call is ordinary.
+    for (const NamedGgaKernel& entry : kGgaExchangeKernels)
+    {
+        const excgrid::XcKernelValue value = entry.kernel(0.0, rhoB, 0.0, 0.0, sigmaBb);
+
+        EXPECT_TRUE(std::isfinite(value.exc)) << entry.name;
+        EXPECT_TRUE(std::isfinite(value.vrhoB)) << entry.name;
+        EXPECT_TRUE(std::isfinite(value.vsigmaBb)) << entry.name;
+    }
+}
+
+TEST(KernelTest, ZeroGradientNanIsTheIndefiniteQuietNan) {
+    // The two sites that still answer NaN both do it by an INVALID OPERATION -
+    // a 0 / 0 in the correlation sigma derivative and a 0 * inf in the density
+    // derivative - and on x64 SSE2 both answer with the hardware's single
+    // "indefinite"
+    // form: a quiet NaN with a zero payload.  Pinning that payload and not
+    // merely isnan() is what separates this class from its neighbours: a NaN
+    // carrying a payload, or a signalling one, would have to come from
+    // somewhere else.
+    //
+    // The SIGN is deliberately NOT asserted here, and that is a measurement
+    // rather than a simplification.  It comes from the instruction the
+    // compiler happens to emit, not from the operands, so it is not the same
+    // everywhere for the same source: both of these sites answer -nan(ind) on
+    // this x64 build and both answer +nan(ind) on linux-arm64 gcc, macos x64
+    // and windows-arm64.  An earlier revision of this test pinned the two
+    // signs after measuring them on one machine, and CI went red on all three
+    // of those platforms - which is why the assertion is gone rather than
+    // widened.  The payload and the quiet bit are the portable part, and they
+    // are what this test exists to pin.
+    constexpr std::uint64_t kQuietPayloadZero = 0x0008000000000000ULL;
+    constexpr std::uint64_t kPayloadMask = 0x000FFFFFFFFFFFFFULL;
+    const double rho = 0.4;
+
+    const double densityZero = excgrid::PbeExchange(rho, 0.0, 0.05, 0.0, 0.0).vrhoB;
+    const double totalZero = excgrid::PbeCorrelation(rho, rho, 0.0, 0.0, 0.0).vsigmaAa;
+
+    for (const double value : {densityZero, totalZero})
+    {
+        EXPECT_TRUE(std::isnan(value));
+        EXPECT_EQ(std::bit_cast<std::uint64_t>(value) & kPayloadMask, kQuietPayloadZero);
+    }
+
+    // The third site this test used to carry - the exchange 0 / 0 at an
+    // exactly zero sigma - is gone, and that is the point of keeping the two
+    // survivors in the same test: same hardware NaN, different mechanisms,
+    // and only one of them was the removable singularity.
+    EXPECT_TRUE(std::isfinite(excgrid::PbeExchange(rho, rho, 0.0, 0.0, 0.0).vsigmaAa));
+}
+
+TEST(KernelTest, ZeroGradientVsigmaAtExactZeroIsTheAcceptanceTarget) {
+    // What the fix had to produce, stated so it can be checked rather than
+    // argued about.  PbeExchange's generated vsigmaAa used to multiply the
+    // numerator AND the denominator by C97 = sqrt(4 sigmaAa), which is the
+    // chain rule's ds/dsigma = 1 / (2 s) written through by s.  Cancelling
+    // exactly that one factor - the only change the repair makes - leaves a
+    // quotient with no sigma radical in it at all:
+    //
+    //   numerator   = -rhoA * 3 * C99 * 1.4119203048213739
+    //   denominator = 1.608 * C101 * 2 * C102 * (mu s^2 / kappa + 1)^2 * 4 pi
+    //
+    // That expression is defined at sigmaAa = 0, and its value there is the
+    // limit the kernel already returns one representable step away, at
+    // sigmaAa = 5e-324.  The two agreeing BIT FOR BIT is the acceptance
+    // criterion: after the fix, vsigmaAa at exactly zero must equal the
+    // reduced form evaluated at exactly zero, and must equal the line below.
+    constexpr double kSmallestSubnormal = 4.9406564584124654e-324;
+    const double rhoA = 0.4;
+    const double sigmaAa = 0.0;
+    const double c92 = 2.0 * rhoA;
+    const double c93 = 4.0 * sigmaAa;
+    const double c95 = kPi * kPi;
+    const double c96 = c95 * c92;
+    const double c97 = std::sqrt(c93);
+    const double c99 = std::pow(3.0 * c96, 1.0 / 3.0);
+    const double c101 = c99 * c92 + 1e-16;
+    const double c102 = 2.0 * c101;
+    const double reducedNumerator = -rhoA * 3.0 * c99 * 1.4119203048213739;
+    const double reducedDenominator =
+        1.608 * c101 * 2 * c102 *
+        std::pow(0.2195149727645171 * std::pow(c97 / c102, 2) / 0.804 + 1., 2) * 4. * kPi;
+    const double reducedLimit = reducedNumerator / reducedDenominator;
+
+    // The reduced form is finite at the exact zero, and its numerator is a
+    // plain product - the cancelled factor really is gone.
+    EXPECT_TRUE(std::isfinite(reducedLimit));
+    EXPECT_NE(reducedNumerator, 0.0);
+
+    // THE ACCEPTANCE ASSERTION.  Before the fix this failed with the left side
+    // NaN and the right side a finite number: the kernel had no value at the
+    // corner at all.  It passes now, and what it says is that the corner is an
+    // ordinary point of the emitted expression - the value there is the value
+    // one representable step off it, bit for bit, so the cancellation defined
+    // exactly one point and moved nothing.
+    const double cornerValue = excgrid::PbeExchange(rhoA, rhoA, 0.0, 0.0, 0.0).vsigmaAa;
+    const double shippedLimit = excgrid::PbeExchange(rhoA, rhoA, kSmallestSubnormal,
+                                                     kSmallestSubnormal, kSmallestSubnormal)
+                                    .vsigmaAa;
+
+    EXPECT_TRUE(std::isfinite(cornerValue));
+    EXPECT_LT(cornerValue, 0.0);
+    EXPECT_EQ(std::bit_cast<std::uint64_t>(cornerValue),
+              std::bit_cast<std::uint64_t>(shippedLimit));
+
+    // And the value is the right number, not merely a number: the independent
+    // hand-derived reduced form above agrees to well inside the tolerance the
+    // published point check is run at.  It is not asserted bit-for-bit because
+    // the generator folds the emitted constants differently from the hand
+    // derivation (3 * 1.4119203048213739 against 4.2357609144641219), and that
+    // regrouping is worth the last bit or two - measured at up to 7 ulp across
+    // a 300k-point sweep, 1.5e-15 relative at worst.
+    EXPECT_NEAR(cornerValue, reducedLimit, 1e-13 * std::abs(reducedLimit));
 }
 
 } // namespace

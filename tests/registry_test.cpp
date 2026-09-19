@@ -127,8 +127,7 @@ TEST(RegistryTest, LdaComposites) {
 // documentation).
 //
 // This guard fixtures that RULE rather than the four entries that broke it -
-// b3lyp, b3pw91, b3p86 and bhandhlyp, whose 22-entry sweep lives in
-// .claude/lane-status/ks-hybrid-exchange-hunt-lane.md section 6:
+// b3lyp, b3pw91, b3p86 and bhandhlyp, the four the sweep found:
 //
 //     a recipe's DFT exchange is split exactly once, so
 //

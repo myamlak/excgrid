@@ -162,8 +162,7 @@ void BuildShellWindow(const Geometry& geometry,
 // the same factors in the same order as the full N^2 form, so the weights
 // are unchanged.  With the shell window in front of it the pass visits the
 // local atoms instead of the molecule: measured 2.25 candidate atoms per
-// point at 48 atoms and 3.18 at 384 (lane record becke-partition-cost-lane,
-// 2026-09-13).
+// point at 48 atoms and 3.18 at 384 (measured 2026-09-13).
 double OwnerPartitionWeight(const std::array<double, 3>& point,
                             const Geometry& geometry,
                             PartitionScratch& scratch,
@@ -417,9 +416,8 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
     // is the next free point".  In the endgame it dominates the pass - 81-87 %
     // of the seeds run with 10 % or less of the pool free and walk 67-184
     // times the uniform gap between free points, measured 1999-5368 probes per
-    // block (lane record becke-partition-lane, 2026-09-15).  One bit per point
-    // answers it a word at a time; an index per point costs 64 times the
-    // memory for no measured gain.
+    // block (measured 2026-09-15).  One bit per point answers it a word at a
+    // time; an index per point costs 64 times the memory for no measured gain.
     std::vector<std::uint64_t> freeWords(count / 64 + 1, ~0ull);
 
     if (count % 64 != 0)

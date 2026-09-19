@@ -31,6 +31,9 @@ The formulas and data the kernels implement:
   (1996) 3865.
 - revPBE: Y. Zhang, W. Yang, *Comment on "Generalized gradient
   approximation made simple"*, Phys. Rev. Lett. 80 (1998) 890.
+- RPBE: B. Hammer, L. B. Hansen, J. K. Norskov, *Improved adsorption
+  energetics within density functional theory using revised PBE
+  functionals*, Phys. Rev. B 59 (1999) 7413.
 - PBEsol: J. P. Perdew et al., *Restoring the density-gradient expansion
   for exchange in solids and surfaces*, Phys. Rev. Lett. 100 (2008)
   136406.

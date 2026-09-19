@@ -1,12 +1,15 @@
 // excgrid codegen source: the mPW91 (modified PW91) GGA exchange
-// functional (Adamson-Gill-Barthel).  Fresh authorship; the form is the
-// published one (docs/mainpage.md references), and its damping exponent is
-// 1.6455307846 - the FULL-PRECISION value, not the 1.6455 the published form
-// prints.  Owner ruling 2026-09-14: the truncation was a transcription
-// precision choice, not a distinct variant of mPW91, and the value was
-// solved out of the oracle's own numbers (identically at every
-// well-conditioned sample point; the fit is in the lane record and the
-// comparison in tools/verify_pyscf.py).  Regenerate with tools/regenerate.py.
+// functional (Adamo-Barone).  Fresh authorship; the form is the published
+// PW91 exchange with this functional's modified constants.
+//
+// The damping exponent, re-derived here rather than quoted at one digit
+// count: PW91 damps with Exp(-alpha s^2), alpha = 100, where
+// s = |grad rho| / (2 kF rho) and kF = (6 pi^2 rho)^(1/3) is the
+// spin-density Fermi wavevector.  This kernel works in the variable
+// x = |grad rho| / rho^(4/3), so s = x / (2 (6 pi^2)^(1/3)) and the damping
+// is Exp(-100 / (4 (6 pi^2)^(2/3)) * x^2).  The exponent below is that
+// constant - 1.6455307846020557... - carried at double precision, so no
+// digit of it is a free parameter.  Regenerate with tools/regenerate.py.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
@@ -18,9 +21,8 @@
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
 // contributions vanish with the spin density).
-
-// Auto-generated file, do not modify
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>

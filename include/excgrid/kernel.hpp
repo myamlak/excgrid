@@ -15,9 +15,9 @@ namespace excgrid {
 /// (vsigma).
 
 /// One per-point XC kernel evaluation: the energy density and its first
-/// derivatives.  A plain aggregate (the public fields are the API) with
-/// the Lane-U-style algebra - value and derivatives in one struct,
-/// functionals compose via `+` and scalar `*`.  The tau slots are
+/// derivatives.  A plain aggregate (the public fields are the API) holding
+/// value and derivatives together, so functionals compose via `+` and
+/// scalar `*`.  The tau slots are
 /// reserved for the meta-GGA extension: present in every result, zero
 /// from every shipped LDA/GGA kernel, so the extension is additive.
 /// \ingroup excgrid-kernel

@@ -1,7 +1,24 @@
-// ExCppForm: convert Yacas objects to C++ source text - the excgrid
-// printer, fresh-authored for this project (the yacas-standard idiom
-// of rule-based form printing; that of an independent implementation is
-// the design precedent, not the text).
+// ExCppForm: convert Yacas objects to C++ source text - the excgrid printer.
+//
+// LICENCE.  The rule FRAME of this file derives from the CForm printer that
+// ships with the Yacas standard library, vendored in this repository at
+// `tools/yacas/share/yacas/scripts/c_form.rep/code.ys`.  Yacas is
+// LGPL-2.1-or-later (`tools/yacas/COPYING.LESSER`, `tools/yacas/COPYING`;
+// see THIRD_PARTY_NOTICES.md), so THIS FILE is distributed under those terms
+// and not under excgrid's BSD-3-Clause.  It is maintainer codegen tooling:
+// never linked into the library, never invoked by a build, and the C++ text
+// it emits is excgrid's own output.
+//
+// What the frame follows: the RuleBase pair (one- and two-argument), the
+// precedence constant 60000 that is never bracketed, the guard function over
+// IsBoolean/IsString, the rule numbers and predicate names for integers, zero,
+// numbers, atoms and strings, and the LocalSymbols table of math-function
+// renames.
+//
+// What is this project's own, written for C++ output and for yacas 1.8's
+// precedence model: the bracketing policy below, the std:: names, the
+// ordering-comparison and Not rules, the assignment and CSE forms, and the
+// hooks the excgrid generator drives.
 
 RuleBase("ExCppForm", {expression});
 RuleBase("ExCppForm", {expression, precedence});

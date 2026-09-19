@@ -31,11 +31,16 @@ library `-d`/`--rootdir` needs). Excluded from the release zip: the Qt GUI
 
 ## License
 
-Yacas is **LGPL-2.1** (per the upstream repository's declared license).
-As a maintainer-side code-generation tool, Yacas is never linked into or
-redistributed with excgrid binaries; only its OUTPUT (the committed
-`excgrid/generated/*.cpp`, generated from this project's own `.ey` input
-scripts) enters the library. See `THIRD_PARTY_NOTICES.md`.
+Yacas is **LGPL-2.1-or-later**: upstream declares version 2.1 or, at your
+discretion, any later version, and the vendored `bin/yacas.exe` prints the
+same grant in its own startup banner.  As a maintainer-side
+code-generation tool, Yacas is never linked into the library and never
+invoked by a build; only its OUTPUT (the committed `excgrid/generated/*.cpp`,
+generated from this project's own `.ey` input scripts) enters the library.
+The vendored subset itself - this directory - is redistributed as part of
+this repository, so LGPL-2.1 section 4 governs it and the corresponding-source
+offer recorded in `THIRD_PARTY_NOTICES.md` applies.  See that file, and
+`COPYING.LESSER` / `COPYING` here for the license texts.
 
 ## Reproducibility
 

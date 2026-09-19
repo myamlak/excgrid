@@ -1,14 +1,15 @@
 // excgrid codegen source: the Hammer-Hansen-Norskov 1999 revised PBE GGA
-// exchange functional (RPBE).  Fresh authorship.  The enhancement factor
-// Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)) has kappa = 0.804 and
-// mu = 0.2195149727645171 - the FULL-PRECISION value, not the 0.21951 the
-// paper prints.  Owner ruling 2026-09-13: the truncation was a transcription
-// precision choice, not a distinct variant of RPBE, libxc's kernel is
-// algebraically the same expression with mu = MU_PBE, and this tree's own
-// pbe and revpbe rules already carry that value - so matching it is internal
-// consistency, not adopting another code's definition.  The form itself is
-// still the published enhancement factor.  Verified against the oracle by
-// excgrid/tools/verify_pyscf.py.  Regenerate with tools/regenerate.py.
+// exchange functional (RPBE).  Fresh authorship.
+//
+// The enhancement factor Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)) has
+// kappa = 0.804 and mu = beta pi^2 / 3, the PBE relation, evaluated with
+// this tree's own full-precision PBE beta (X'PbeCorrBeta).  That product is
+// 0.2195149727645171 - the standard PBE mu, and the same value the tree's
+// pbe and revpbe rules carry - and it is what RPBE uses: RPBE keeps PBE's
+// kappa and mu and changes only the enhancement's FORM, from PBE's rational
+// expression to this exponential one.
+// Verified against the oracle by excgrid/tools/verify_pyscf.py.
+// Regenerate with tools/regenerate.py.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
@@ -20,9 +21,8 @@
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
 // contributions vanish with the spin density).
-
-// Auto-generated file, do not modify
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>
@@ -116,38 +116,34 @@ XcKernelValue RpbeExchange(
         (4. * Pi);
 
     const double C94 = 2. * rhoA;
-    const double C95 = 4. * sigmaAa;
-    const double C96 = 1. / 3.;
-    const double C97 = std::pow(Pi, 2);
-    const double C98 = C97 * C94;
-    const double C99 = std::sqrt(C95);
-    const double C100 = 3. * C98;
-    const double C101 = std::pow(C100, C96);
-    const double C102 = C101 * C94;
-    const double C103 = C102 + 1e-16;
-    const double C104 = 2. * C103;
+    const double C95 = 1. / 3.;
+    const double C96 = std::pow(Pi, 2);
+    const double C97 = C96 * C94;
+    const double C98 = 3. * C97;
+    const double C99 = std::pow(C98, C95);
+    const double C100 = C99 * C94;
+    const double C101 = C100 + 1e-16;
 
-    result.vsigmaAa = -rhoA * 3. * C101 * 0.804 *
-                      std::exp(-0.2195149727645171 * std::pow(C99 / C104, 2) / 0.804) *
-                      1.7561197821161368 * C99 / (1.608 * C103 * 2 * C99 * C104 * 4. * Pi);
+    result.vsigmaAa =
+        -4.2357609144641219 *
+        std::exp(-0.2195149727645171 * std::pow(std::sqrt(4. * sigmaAa) / (2. * C101), 2) / 0.804) *
+        C99 * rhoA / (0.25728e2 * Pi * std::pow(C101, 2));
 
     result.vsigmaAb = 0;
 
-    const double C107 = 2. * rhoB;
-    const double C108 = 4. * sigmaBb;
-    const double C109 = 1. / 3.;
-    const double C110 = std::pow(Pi, 2);
-    const double C111 = C110 * C107;
-    const double C112 = std::sqrt(C108);
-    const double C113 = 3. * C111;
-    const double C114 = std::pow(C113, C109);
-    const double C115 = C114 * C107;
-    const double C116 = C115 + 1e-16;
-    const double C117 = 2. * C116;
+    const double C104 = 2. * rhoB;
+    const double C105 = 1. / 3.;
+    const double C106 = std::pow(Pi, 2);
+    const double C107 = C106 * C104;
+    const double C108 = 3. * C107;
+    const double C109 = std::pow(C108, C105);
+    const double C110 = C109 * C104;
+    const double C111 = C110 + 1e-16;
 
-    result.vsigmaBb = -rhoB * 3. * C114 * 0.804 *
-                      std::exp(-0.2195149727645171 * std::pow(C112 / C117, 2) / 0.804) *
-                      1.7561197821161368 * C112 / (1.608 * C116 * 2 * C112 * C117 * 4. * Pi);
+    result.vsigmaBb =
+        -4.2357609144641219 *
+        std::exp(-0.2195149727645171 * std::pow(std::sqrt(4. * sigmaBb) / (2. * C111), 2) / 0.804) *
+        C109 * rhoB / (0.25728e2 * Pi * std::pow(C111, 2));
 
     return result;
 }

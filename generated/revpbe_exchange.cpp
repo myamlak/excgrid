@@ -13,9 +13,8 @@
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
 // contributions vanish with the spin density).
-
-// Auto-generated file, do not modify
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>
@@ -103,40 +102,40 @@ XcKernelValue RevPbeExchange(
                    (4. * Pi);
 
     const double C92 = 2. * rhoA;
-    const double C93 = 4. * sigmaAa;
-    const double C94 = 1. / 3.;
-    const double C95 = std::pow(Pi, 2);
-    const double C96 = C95 * C92;
-    const double C97 = std::sqrt(C93);
-    const double C98 = 3. * C96;
-    const double C99 = std::pow(C98, C94);
-    const double C100 = C99 * C92;
-    const double C101 = C100 + 1e-16;
-    const double C102 = 2. * C101;
+    const double C93 = 1. / 3.;
+    const double C94 = std::pow(Pi, 2);
+    const double C95 = C94 * C92;
+    const double C96 = 3. * C95;
+    const double C97 = std::pow(C96, C93);
+    const double C98 = C97 * C92;
+    const double C99 = C98 + 1e-16;
 
     result.vsigmaAa =
-        -rhoA * 3. * C99 * 2.1863691287345903 * C97 /
-        (2.49 * C101 * 2 * C97 * C102 *
-         std::pow(0.2195149727645171 * std::pow(C97 / C102, 2) / 1.245 + 1., 2) * 4. * Pi);
+        -6.5591073862037709 * C97 * rhoA /
+        (0.3984e2 * Pi *
+         std::pow(0.2195149727645171 * std::pow(std::sqrt(4. * sigmaAa) / (2. * C99), 2) / 1.245 +
+                      1.,
+                  2) *
+         std::pow(C99, 2));
 
     result.vsigmaAb = 0;
 
-    const double C105 = 2. * rhoB;
-    const double C106 = 4. * sigmaBb;
-    const double C107 = 1. / 3.;
-    const double C108 = std::pow(Pi, 2);
-    const double C109 = C108 * C105;
-    const double C110 = std::sqrt(C106);
-    const double C111 = 3. * C109;
-    const double C112 = std::pow(C111, C107);
-    const double C113 = C112 * C105;
-    const double C114 = C113 + 1e-16;
-    const double C115 = 2. * C114;
+    const double C102 = 2. * rhoB;
+    const double C103 = 1. / 3.;
+    const double C104 = std::pow(Pi, 2);
+    const double C105 = C104 * C102;
+    const double C106 = 3. * C105;
+    const double C107 = std::pow(C106, C103);
+    const double C108 = C107 * C102;
+    const double C109 = C108 + 1e-16;
 
     result.vsigmaBb =
-        -rhoB * 3. * C112 * 2.1863691287345903 * C110 /
-        (2.49 * C114 * 2 * C110 * C115 *
-         std::pow(0.2195149727645171 * std::pow(C110 / C115, 2) / 1.245 + 1., 2) * 4. * Pi);
+        -6.5591073862037709 * C107 * rhoB /
+        (0.3984e2 * Pi *
+         std::pow(0.2195149727645171 * std::pow(std::sqrt(4. * sigmaBb) / (2. * C109), 2) / 1.245 +
+                      1.,
+                  2) *
+         std::pow(C109, 2));
 
     return result;
 }

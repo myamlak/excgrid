@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Isolated Exc/Vxc point checks: excgrid kernels vs Libxc (via pyscf).
 
-The linux leg of `.github/workflows/excgrid.yml` (Python 3.12,
+The linux leg of `.github/workflows/ci.yml` (Python 3.12,
 requirements-verif.txt): samples (rhoA, rhoB, sigma) points, evaluates each
 shipped excgrid kernel through the kernel-probe binary and the corresponding
 Libxc functional through pyscf's own Libxc wrapper (pyscf.dft.libxc.eval_xc),
@@ -23,8 +23,8 @@ relative paths, so the command works from any checkout location:
 A Ninja build puts the same probe at `build/excgrid-kernel-probe`, which is
 the default when `--probe` is omitted.
 
-What the run measures now (2026-09-14, after the owner ruled `rpbe` and
-`mpw91` to full precision and both were regenerated): 16 of the 18 compared
+What the run measures now (measured 2026-09-14, after `rpbe` and `mpw91` were
+moved to their full-precision constants and regenerated): 16 of the 18 compared
 kernels reproduce Libxc to 8.24e-09 or better - 15 of them to 5.75e-13 and 8
 to 8.85e-15, per-functional max over the compared slots, from the table the
 run now prints (corrected 2026-09-15: the earlier wording here claimed "15 of
@@ -34,28 +34,28 @@ is at 4.7e-16 on exc, 6.2e-16 on vrhoA, 5.8e-15 and 3.3e-14 on two vsigma
 slots and 0.0 on the third, and `mpw91` came from 5.554e-06 to 3.702e-13 at
 its worst - with no mismatch in either. Two do not, and for those two the
 first question is not which value is right but whether the two sides compute
-the SAME functional, so they were compared as FUNCTIONS and against Libxc's
-source (`src/gga_x_rpbe.c` and `src/util.h`, `src/gga_c_p86.c`, the maple2c
-kernels) rather than against its numbers:
+the SAME functional, so they were compared as FUNCTIONS - each side identified
+by the published parametrization it implements - rather than by matching
+numbers:
 
 - `p86` was recorded here until 2026-09-17 as a DIFFERENT FORM in three named
-  terms, "expected, not a defect". Re-examination against Libxc's own authored
-  source (`maple/gga_exc/gga_c_p86.mpl` at 7.0.0, and the readable hand-written
-  4.0.2 body) and against the paper's printed equations shows all three terms
-  are transcription defects of THIS repo's rule, not an alternative published
+  terms, "expected, not a defect". Re-examination against the paper's printed
+  equations (Perdew, Phys. Rev. B 33, 8822 (1986)) shows all three terms are
+  transcription defects of THIS repo's rule, not an alternative published
   form, and all three are corrected in `xc_defs/excgrid_defs.ys`:
   (1) the damping exponent's C(infinity) is the INFINITE-DENSITY limit,
   aa + bb = 0.004235 - not the rs -> infinity limit aa = 0.001667 the rule
   carried. The old note's measured exponent ratio, 2.5414 / 2.5401 / 2.5412,
   is 0.004235 / 0.001667 = 2.54049: the old note measured the defect correctly
-  and then ruled that it belonged to the paper rather than to us.
+  and then read it as the paper's choice rather than as this rule's.
   (2) the gradient term is divided by the paper's spin factor
-  delta(z) = sqrt(((1 + z)^(5/3) + (1 - z)^(5/3)) / 2), for which the old rule
-  had no denominator (Libxc calls it `p86_DD`, eq. 4 of the paper).
+  delta(z) = sqrt(((1 + z)^(5/3) + (1 - z)^(5/3)) / 2), which the old rule had
+  no denominator for (eq. 4 of the paper).
   (3) the LDA baseline was the VWN-RPA (table I) parametrization where the
-  paper and Libxc carry the Perdew-Zunger 1981 piecewise one (`lda_c_pz`) -
-  the two sigma = 0 limits ARE `lda_c_vwn_rpa` and `lda_c_pz` to 1e-15, 29%
-  apart at rs = 1.34. It was the whole of the remaining residual and is
+  paper carries the Perdew-Zunger 1981 piecewise one (Perdew & Zunger, Phys.
+  Rev. B 23, 5048 (1981)) - the two sigma = 0 limits are 29% apart at
+  rs = 1.34, and the oracle's matches the PZ81 one to 1e-15.  It was the whole
+  of the remaining residual and is
   corrected too: PZ81 is piecewise at rs = 1 (a rational above, a logarithmic
   form below), so `p86` is now the tree's only branch-carrying kernel -
   `xc_defs/excgrid_gga_piecewise_skeleton.ey` carries the emitted shape and
@@ -65,20 +65,21 @@ kernels) rather than against its numbers:
   the run's total went from 114 mismatches to 0. The two analytic corrections
   alone had moved the `exc` slot's worst only 6.55e+01 -> 7.56e+00, so the
   residual was entirely the LDA term, as that intermediate measurement said.
-- `rpbe` is the SAME FORM with one truncated constant, and the owner ruled it
-  fixed 2026-09-14: full-precision mu. Libxc's own expression is F = 1 +
-  kappa(1 - exp(-mu s^2/kappa)) with kappa 0.8040 and mu = MU_PBE
-  = 0.2195149727645171; an analytic RPBE reproduced our kernel to 3.2e-16 and
-  Libxc to 4.7e-16 across all 18 sampled points with that mu.
-- `mpw91` was the same class and is now applied: its damping exponent
-  `Exp(-alpha x^2)` carried alpha = 1.6455 where Libxc's value, solved from
-  its own numbers at 22 points across two densities, is 1.6455307846 (nine
-  digits identical at every well-conditioned point; a two-parameter fit
-  reproducing Libxc with a max log-residual of 4.4e-12). The solve cannot
-  resolve the two values at spin-polarised points - the exponent's lever on
-  `exc` is below 1e-8 there - so the identification rests on the unpolarised
-  points, and this run's polarised points going green is the independent
-  check on it.
+- `rpbe` is the PBE enhancement with the exponential FORM: kappa = 0.804 and
+  mu = beta pi^2/3, both PBE's own constants. Our mu is that product formed
+  with the tree's full-precision beta (`X'PbeCorrBeta`), 0.2195149727645171,
+  which is also what the other PBE-family rules here carry; the oracle uses
+  the same constant. An analytic RPBE reproduced our kernel to 3.2e-16 and
+  the oracle to 4.7e-16 across all 18 sampled points.
+- `mpw91` is the same class and is now applied. Its damping exponent is not
+  a quoted number: PW91 damps with `Exp(-100 s^2)` in the reduced gradient
+  s = |grad rho| / (2 kF rho), kF = (6 pi^2 rho)^(1/3), and this kernel works
+  in x = |grad rho| / rho^(4/3), so the exponent is exactly
+  100 / (4 (6 pi^2)^(2/3)) = 1.6455307846020557... . The kernel carried a
+  five-digit alpha before and now carries that constant; the oracle's
+  independent agreement to nine digits at every well-conditioned sampled
+  point (this run, 22 points across two densities) is the check on the
+  change, not its source.
 - `pw91_c` is NOT that class, and its status was re-measured on 2026-09-17:
   the whole deviation is one named term - the `0.07389 rs^3` of H1's
   `C_c(rs)`, which this rule carries and Libxc's `gga_c_pw91` does not. Its
@@ -88,12 +89,11 @@ kernels) rather than against its numbers:
   3.51e-16 and 3.71e-16, and the worst over all 18 points from 9.49e-06 to
   8.42e-09 (that 8.4e-09 floor is a separate, sub-tolerance LDA
   spin-interpolation residue present at every point, not part of this term).
-  The two sides are NOT a truncation of one expression: Libxc's authored
-  source attributes its `C_xc(rs)` BY NAME to Rasolt & Geldart, Phys. Rev. B
-  34, 1325 (1986), and transcribes it with a quadratic denominator
-  (`RS_b := [1, 8.723, 0.472]`), while this rule's `C_c(rs)` is the P86
-  paper's `C(n)` form verbatim - algebraically identical to this repo's own
-  `P86Cc` and to that of an independent implementation, cubic included.
+  The two sides are NOT a truncation of one expression: the oracle's
+  `C_xc(rs)` is the Rasolt & Geldart, Phys. Rev. B 34, 1325 (1986)
+  parametrization, carried with a quadratic denominator, while this rule's
+  `C_c(rs)` is the P86 paper's `C(n)` form verbatim - algebraically identical
+  to this repo's own `P86Cc`, cubic included.
   So both sides follow a published parametrization of the same gradient
   coefficient, and the cubic is not evidence of a transcription slip on
   either side. What could NOT be
@@ -167,7 +167,7 @@ so a green line never means "silently passed". `exc` and the `vrho` pair stay
 finite and ARE compared at those points.
 
 pyscf has no Windows wheels (upstream), so the windows leg of
-`.github/workflows/excgrid.yml` skips this step - the linux leg is the gate;
+`.github/workflows/ci.yml` skips this step - the linux leg is the gate;
 the repo's ctest suite (finite-difference + exact-condition channels) runs on
 both legs and needs no external reference.  Libxc is the verification oracle
 only - never linked into the library and never vendored, so the shipped

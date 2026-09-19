@@ -13,9 +13,8 @@
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
 // contributions vanish with the spin density).
-
-// Auto-generated file, do not modify
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>

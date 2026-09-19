@@ -16,9 +16,8 @@
     // The PZ81 LDA piece this functional is defined on is PIECEWISE at
     // rs = 1 (Perdew & Zunger, Phys. Rev. B 23, 5048 (1981)): a rational
     // gamma/(1 + beta1 sqrt(rs) + beta2 rs) above, a logarithmic
-    // a ln rs + b + c rs ln rs + d rs below.  The boundary and the test are
-    // the ones libxc's `lda_c_pz` uses (`my_piecewise3(x >= 1, ec_low,
-    // ec_high)`), so this kernel carries the tree's only branch; the emitted
+    // a ln rs + b + c rs ln rs + d rs below.  That is the boundary the paper
+    // prints, so this kernel carries the tree's only branch; the emitted
     // shape and its contract are documented in
     // `excgrid_gga_piecewise_skeleton.ey`.
     cond := X'Rs(rhoA + rhoB) >= 1.;

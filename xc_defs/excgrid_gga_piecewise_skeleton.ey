@@ -29,9 +29,8 @@
 // A kernel author adding a piecewise form must therefore state the boundary
 // and its source in the `.ey` beside the condition, as `p86_correlation.ey`
 // does; nothing here infers it.
-
-// <? WriteString("Auto-generated file, do not modify"); ?>
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>

@@ -78,16 +78,16 @@ Hybrids (composition + an exact-exchange fraction; the HF part is the CONSUMER's
 Fock-side concern — `ExchangeFraction()` states the fraction): `b3lyp`, `pbe0`,
 `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86`.
 
-**`pw91_c` and `p86` each carry a cited provenance difference from Libxc, and
-both are deliberate.** `pw91_c` implements the PW91 correlation with the
-gradient coefficient `C(rho)` of the P86 paper (its eq. 6, cubic
-`0.07389 rs^3` denominator term included), where Libxc's `gga_c_pw91` follows
-the parametrization Libxc's own source attributes to M. Rasolt and
-D. J. W. Geldart, Phys. Rev. B 34, 1325 (1986), whose denominator is
+**`pw91_c` and `p86` each differ from the point-check oracle, and both
+differences are deliberate and cited.** `pw91_c` implements the PW91
+correlation with the gradient coefficient `C(rho)` of the P86 paper (its
+eq. 6, cubic `0.07389 rs^3` denominator term included), while the PW91
+correlation's own published fit is the M. Rasolt and D. J. W. Geldart,
+Phys. Rev. B 34, 1325 (1986) parametrization, whose denominator is
 quadratic. Those are two published fits of the same coefficient, and the
 difference is that one term and nothing else: removing our cubic reproduces
-`gga_c_pw91` to 3.5e-16 at the verification points, so neither side is
-truncating the other. `p86` is the Perdew 1986 correlation (Phys. Rev. B 33,
+the oracle's `gga_c_pw91` to 3.5e-16 at the verification points, so neither
+side is truncating the other. `p86` is the Perdew 1986 correlation (Phys. Rev. B 33,
 8822) on the Perdew–Zunger 1981 LDA piece (Phys. Rev. B 23, 5048), which the
 P86 paper specifies; PZ81 is piecewise at `rs = 1`, so `p86` is the tree's only
 branch-carrying kernel — `tools/verify_pyscf.py` and

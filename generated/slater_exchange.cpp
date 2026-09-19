@@ -12,9 +12,8 @@
 // density and its spin-density derivatives, with the exact one-spin-zero
 // limit branches (the generator's limit substitution supplies the limit
 // expressions).
-
-// Auto-generated file, do not modify
-#include "excgrid/kernel.hpp"
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
 #include <limits>
