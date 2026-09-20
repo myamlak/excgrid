@@ -1,0 +1,79 @@
+# clang-format config for excgrid (requires clang-format >= 15).
+# Base: LLVM, modernized: 4-space indent, 100 columns, no bin-packing.
+#
+# This file is NOT cosmetic and NOT optional. The committed generated
+# kernels (generated/*.cpp) are clang-format output: tools/regenerate.py
+# pipes every Yacas expansion through the formatter before writing it, and
+# the CI freshness gate (regenerate.py --check) diffs the result against
+# the committed bytes. The committed bytes were produced under THIS
+# config. Without it in the tree, clang-format falls back to the LLVM
+# defaults (2-space indent, 80 columns, right pointers) and every one of
+# the fifteen kernels reports as drift - the gate goes red for a reason
+# that has nothing to do with the kernels.
+#
+# Standard: stays at c++20. clang-format rejects c++23 as an unknown
+# enumerated scalar, and the value is part of what the committed bytes
+# were formatted under.
+---
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: c++20
+
+IndentWidth: 4
+ContinuationIndentWidth: 4
+TabWidth: 4
+UseTab: Never
+ColumnLimit: 100
+AccessModifierOffset: -4
+
+BreakBeforeBraces: Custom
+BraceWrapping:
+  # The brace of every control statement (if, else, for, while, do, switch)
+  # goes on its own line, even for one-line bodies; InsertBraces + the
+  # AllowShort* rules below remove one-liners entirely. Functions, classes,
+  # and namespaces stay attached.
+  AfterControlStatement: Always
+NamespaceIndentation: None
+FixNamespaceComments: true
+IndentCaseLabels: false
+
+PointerAlignment: Left
+ReferenceAlignment: Left
+DerivePointerAlignment: false
+
+BinPackArguments: false
+BinPackParameters: false
+AllowAllArgumentsOnNextLine: true
+AllowAllParametersOfDeclarationOnNextLine: true
+
+AllowShortFunctionsOnASingleLine: Empty
+AllowShortBlocksOnASingleLine: Never
+AllowShortIfStatementsOnASingleLine: Never
+AllowShortLoopsOnASingleLine: false
+AllowShortCaseLabelsOnASingleLine: false
+InsertBraces: true
+
+AlignTrailingComments: false
+SpacesBeforeTrailingComments: 1
+
+SortIncludes: true
+IncludeBlocks: Regroup
+IncludeCategories:
+  - Regex: '^"'
+    Priority: 1
+  - Regex: '^<'
+    Priority: 2
+
+# Blank lines: allow one between logical blocks, before access modifiers,
+# and between top-level definitions.
+MaxEmptyLinesToKeep: 1
+KeepEmptyLinesAtTheStartOfBlocks: false
+EmptyLineBeforeAccessModifier: LogicalBlock
+SeparateDefinitionBlocks: Always
+
+BreakConstructorInitializers: AfterColon
+ConstructorInitializerIndentWidth: 4
+
+PenaltyReturnTypeOnItsOwnLine: 200
+SpaceAfterTemplateKeyword: true
+SpaceBeforeParens: ControlStatements

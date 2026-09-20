@@ -1,0 +1,26 @@
+// excgrid codegen source: the mPW91 (modified PW91) GGA exchange
+// functional (Adamo-Barone).  Fresh authorship; the form is the published
+// PW91 exchange with this functional's modified constants.
+//
+// The damping exponent, re-derived here rather than quoted at one digit
+// count: PW91 damps with Exp(-alpha s^2), alpha = 100, where
+// s = |grad rho| / (2 kF rho) and kF = (6 pi^2 rho)^(1/3) is the
+// spin-density Fermi wavevector.  This kernel works in the variable
+// x = |grad rho| / rho^(4/3), so s = x / (2 (6 pi^2)^(1/3)) and the damping
+// is Exp(-100 / (4 (6 pi^2)^(2/3)) * x^2).  The exponent below is that
+// constant - 1.6455307846020557... - carried at double precision, so no
+// digit of it is a free parameter.  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'MPw91Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("MPw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

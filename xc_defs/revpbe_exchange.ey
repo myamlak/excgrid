@@ -1,0 +1,18 @@
+// excgrid codegen source: the revPBE GGA exchange functional (the PBE
+// exchange form with kappa = 1.245).  Fresh authorship; formula from the
+// revPBE paper (docs/mainpage.md references).  Regenerate with
+// tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'RevPbeExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("RevPbeExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

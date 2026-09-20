@@ -1,0 +1,14 @@
+# Build outputs
+/build/
+
+# Python caches
+__pycache__/
+
+# FetchContent and CMake user state
+/_deps/
+/CMakeUserPresets.json
+
+# Doxygen output.  The Doxyfile writes build/doxygen/html, so /build/ above
+# already covers it; this line is kept for the older layout (a checkout of an
+# earlier revision still writes docs/html/) so a stale run cannot be staged.
+/docs/html/

@@ -1,0 +1,17 @@
+// excgrid codegen source: the Becke 1988 GGA exchange functional.
+// Fresh authorship; formula from the B88 paper (docs/mainpage.md
+// references).  Regenerate with tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'Becke88Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+
+    ExKernelGenerate("Becke88Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+?>

@@ -1,0 +1,20 @@
+# Line endings: LF in the repository and in the working tree, on every OS.
+#
+# This is not cosmetic here.  The committed generated kernels are compared
+# byte-for-byte by the CI freshness gate (tools/regenerate.py --check), and
+# that script normalizes its own output to LF.  A checkout that materializes
+# them with CRLF would have to diff equal to LF bytes for the gate to mean
+# anything; the rule below removes the question.
+* text=auto eol=lf
+
+# Never mangle binaries.  *.exe matters: the vendored codegen tool
+# (tools/yacas/bin/yacas.exe) is a PE32+ executable committed to this tree,
+# and a line-ending filter applied to it is a corrupt maintainer tool.
+*.exe binary
+*.dll binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.ico binary
+*.pdf binary
+*.zip binary

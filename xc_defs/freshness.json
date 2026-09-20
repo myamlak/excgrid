@@ -1,0 +1,26 @@
+{
+  "note": "Codegen input hashes for the freshness gate. Written by tools/regenerate.py after a successful regeneration, checked by tools/check_freshness.py at commit time. This proves the sources are unchanged since the blessing; it does NOT prove the committed generated code matches them - that is what `python tools/regenerate.py --check` proves, which costs a full Yacas expansion and is therefore a deliberate run, not a hook.",
+  "sources": {
+    "becke88_exchange.ey": "a9b3eaf0c3b3d1222063b1aec379f360536ee70df4890b5255caeb8b33c81c65",
+    "excgrid_cpp_form.ys": "73423ccf69595bc23fef93b0fd04724ba04e7e98fee87e8bb732e4af8555f47b",
+    "excgrid_defs.ys": "c71ccd82458552a7f1f5683343fbb9942a707a8b44413fc43f4bce9d3fb7fec2",
+    "excgrid_generate.ys": "1f3b38f291318727c764fb1e92dcbebf8f0739747dfb2961980913818812bb4b",
+    "excgrid_gga_piecewise_skeleton.ey": "0df3fd348f1611b34b6dcc023a4d08ad129b199c1ce04108589e8861f90986cb",
+    "excgrid_gga_skeleton.ey": "e9947b0c108aa7931ce69bd2839df73c7f2c11026df528677010da06e495fd1b",
+    "excgrid_lda_skeleton.ey": "99c92ec06b933e2cebe6fed2e6a4abf9e3cc5abdae518484220fc1e6b6eb53b9",
+    "lyp_correlation.ey": "784470739e40b9ae26a992f2284a3d51c1e78a27a7f5372898e096564797b4bc",
+    "mpw91_exchange.ey": "c15f5cab7a0d0a2432ce57de8100c34eae16f3c7d702e39d134bd234f250ed3e",
+    "p86_correlation.ey": "d888beef477438c5e63297d939c6b15e5f35056c52c890bd8353f32874bc1619",
+    "pbe_correlation.ey": "afe80451b77bd3e7fd826c86168d599268e203bb70c1b4f763910b415d5dedb1",
+    "pbe_exchange.ey": "11f329a5b11bf7324dcfc67b42f83da2378ee9ba458ebdd26784d4e8b865a735",
+    "pbesol_exchange.ey": "5e836cea6a08752075deee3b9ead43afa9cf5210cabfc196f329ff11e5bf228b",
+    "pw91_correlation.ey": "9cb09e686cda76bec24fc4ad8d88c22b1d8691f6dbec2340ddc209d45bafc913",
+    "pw91_exchange.ey": "6b37332bc33438f8b38b3480626626c79cb2a7f93dd6c27e35e46cd67a7931c8",
+    "pw92_correlation.ey": "a9a74f6c13cadab6c3886f4a3165aa4108582934476d4122ba1526fb9de53506",
+    "revpbe_exchange.ey": "707adcfc158d70e68d716e7517e2f9857ed8cf2ec77cdf4461b3fce418d85fd9",
+    "rpbe_exchange.ey": "10656fb580775a0f6606240e451608b78560c3c6d8afd16638a278f58f609dcb",
+    "slater_exchange.ey": "eefa49282b63cee5af66a7eae4f68b69ac003eeb941ea39c6820c86bedd00fd7",
+    "vwn3_correlation.ey": "e04712e81977333dccb3d4c3f3686912327dfdcd381dcdf0b3582199ad95a3b9",
+    "vwn5_correlation.ey": "7e3c8872d795e19158b09f5a8a95b603c3f6a29798492a4454cf20e30b86e43a"
+  }
+}

@@ -1,0 +1,59 @@
+// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).
+// Emits one excgrid::XcKernelValue function per LDA functional: the energy
+// density and its spin-density derivatives, with the exact one-spin-zero
+// limit branches (the generator's limit substitution supplies the limit
+// expressions).
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
+
+#include <cmath>
+#include <limits>
+
+namespace excgrid {
+
+XcKernelValue <? WriteString(fname); ?>(double rhoA, double rhoB)
+{
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    XcKernelValue result;
+
+    if (rhoA + rhoB < 2. * eps)
+    {
+        return result;
+    }
+
+    if (rhoA >= eps && rhoB >= eps)
+    {
+<?  ForEach(d, Reverse(aecsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.exc = <? WriteString(ExCppForm(e)); ?>;
+    }
+    else if (rhoA < eps)
+    {
+<?  ForEach(d, Reverse(aleAcsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.exc = <? WriteString(ExCppForm(leA)); ?>;
+    }
+    else
+    {
+<?  ForEach(d, Reverse(aleBcsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.exc = <? WriteString(ExCppForm(leB)); ?>;
+    }
+
+    if (rhoA >= eps)
+    {
+<?  ForEach(d, Reverse(aleBcsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ];
+    ForEach(d, Reverse(adeDracsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoA = <? WriteString(ExCppForm(deDra)); ?>;
+    }
+
+    if (rhoB >= eps)
+    {
+<?  ForEach(d, Reverse(aleAcsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ];
+    ForEach(d, Reverse(adeDrbcsl)) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+        result.vrhoB = <? WriteString(ExCppForm(deDrb)); ?>;
+    }
+
+    return result;
+}
+
+} // namespace excgrid

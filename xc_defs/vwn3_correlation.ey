@@ -1,0 +1,19 @@
+// excgrid codegen source: the VWN3 LDA correlation functional (the VWN
+// RPA-parameter interpolation).  Distinct from VWN5 - the two are
+// separately named, never conflated (docs/kernel-api.md section 4).
+// Fresh authorship; formula from VWN 1980 Table I.  Regenerate with
+// tools/regenerate.py.
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'Vwn3Correlation(rhoA, rhoB);
+
+    ExKernelGenerate("Vwn3Correlation", e, rhoA, rhoB);
+?>
