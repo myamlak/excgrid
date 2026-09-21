@@ -1,11 +1,14 @@
 # excgrid
 
-The grid + XC-kernel + D3 library: molecular block-grid construction
-(Murray-Handy-Laming radial, Lebedev-Laikov angular, Becke/SSF
-partition), the per-point LDA/GGA/hybrid kernel family (energy density +
-first derivatives, Yacas-code-generated from the committed `xc_defs/*.ey`
-sources), and the Grimme D3 zero-damping dispersion with analytic
-gradients.  The frozen boundary contract is `docs/kernel-api.md`.
+The grid + XC-kernel + dispersion library: molecular block-grid
+construction (Murray-Handy-Laming radial, Lebedev-Laikov angular,
+Becke/SSF partition) and the geometric derivatives of its points and
+weights; the per-point LDA/GGA/hybrid/meta-GGA kernel family (energy
+density, first derivatives, and a second-derivative tier, Yacas-code-
+generated from the committed `xc_defs/*.ey` sources); and the Grimme D3
+and D4 dispersion with analytic gradients.  A component table and schema
+name what a kernel reads.  The frozen boundary contract is
+`docs/kernel-api.md`.
 
 ## References
 

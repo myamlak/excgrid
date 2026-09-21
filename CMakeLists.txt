@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-# excgrid - the grid + XC-kernel + D3 library (the standalone DFT
+# excgrid - the grid + XC-kernel + dispersion library (the standalone DFT
 # foundation repo; its frozen public seam is docs/kernel-api.md).  Layout:
 # public headers under include/excgrid/, hand-written sources under
 # src/, the committed Yacas-generated kernels under generated/, the
@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.25)
 # top-level project.  The verification jobs (pylibxc/pyscf point
 # checks) are CI Python steps, not CMake targets.
 
-project(excgrid VERSION 0.1.0 LANGUAGES CXX)
+project(excgrid VERSION 0.2.0 LANGUAGES CXX)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(EXCGRID_TOP_LEVEL ON)
@@ -36,8 +36,14 @@ option(EXCGRID_WERROR "Treat warnings in excgrid's own code as errors" ON)
 add_library(excgrid
     src/angular_grid.cpp
     src/block_grid.cpp
+    src/components.cpp
     src/d3.cpp
+    src/d4.cpp
+    src/grid_derivatives.cpp
+    src/grid_derivs.cpp
+    src/kernel.cpp
     src/kernels_registry.cpp
+    src/meta_gga_reference.cpp
     src/radial_grid.cpp
     generated/becke88_exchange.cpp
     generated/lyp_correlation.cpp
@@ -52,6 +58,7 @@ add_library(excgrid
     generated/revpbe_exchange.cpp
     generated/rpbe_exchange.cpp
     generated/slater_exchange.cpp
+    generated/tau_x.cpp
     generated/vwn3_correlation.cpp
     generated/vwn5_correlation.cpp
 )
@@ -115,8 +122,13 @@ if (EXCGRID_BUILD_TESTS)
         tests/angular_grid_test.cpp
         tests/block_grid_partition_test.cpp
         tests/block_grid_test.cpp
+        tests/contract_test.cpp
         tests/d3_test.cpp
+        tests/d4_test.cpp
+        tests/grid_derivatives_test.cpp
+        tests/grid_derivs_test.cpp
         tests/kernel_test.cpp
+        tests/meta_gga_reference_test.cpp
         tests/radial_grid_test.cpp
         tests/registry_test.cpp)
     target_link_libraries(excgrid-tests PRIVATE excgrid gtest gtest_main)

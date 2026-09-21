@@ -3,11 +3,12 @@
   "sources": {
     "becke88_exchange.ey": "a9b3eaf0c3b3d1222063b1aec379f360536ee70df4890b5255caeb8b33c81c65",
     "excgrid_cpp_form.ys": "73423ccf69595bc23fef93b0fd04724ba04e7e98fee87e8bb732e4af8555f47b",
-    "excgrid_defs.ys": "c71ccd82458552a7f1f5683343fbb9942a707a8b44413fc43f4bce9d3fb7fec2",
-    "excgrid_generate.ys": "1f3b38f291318727c764fb1e92dcbebf8f0739747dfb2961980913818812bb4b",
+    "excgrid_defs.ys": "94e636050ebdb4e252bf0c78a8883d02c35b5c12f33a740ad9363b8bb8b970c9",
+    "excgrid_generate.ys": "a4e7f80699925aba4a70d5684fff1fc43ef99cb0f9b1e4d60a008b94f5bb5e5c",
     "excgrid_gga_piecewise_skeleton.ey": "0df3fd348f1611b34b6dcc023a4d08ad129b199c1ce04108589e8861f90986cb",
     "excgrid_gga_skeleton.ey": "e9947b0c108aa7931ce69bd2839df73c7f2c11026df528677010da06e495fd1b",
     "excgrid_lda_skeleton.ey": "99c92ec06b933e2cebe6fed2e6a4abf9e3cc5abdae518484220fc1e6b6eb53b9",
+    "excgrid_meta_gga_skeleton.ey": "658a7288ef65edf25f0fc459bb2163fc73af6ec1dfdc2d94685d124b7e64f553",
     "lyp_correlation.ey": "784470739e40b9ae26a992f2284a3d51c1e78a27a7f5372898e096564797b4bc",
     "mpw91_exchange.ey": "c15f5cab7a0d0a2432ce57de8100c34eae16f3c7d702e39d134bd234f250ed3e",
     "p86_correlation.ey": "d888beef477438c5e63297d939c6b15e5f35056c52c890bd8353f32874bc1619",
@@ -20,6 +21,7 @@
     "revpbe_exchange.ey": "707adcfc158d70e68d716e7517e2f9857ed8cf2ec77cdf4461b3fce418d85fd9",
     "rpbe_exchange.ey": "10656fb580775a0f6606240e451608b78560c3c6d8afd16638a278f58f609dcb",
     "slater_exchange.ey": "eefa49282b63cee5af66a7eae4f68b69ac003eeb941ea39c6820c86bedd00fd7",
+    "tau_x.ey": "adef0e397a9bd3123890b8580e37020d422bd564317a50584f3159beac3661c8",
     "vwn3_correlation.ey": "e04712e81977333dccb3d4c3f3686912327dfdcd381dcdf0b3582199ad95a3b9",
     "vwn5_correlation.ey": "7e3c8872d795e19158b09f5a8a95b603c3f6a29798492a4454cf20e30b86e43a"
   }

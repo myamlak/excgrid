@@ -465,3 +465,41 @@ X'P86CorrelationHigh(rhoA, rhoB, gaa, gab, gbb) := [
     gamma := gaa + 2. * gab + gbb;
     rho * (X'Pz81EcHigh(rho, z) + X'P86Gradient(rho, z, gamma));
 ];
+
+// --- The meta-GGA (tau-dependent) tier -------------------------------------
+//
+// The second-order gradient expansion of exchange rewritten in the iso-orbital
+// (Pauli) variables.  Per spin channel,
+//
+//     e_sigma = e_x^LSDA(rho_sigma) (1 + (1 - tau_P / tau_unif) / 12),
+//
+// with tau_P the Pauli kinetic-energy density and tau_unif its uniform-gas
+// value.  The gradient enters through tau_P alone, so the form carries the
+// exact conditions the table below names rather than reproducing them by fit:
+// the uniform gas (tau_P = tau_unif, enhancement exactly 1, so the kernel IS
+// the spin-scaled Slater kernel) and the slowly varying gas, whose enhancement
+// coefficient is the exact 10/81 of the exchange gradient expansion.
+
+// The spin-scaled Thomas-Fermi kinetic-energy density,
+//   tau_unif = (3/10)(6 pi^2)^(2/3) rho^(5/3)  per spin channel.
+// The 6 pi^2 (rather than 3 pi^2) is the spin scaling: each channel carries its
+// own Fermi sphere.  The Tiny guard sits inside the power rather than beside it
+// so that the zero-density corner stays finite: the kernel multiplies this
+// reciprocal by rho^(4/3), which vanishes there, so the guard only has to keep
+// the intermediate from being infinite.
+X'TauUnif(rho) := 3. / 10. * (6. * Pi^2)^(2. / 3.) * (rho + X'Tiny)^(5. / 3.);
+
+// The iso-orbital (Pauli) kinetic-energy density of one spin channel,
+//   tau_P = tau - |grad rho|^2 / (8 rho).
+// This is the only place the gradient enters the tier, which is why the
+// von Weizsacker relation between the sigma and tau derivatives is exact here.
+X'TauPauli(rho, sigma, tau) := tau - sigma / (8. * (rho + X'Tiny));
+
+X'TauXChannel(rho, sigma, tau) :=
+    -X'Cx * rho^(4. / 3.) * (1. + (1. - X'TauPauli(rho, sigma, tau) / X'TauUnif(rho)) / 12.);
+
+// The spin-resolved exchange energy density of the tier.  The cross gradient
+// invariant does not appear - each channel reads only its own sigma - so the
+// emitted kernel takes sigmaAb and never reads it.
+X'TauXExchange(rhoA, rhoB, gaa, gab, gbb, ta, tb) :=
+    X'TauXChannel(rhoA, gaa, ta) + X'TauXChannel(rhoB, gbb, tb);

@@ -51,9 +51,13 @@ number`, ...) or lacks the kernel shape (an `excgrid` namespace line plus a
 `result.` assignment), and it aborts before blessing the manifest.
 `tools/regenerate_test.py` drives both reproduced exit-0 failures through it.
 
-Before assuming a functional's form fits, check whether it is an LDA or a GGA
-shape (the two shipped skeletons) or needs a new skeleton. A meta-GGA would
-need the reserved tau slots plus a new skeleton.
+Before assuming a functional's form fits, check which skeleton it needs. There
+are three: the LDA and GGA shapes, and — for a functional that reads the
+reserved tau slots — `xc_defs/excgrid_meta_gga_skeleton.ey`, which emits the
+seven-argument order-1 kernel **and** the functional's second-derivative matrix
+from the one expression. The tau tier's own example is `xc_defs/tau_x.ey`, and
+it is four lines: the rule is in `excgrid_defs.ys`, the `.ey` is the call plus
+`ExKernelGenerate` with its seven named components.
 
 ### 3. Run `tools/regenerate.py` once
 
@@ -114,10 +118,10 @@ things:
   `xc_defs/freshness.json`, the hash manifest `regenerate.py` rewrites on a
   successful run, and fails when a codegen input has moved since the blessing.
   Run it before every commit that touches codegen inputs.
-- `python tools/regenerate.py --check` re-expands all fifteen kernels — about
-  half an hour, `pbe_correlation` alone being most of it — and diffs the result
-  against the committed bytes. That is the deliberate run, not a hook. CI runs
-  it on the Windows leg.
+- `python tools/regenerate.py --check` re-expands every kernel — about half an
+  hour, `pbe_correlation` alone being most of it — and diffs the result against
+  the committed bytes. That is the deliberate run, not a hook. CI runs it on the
+  Windows leg.
 
 ### The complete list of what an addition touches
 
@@ -135,6 +139,9 @@ merely untidy:
    a spurious ill-conditioned combination and fails the folding rule. Note that
    the guard's own header comment claims an added functional "is checked
    without touching this test" — true for a hybrid, not for a new kernel.
+   A kernel that reads tau is the exception to that second edit: it is exempted
+   by `RequiredMask` before the fit, and the exemption is paid for with the
+   response check beside it, so do not add it to the universe.
 3. `CMakeLists.txt` — the `generated/<name>.cpp` entry in the library sources.
    Miss it and the kernel is never compiled, so the probe reports
    `unknown functional`. Add it **after** step 3 has produced the file, not
@@ -143,7 +150,11 @@ merely untidy:
    `Cannot find source file`, which reads like a broken tree rather than a step
    done out of order.
 4. `include/excgrid/kernels.hpp` — the declaration, documented like its
-   neighbours.
+   neighbours. A tau-tier kernel has none here: it is wider than the two
+   kernel-pointer types the header's functions return, so the registry names it
+   where it is built (`src/kernels_registry.cpp`) and consumers reach it through
+   the registry name like any other functional. The header publishes the
+   per-point contract, not the tier's internals.
 5. `src/kernels_registry.cpp` — for a pure functional, three edits: the
    `PureFunctional` object, the `kRegistry` array (whose size template argument
    is written out), and `kNames`. A hybrid adds one edit before its object: the
@@ -153,7 +164,13 @@ merely untidy:
    the published LSDA coefficient against a full GGA kernel double counts the
    LSDA exchange, so the LSDA weight is the published coefficient minus the
    GGA-exchange coefficient, and the two exchange roles must sum to
-   `1 - exchangeFraction`. A violation is a build failure.
+   `1 - exchangeFraction`. A violation is a build failure. A tau-tier kernel is
+   the third shape: the registry declares the generated kernel and its
+   second-derivative function at namespace scope (an anonymous-namespace
+   declaration would give the definitions in `generated/tau_x.cpp` internal
+   linkage and fail at link time) and one class over them supplies the two
+   second-derivative entry points, re-packing the generated matrix onto the
+   caller's mask.
 6. `tests/kernel_test.cpp` — **two edits, not one**: the finite-difference
    list (step 4), and, for a new kernel, the size-pinned
    `std::array<NamedGgaKernel, 6>` (`kGgaExchangeKernels`) or
@@ -175,15 +192,34 @@ merely untidy:
     would notice the driver silently accepting a failed expansion again), and
     the test suite passing.
 
-## Extending the derivative tiers
+## The derivative tiers
 
-The shipped generator emits the **order-1 tier only** (energy density + first
-derivatives), which is all plain Vxc assembly consumes. The higher tiers
-(second/third derivatives, consumed by energy-gradient machinery) are a
-mechanical generator extension: add the `Deriv` chain and the CSE/substitution
-passes in `excgrid_generate.ys`, the corresponding fields in `XcKernelValue`
-(an additive struct change = a minor release), and the skeleton sections. The
-tau slots are already reserved the same way.
+The order-1 tier (energy density + first derivatives) is what plain Vxc
+assembly consumes, and the LDA and GGA skeletons emit that tier alone.
+
+The tau tier emits one tier further: `xc_defs/excgrid_meta_gga_skeleton.ey`
+expands the same expression into the functional's **materialised second
+derivatives** as well, because the contract already crosses that tier
+(`PointSecondDerivativeMatrix`) and this is the tier an analytic gradient
+reaches for. Two pieces of the generator carry it, both in
+`xc_defs/excgrid_generate.ys`: `ExSecondDerivativeEntries` differentiates the
+expression over its arguments and folds the entries that are identically zero,
+and `ExUpperTriangleIndex` places each survivor in the contract's upper
+triangle over the active components in identifier order.
+`tools/regenerate.py` prunes per emitted assignment, so a
+`matrix.upper[<k>] = ...` line is a root exactly as a `result.<field> = ...`
+line is.
+
+Two things to know when reading that output. The skeleton emits the entries in
+the order of the seven components its kernel takes; which of them a caller's
+matrix is actually over is the caller's mask, and `src/kernels_registry.cpp`
+re-packs the two — an input outside the mask has no row and no column rather
+than a zero one. And the contracted tier is computed from the materialised
+matrix rather than emitted beside it, so the schema's two second-derivative
+entry points cannot disagree.
+
+What is not built: the third derivative, which has no contract type to cross in
+— that addition is a schema change before it is a generator change.
 
 ## Regenerating the angular tables
 
