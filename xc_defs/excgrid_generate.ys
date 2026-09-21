@@ -406,3 +406,155 @@ ExPiecewiseKernelGenerate(fname, cond, eLow, eHigh, args) := [
     ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh,
                            args[1], args[2], args[3], args[4], args[5]);
 ];
+
+// --- The meta-GGA (tau-dependent) tier -------------------------------------
+//
+// The entry point below takes the same expression in the seven variables a
+// meta-GGA reads: the five the GGA tier differentiates in, plus the two
+// kinetic-energy densities the contract reserves as identifiers 5 and 6.  It
+// emits the order-1 kernel and, beside it, that functional's SECOND-DERIVATIVE
+// tier - the materialised upper triangle the contract's matrix view exposes,
+// which is what the analytic-gradient track consumes.
+//
+// The second-derivative tier is generated symbolically for the same reason the
+// first is: the chain rule through the reduced-gradient variables is where a
+// hand-derived Hessian goes wrong, and the finite-difference gate in the tests
+// is only as good as the algebra it checks.
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom,
+                      ta_IsAtom, tb_IsAtom}) <--
+    ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb);
+
+// The contract's upper-triangle index: entry (i, j) with i <= j of an
+// `active` by `active` matrix sits at
+//     i*active - i*(i-1)/2 + (j-i),
+// which is the row offset of i plus the column offset within the row.
+Function("ExUpperTriangleIndex", {i, j, active})
+[
+    i * active - i * (i - 1) / 2 + j - i;
+];
+
+// Is the reduced expression a zero that yacas left inside a quotient?
+//
+// Differentiating a reciprocal whose numerator's derivative vanishes leaves
+// `0/(96*(rho + Tiny)*(rho + Tiny)^(5/3)*...)` rather than folding it: zero
+// everywhere the kernel is defined, but three powers and a division to compute
+// it, and a declaration of the guard it divides by.  Folding it prints the same
+// plain zero the printer already emits for a derivative that never had that
+// variable to differentiate.
+//
+// The test is the NUMERATOR'S OWN TEXT: `String` is what the number printer
+// emits, so a numerator that renders as the literal zero is one the emitted
+// code already divides as `0.` - folding that quotient cannot move a single
+// bit of the result, and the denominators here are products of positive powers
+// of (rho + Tiny), so none of them is zero where the kernel is defined.
+// Written this way rather than as `num = 0` because yacas' differentiation
+// leaves the numerator as a residue below the working precision (measured:
+// 0./(96*...) whose numerator prints as `0.` and is nevertheless not `= 0`),
+// and rather than as a magnitude threshold, which would be a number this
+// generator has no business inventing.
+//
+// The atom guard is not decoration either: Listify(0) is an error in this
+// yacas, and an integer zero is exactly what the derivative of an expression
+// that never carried the variable comes back as.
+Function("ExIsQuotientZero", {e})
+[
+    Local(l, z);
+    z := False;
+    If (Not IsAtom(e),
+    [
+        l := Listify(e);
+        If (ExOpIs(l, ExU/ExV),
+            If (IsAtom(l[2]),
+                z := ((String(l[2]) = "0.") Or (String(l[2]) = "0")),
+                z := ExIsQuotientZero(l[2])));
+    ]);
+    z;
+];
+
+// One entry per unordered pair of the input list, in the contract's
+// upper-triangle order: {row, column, flat index, expression, CSE assignments}.
+// A pair the energy density does not couple comes back as the integer 0 - the
+// generator must not print a different spelling of zero for it than the one
+// every other kernel prints - and an uncoupled pair contributes no CSE list.
+//
+// The expressions are differentiated from the ORIGINAL energy density, before
+// the order-1 path substitutes the CSE tags into it, because Deriv() cannot
+// differentiate a tag.
+// `For` is the C-style four-argument form here (start, predicate, increment,
+// body) - yacas 1.8's controlflow.rep defines it that way, and a three-argument
+// call reads its middle argument as the predicate, so it silently runs zero
+// times rather than complaining.
+Function("ExSecondDerivativeEntries", {e, vars})
+[
+    Local(n, entries, d2, reduced, i, j);
+    n := Length(vars);
+    entries := {};
+    For(i := 1, i <= n, i++)
+    [
+        For(j := i, j <= n, j++)
+        [
+            d2 := Deriv(vars[j]) Deriv(vars[i]) e;
+            If (ExIsQuotientZero(d2), d2 := 0);
+            reduced := CSE(d2);
+            Push(entries, {i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), reduced[1],
+                           ExAssignments(reduced[2])});
+        ];
+    ];
+    entries;
+];
+
+ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
+    // The second-derivative tier first, while `e` is still the untagged
+    // expression.
+    asecondDerivativeEntries :=
+        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb});
+
+    deDra := Deriv(ra) e;
+    deDrb := Deriv(rb) e;
+    deGaa := Deriv(gaa) e;
+    deGab := Deriv(gab) e;
+    deGbb := Deriv(gbb) e;
+    deDta := Deriv(ta) e;
+    deDtb := Deriv(tb) e;
+
+    // The same removable-radical cancellation the GGA path applies, for the
+    // same reason and with the same measurement behind it: the chain rule
+    // leaves a Sqrt(gamma) uncancelled against its own reciprocal, and the
+    // emitted quotient would be 0/0 at an exactly zero gradient.  The tau
+    // derivatives carry no Sqrt(gamma) and are left alone.
+    deGaa := ExCancelRadical(deGaa);
+    deGab := ExCancelRadical(deGab);
+    deGbb := ExCancelRadical(deGbb);
+
+    {e, ecsl} := CSE(e);
+
+    // Express the density derivatives through the energy density's common
+    // subexpressions, exactly as the GGA path does.  The kinetic-energy
+    // derivatives go through the same substitution: they share the
+    // reduced-variable subexpressions.
+    deDra := ExSubstituteTagged(ecsl, deDra);
+    deDrb := ExSubstituteTagged(ecsl, deDrb);
+    deDta := ExSubstituteTagged(ecsl, deDta);
+    deDtb := ExSubstituteTagged(ecsl, deDtb);
+
+    {deDra, deDracsl} := CSE(deDra);
+    {deDrb, deDrbcsl} := CSE(deDrb);
+    {deGaa, deGaacsl} := CSE(deGaa);
+    {deGab, deGabcsl} := CSE(deGab);
+    {deGbb, deGbbcsl} := CSE(deGbb);
+    {deDta, deDtacsl} := CSE(deDta);
+    {deDtb, deDtbcsl} := CSE(deDtb);
+
+    aecsl := ExAssignments(ecsl);
+    adeDracsl := ExAssignments(deDracsl);
+    adeDrbcsl := ExAssignments(deDrbcsl);
+    adeGaacsl := ExAssignments(deGaacsl);
+    adeGabcsl := ExAssignments(deGabcsl);
+    adeGbbcsl := ExAssignments(deGbbcsl);
+    adeDtacsl := ExAssignments(deDtacsl);
+    adeDtbcsl := ExAssignments(deDtbcsl);
+
+    PatchLoad("excgrid_meta_gga_skeleton.ey");
+];

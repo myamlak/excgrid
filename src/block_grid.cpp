@@ -1,5 +1,7 @@
 #include "excgrid/grid.hpp"
 
+#include "bragg_slater.hpp"
+
 #include <algorithm>
 #include <bit>
 #include <cmath>
@@ -11,39 +13,8 @@ namespace excgrid {
 
 namespace {
 
-// Bragg-Slater covalent radii in Angstrom, scaled to Bohr on lookup;
-// elements without a tabulated value fall back to a default (1.0 A)
-// radius.  Slater, J. Chem. Phys. 41 (1964) 3199.
-struct SlaterEntry {
-    int atomicNumber;
-    double radiusAngstrom;
-};
-
-constexpr std::array<SlaterEntry, 46> kSlaterRadii = {{
-    {1, 0.35},  {2, 1.0},   {3, 1.45},  {4, 1.05},  {5, 0.85},  {6, 0.70},  {7, 0.65},  {8, 0.60},
-    {9, 0.50},  {10, 1.0},  {11, 1.80}, {12, 1.50}, {13, 1.25}, {14, 1.10}, {15, 1.00}, {16, 1.00},
-    {17, 1.00}, {18, 1.0},  {19, 2.20}, {20, 1.80}, {21, 1.60}, {22, 1.40}, {23, 1.35}, {24, 1.40},
-    {25, 1.40}, {26, 1.40}, {27, 1.35}, {28, 1.35}, {29, 1.35}, {30, 1.35}, {31, 1.30}, {32, 1.25},
-    {33, 1.15}, {34, 1.15}, {35, 1.15}, {36, 1.0},  {37, 2.35}, {38, 2.00}, {39, 1.80}, {40, 1.55},
-    {41, 1.45}, {42, 1.45}, {43, 1.35}, {44, 1.30}, {45, 1.35}, {46, 1.40},
-}};
-
 constexpr double kSwitchWindow = 0.64; // SSF: |mu| <= a window.
-constexpr double kDefaultRadiusA = 1.0; // Fallback for untabulated elements.
-constexpr double kAngstromToBohr = 1.8897261246257702;
 constexpr std::size_t kCandidateCap = 512; // Nearest-neighbour search cap per step.
-
-double RadiusOf(int atomicNumber) {
-    for (const SlaterEntry& entry : kSlaterRadii)
-    {
-        if (entry.atomicNumber == atomicNumber)
-        {
-            return entry.radiusAngstrom * kAngstromToBohr;
-        }
-    }
-
-    return kDefaultRadiusA * kAngstromToBohr;
-}
 
 // The SSF switching function: s(mu) in [0, 1], s(mu) = 0 for mu >= a,
 // s(mu) = 1 for mu <= -a, and the odd degree-7 polynomial
@@ -72,13 +43,13 @@ double Switch(double mu) {
 // than the callee's, and the Slater radii are resolved once here instead of
 // once per point per atom.
 struct PartitionScratch {
-    std::vector<double> radius; // RadiusOf(atom), per atom.
+    std::vector<double> radius; // Bragg-Slater radius, one per atom.
     std::vector<double> distance; // |point - atom|, per point.
     std::vector<double> lo; // distance - 0.64 radius, per point.
     std::vector<double> hi; // distance + 0.64 radius, per point.
     std::vector<double> raw; // the un-normalized cell weights.
     std::vector<std::size_t> window; // the atoms that can matter, per shell.
-    double windowMargin = 0.0; // 4 max over atoms of 0.64 RadiusOf.
+    double windowMargin = 0.0; // 4 max over atoms of 0.64 x radius.
 };
 
 PartitionScratch MakePartitionScratch(const Geometry& geometry) {
@@ -88,7 +59,7 @@ PartitionScratch MakePartitionScratch(const Geometry& geometry) {
 
     for (const Atom& atom : geometry.atoms)
     {
-        scratch.radius.push_back(RadiusOf(atom.atomicNumber));
+        scratch.radius.push_back(internal::BraggSlaterRadius(atom.atomicNumber));
     }
 
     for (const double radius : scratch.radius)

@@ -59,6 +59,7 @@ FUNCTIONALS = [
     ("pbe_correlation.ey", "pbe_correlation.cpp"),
     ("pw91_correlation.ey", "pw91_correlation.cpp"),
     ("p86_correlation.ey", "p86_correlation.cpp"),
+    ("tau_x.ey", "tau_x.cpp"),
 ]
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -252,8 +253,13 @@ def normalize_and_format(path, clang_format):
 # One emitted CSE temporary: `const double C17 = <expr>;`, always one line
 # (checked over the committed corpus: 4772 of 4772).
 DECLARATION = re.compile(r"^(?P<indent>[ \t]*)const double (?P<tag>C\d+) = (?P<rhs>.*);\s*$")
-# The assignment whose expression the group's declarations feed.
-RESULT_START = re.compile(r"^[ \t]*result\.[A-Za-z]+ =")
+# The assignment whose expression the group's declarations feed: a member of one
+# of the kernel's output objects - `result.<field> = ...` for the order-1 tier,
+# `matrix.upper[<k>] = ...` for the second-derivative tier.  Written as the
+# shape rather than as the two names, so an output added later is a root without
+# a second edit here.  Measured over the committed corpus before widening: 92
+# matching lines either way, so the two spellings select the same assignments.
+ASSIGNMENT_START = re.compile(r"^[ \t]*[A-Za-z_][A-Za-z0-9_]*(?:\.[A-Za-z_][A-Za-z0-9_]*|\[[0-9]+\])* =")
 TAG = re.compile(r"\bC\d+\b")
 
 
@@ -267,7 +273,7 @@ def prune_unreachable_temporaries(text):
     tip at a time, because C4189 fires only on a local with ZERO references: a
     dead chain, whose entries reference each other, produces no warning at all.
 
-    Reachability is computed from every `result.*` assignment in the SAME C++
+    Reachability is computed from every output assignment in the SAME C++
     scope, because that is what the declarations are visible to: the LDA
     skeleton puts each branch's list inside its own braces, while the GGA
     skeleton declares all six blocks in one function scope, where a later
@@ -297,7 +303,7 @@ def prune_unreachable_temporaries(text):
                 scopes[-1]["declarations"].append(
                     (index, declaration.group("tag"), declaration.group("rhs"))
                 )
-            elif RESULT_START.match(line):
+            elif ASSIGNMENT_START.match(line):
                 # The assignment may wrap; it ends at the first line with ';'.
                 pending_root = (index, [index])
                 if ";" in line:

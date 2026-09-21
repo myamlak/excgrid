@@ -1,0 +1,105 @@
+// The excgrid meta-GGA kernel skeleton (fresh authorship; BSD-3-Clause).
+// Emits, per meta-GGA functional, the order-1 kernel - the energy density, the
+// two spin-density derivatives, the three sigma derivatives and the two
+// kinetic-energy-density derivatives, the contract's reserved slots 5 and 6 -
+// and, beside it, the functional's SECOND-DERIVATIVE tier: one function filling
+// the contract's materialised matrix.
+//
+// The second-derivative function's argument list is the kernel's, and the matrix
+// it fills is the contract's upper triangle, row-major over the ACTIVE components
+// in identifier order.  Which components those are is the caller's mask, so the
+// order is pinned by the caller and not here: this skeleton emits the entries in
+// the identifier order of the seven collinear inputs it is generated over.
+//
+// No spin-edge branches: as in the GGA skeleton, the definitions' Tiny guards
+// keep every expression finite at the spin and gamma edges, and the density
+// prefactor carries the zero-density corner.
+// The banner and the kernel.hpp include are emitted by the calling .ey, which
+// always precedes this skeleton, so they are not repeated here.
+
+#include <cmath>
+#include <limits>
+
+namespace excgrid {
+
+XcKernelValue <? WriteString(fname); ?>(double rhoA,
+                                       double rhoB,
+                                       double sigmaAa,
+                                       double sigmaAb,
+                                       double sigmaBb,
+                                       double tauA,
+                                       double tauB)
+{
+<? WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"},
+                                     {gab, "sigmaAb"}, {gbb, "sigmaBb"}, {ta, "tauA"},
+                                     {tb, "tauB"}},
+                                    {e, deDra, deDrb, deGaa, deGab, deGbb, deDta, deDtb},
+                                    {aecsl, adeDracsl, adeDrbcsl, adeGaacsl, adeGabcsl, adeGbbcsl,
+                                     adeDtacsl, adeDtbcsl})); ?>
+    constexpr double eps = std::numeric_limits<double>::epsilon();
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    XcKernelValue result;
+
+    if (rhoA + rhoB < 2. * eps)
+    {
+        return result;
+    }
+
+<?  ForEach(d, Reverse(aecsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.exc = <? WriteString(ExCppForm(e)); ?>;
+
+<?  ForEach(d, Reverse(adeDracsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vrhoA = <? WriteString(ExCppForm(deDra)); ?>;
+
+<?  ForEach(d, Reverse(adeDrbcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vrhoB = <? WriteString(ExCppForm(deDrb)); ?>;
+
+<?  ForEach(d, Reverse(adeGaacsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaAa = <? WriteString(ExCppForm(deGaa)); ?>;
+
+<?  ForEach(d, Reverse(adeGabcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaAb = <? WriteString(ExCppForm(deGab)); ?>;
+
+<?  ForEach(d, Reverse(adeGbbcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vsigmaBb = <? WriteString(ExCppForm(deGbb)); ?>;
+
+<?  ForEach(d, Reverse(adeDtacsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vtauA = <? WriteString(ExCppForm(deDta)); ?>;
+
+<?  ForEach(d, Reverse(adeDtbcsl)) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ]; ?>
+    result.vtauB = <? WriteString(ExCppForm(deDtb)); ?>;
+
+    return result;
+}
+
+void <? WriteString(fname); ?>SecondDerivatives(double rhoA,
+                                              double rhoB,
+                                              double sigmaAa,
+                                              double sigmaAb,
+                                              double sigmaBb,
+                                              double tauA,
+                                              double tauB,
+                                              PointSecondDerivativeMatrix& matrix)
+{
+<? WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"},
+                                     {gab, "sigmaAb"}, {gbb, "sigmaBb"}, {ta, "tauA"},
+                                     {tb, "tauB"}},
+                                    {e, deDra, deDrb, deGaa, deGab, deGbb, deDta, deDtb},
+                                    {aecsl, adeDracsl, adeDrbcsl, adeGaacsl, adeGabcsl, adeGbbcsl,
+                                     adeDtacsl, adeDtbcsl})); ?>
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())
+    {
+        return;
+    }
+
+<?  ForEach(entry, asecondDerivativeEntries) [
+        ForEach(d, Reverse(entry[5])) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ];
+        WriteString("    matrix.upper[" : String(entry[3]) : "] = " : ExCppForm(entry[4]) : ";" : Nl());
+        WriteString(Nl());
+    ]; ?>
+}
+
+} // namespace excgrid

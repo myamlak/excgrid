@@ -1,16 +1,30 @@
 # The excgrid kernel API — the frozen seam
 
-This document is the **frozen contract** between the excgrid library (grid +
-XC kernels + D3) and its consumers. The header of record is
+This document is the **frozen contract** between the excgrid library and its
+consumers. The header of record is
 [`include/excgrid/kernel.hpp`](../include/excgrid/kernel.hpp); this document is
 its specification, and where the two disagree the header is what compiles.
 
 Change procedure: a new version of this document plus a release-tag bump.
 Consumers pin a version and move only by an explicit bump.
 
+Two public groups sit outside this document's sections and are documented by
+their own headers: the D4 parameter data
+([`include/excgrid/d4.hpp`](../include/excgrid/d4.hpp) — the published
+parameters, an element-coverage test, and deliberately no energy) and the grid's
+geometric derivative interface
+([`include/excgrid/grid_derivatives.hpp`](../include/excgrid/grid_derivatives.hpp)).
+Neither is part of the contract below.
+
 ## 1. Inputs and units
 
-Every per-point kernel consumes the spin-resolved density inputs
+A point's inputs cross as one record (`excgrid::PointInputs`): a value per
+**identifier**, plus the `ComponentMask` saying which of them the caller
+supplied. The identifiers are the component table's
+([`include/excgrid/components.hpp`](../include/excgrid/components.hpp)), numbered
+`0` to `31` and named, never positional. Identifiers `0` to `6` are the inputs
+below and keep the positions they arrived in; `7` to `31` are reserved with fixed
+meanings. **The seven below are active today:**
 
 | Name | Meaning | Unit |
 |---|---|---|
@@ -18,39 +32,61 @@ Every per-point kernel consumes the spin-resolved density inputs
 | `sigmaAa` = grad(rhoA).grad(rhoA) | gamma_aa | Bohr^-8 |
 | `sigmaAb` = grad(rhoA).grad(rhoB) | gamma_ab | Bohr^-8 |
 | `sigmaBb` = grad(rhoB).grad(rhoB) | gamma_bb | Bohr^-8 |
-| `tauA`, `tauB` | kinetic-energy densities | **reserved** — accepted by the struct, zero from every shipped LDA/GGA kernel |
+| `tauA`, `tauB` | kinetic-energy densities | Bohr^-5 |
 
-These are exactly Libxc's conventions (`n`, `sigma` in the same units, as
-surfaced by pyscf's wrapper), so isolated point checks against Libxc are a
+The first five are the LDA/GGA kernels' inputs — an LDA kernel reads the two
+densities, a GGA kernel adds the three gradient invariants. The two
+kinetic-energy densities are what the tau tier reads (section 4) — **zero from
+every other shipped functional**, and part of the mask only there.
+
+An identifier the caller leaves out of the mask reads as zero, so a point's
+value is a function of its masked inputs alone.
+
+These are exactly Libxc's conventions (`n`, `sigma` and `tau` in the same units,
+as surfaced by pyscf's wrapper), so isolated point checks against Libxc are a
 direct equality test with no conversion.
 
 ## 2. Outputs
 
-One struct per evaluation (`excgrid::XcKernelValue`):
+The energy density and its derivatives are carried two ways, and they are not
+the same type.
+
+`excgrid::XcKernelValue` is what a **generated kernel returns** and what
+composition is written in — one named field per derivative:
 
 | Field | Meaning | Unit |
 |---|---|---|
 | `exc` | exchange-correlation energy **density** e(r) (e_total = integral of exc d^3r) | Hartree / Bohr^3 |
 | `vrhoA`, `vrhoB` | de/d rhoA, de/d rhoB | Hartree |
 | `vsigmaAa`, `vsigmaAb`, `vsigmaBb` | de/d sigma_* | Hartree * Bohr^5 |
-| `vtauA`, `vtauB` | de/d tau_* | **reserved** — always 0.0 from LDA/GGA kernels |
+| `vtauA`, `vtauB` | de/d tau_* | Hartree * Bohr^5 — zero from every shipped functional except `tau_x` |
 
-The struct is a plain aggregate (public fields, default-initialized to zero) and
-supports the algebra `+`, `+=`, scalar `*`, `*=` — functionals compose by these
-operators (the hybrid recipes in
-[`src/kernels_registry.cpp`](../src/kernels_registry.cpp) are nothing but such
-weighted sums).
+A plain aggregate (public fields, default-initialized to zero), and it supports
+the algebra `+`, `+=`, scalar `*`, `*=` — functionals compose by these operators
+(the hybrid recipes in [`src/kernels_registry.cpp`](../src/kernels_registry.cpp)
+are nothing but such weighted sums).
 
-## 3. Kernel signatures (order-1, the only shipped tier)
+`excgrid::PointResult` is what a **consumer receives** from a functional's
+per-point entry point: the schema version that produced it, the mask the result
+is over, `exc`, and `first` — the first derivatives in an array indexed by
+`Component`, in identifier order. `FoldIntoResult` is the one mapping between the
+two, and the second-derivative tiers carry their own result types beside it
+(section 3).
+
+## 3. Kernel signatures and the derivative tiers
 
 ```cpp
 namespace excgrid {
     using LdaKernel = XcKernelValue (*)(double rhoA, double rhoB);
     using GgaKernel = XcKernelValue (*)(double rhoA, double rhoB,
                                          double sigmaAa, double sigmaAb, double sigmaBb);
-    class XcFunctional;   // abstract: UsesGradient(), Evaluate(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb), ExchangeFraction()
+    class XcFunctional;   // abstract: RequiredMask(), UsesGradient(), ExchangeFraction(),
+                          // EvaluatePoint(...), EvaluatePointWithSecondDerivatives(...),
+                          // EvaluatePointMaterialising(...)
     const XcFunctional* FindFunctional(std::string_view name);
     std::span<const std::string_view> FunctionalNames();
+    SchemaVersion ContractVersion();
+    std::string_view DescribeStatus(KernelStatus status);
 }
 ```
 
@@ -58,13 +94,42 @@ namespace excgrid {
   (`vsigma_*`, `vtau_*` zero).
 - **GGA kernels** additionally consume the three sigma inputs and return the three
   `vsigma_*`.
-- **Order-1 is the shipped tier**: plain Vxc assembly consumes first
-  derivatives only. Second/third derivative tiers exist solely for
-  energy-gradient machinery; they are a documented, mechanical generator
-  extension and are not shipped.
-- **Tau slots are reserved, never shipped** until a meta-GGA tier lands:
-  the struct and the abstract `Evaluate` always carry them so the extension is
-  additive, not a breaking change.
+- **The tau tier's kernel is neither of those two types.** It takes the seven
+  active components in identifier order and returns the two `vtau_*` as well
+  (section 4); it is reached through the registry name like every other
+  functional.
+- **A functional is evaluated per point through a record, not positionally**:
+  `EvaluatePoint(inputs, result)` over `PointInputs` and `PointResult`.
+  `RequiredMask()` states the components it reads, `UsesGradient()` whether the
+  sigma slots are among them, and `ExchangeFraction()` the exact-exchange
+  fraction the consumer routes through its own Fock path.
+- **Three derivative tiers cross the contract, and `Request` names them**:
+  `kFirstDerivatives` — the energy density and the first derivatives, in
+  `PointResult`; `kSecondDerivativeContraction` — those plus
+  `PointSecondDerivative`, the second-derivative matrix multiplied by the
+  caller's right-hand side (`contracted`, one value per active component per
+  right-hand side in identifier order, `rightHandSides` the count supplied);
+  `kSecondDerivativeMatrix` — those plus `PointSecondDerivativeMatrix`, the
+  matrix itself, upper triangle only, row-major over the active components in
+  identifier order, entry (i, j), i <= j, at `i*active - i*(i-1)/2 + (j-i)`. The
+  materialised form is a debug path. Each tier is asked for by calling its own
+  entry point; the two above the first default to
+  `kRefusedUnsupportedCapability`.
+- **Order-1 is shipped for every functional; the second-derivative tiers are
+  shipped for `tau_x` alone.** Its kernel and the matrix are emitted from one
+  symbolic definition, and its contraction is taken from that same matrix, so the
+  tier's two entry points cannot disagree. Nothing above them is built: the third
+  derivative has no contract type to cross in.
+- A second-derivative request is refused with `kRefusedUnsupportedCombination`
+  when the right-hand side is not a whole number of active-component vectors (or
+  no component is active), and with `kRefusedExhaustedCapacity` beyond
+  `kSecondDerivativeCapacity` (16).
+- **`Evaluate(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb)` is a temporary adapter** for
+  consumers that have not moved to `EvaluatePoint`. It fills the five
+  densities/gradient invariants and cannot express the tau inputs, and a refusal
+  comes back as a zero-filled `XcKernelValue` with the status lost.
+- **Every refusal is named.** `KernelStatus` enumerates them and `DescribeStatus`
+  renders one; none of them is answered with zeros, except on that adapter.
 
 ## 4. Functional naming and coverage
 
@@ -74,9 +139,28 @@ repo releases; the consumer's schema carries the string). The shipped set:
 LDA: `slater`, `vwn5`, `vwn3`, `pw92`, `svwn` (= slater + vwn5), `spw92` (= slater + pw92).
 GGA exchange: `becke88`, `pw91`, `pbe`, `revpbe`, `rpbe`, `mpw91`, `pbesol`.
 GGA correlation: `lyp`, `pbe_c`, `pw91_c`, `p86`.
+Tau tier (meta-GGA): `tau_x`.
 Hybrids (composition + an exact-exchange fraction; the HF part is the CONSUMER's
 Fock-side concern — `ExchangeFraction()` states the fraction): `b3lyp`, `pbe0`,
 `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86`.
+
+**`tau_x` is the tier's first kernel and the only shipped functional that reads
+the kinetic-energy densities.** It is the second-order gradient expansion of
+exchange in the iso-orbital (Pauli) variables, per spin channel: with
+tau_P = tau - |grad rho|^2 / (8 rho) and
+tau_unif = (3/10)(6 pi^2)^(2/3) rho^(5/3),
+e = e_x^LSDA(rho) * (1 + (1 - tau_P/tau_unif)/12). Two limits follow from the
+form rather than from a fit: the uniform gas is the spin-scaled Slater kernel,
+and the slowly varying gas carries the exact 10/81 coefficient of the exchange
+gradient expansion. Its mask is all seven active components; of them the formula
+reads six — `sigmaAb` is not among them. The bare expansion's
+enhancement is unbounded above — the known failure of the second-order form where
+tau runs high — so the entry is the tier's shape reference rather than a
+production functional. Its evidence is internal, not a Libxc point check: the
+finite differences and exact conditions that travel with the tier, and the
+hand-written derivation of the same expansion
+([`src/meta_gga_reference.cpp`](../src/meta_gga_reference.cpp)) that the
+registry's tests cross-check the generated kernel against.
 
 **`pw91_c` and `p86` each differ from the point-check oracle, and both
 differences are deliberate and cited.** `pw91_c` implements the PW91
@@ -145,18 +229,29 @@ molecule type). Output contract ([`include/excgrid/grid.hpp`](../include/excgrid
 
 ## 6. D3 dispersion
 
-`excgrid::GrimmeD3` over the same `Geometry` type: energy + analytic coordinate
-gradients (closed forms, hand-written — the one coordinate-gradient tier shipped,
-because gradients are the unit any optimizer needs). Parameters are the caller's
-(`s6`, `s8`, `rs6` = a1, `alpha6` = a2) per the DFT-D3 (Grimme 2010) zero-damping
-scheme; a `D3Parameters` struct carries the standard presets. The preset
-table follows the published parameter data, so it names method families the
-kernel registry does not ship (`blyp`, `bp86`, `bpbe`, `b97d`, `tpss`, `hf`,
-for instance): the two API surfaces are independent, and a consumer may pair
-D3 with a method it brings from elsewhere.
+`excgrid::GrimmeD3` (the energy and its gradient, a `D3Result`) and
+`excgrid::GrimmeD3Energy` (the energy alone) over the same `Geometry` type:
+closed forms, hand-written — the one energy gradient the library ships, because
+gradients are the unit any optimizer needs. Parameters are the caller's (`s6`,
+`s8`, and `rs6`/`alpha6` = a1/a2 of the R^6 damping with `rs8`/`alpha8` the same
+pair for R^8) per the DFT-D3 (Grimme 2010) zero-damping scheme; `D3Parameters`
+is that struct, and `D3Preset(name)` returns the published set of a method
+family. An element above the table's range is `kUnsupported` — a refusal, never
+an extrapolation. The preset table follows the published parameter data, so it
+names method families the kernel registry does not ship (`blyp`, `bp86`, `bpbe`,
+`b97d`, `tpss`, `hf`, for instance): the two API surfaces are independent, and a
+consumer may pair D3 with a method it brings from elsewhere.
 
 ## 7. Stability promise
 
+- The value schema is versioned separately from the library. A `SchemaVersion`
+  rides with every result, `ContractVersion()` reports the one this build speaks
+  (1.0 today), and two versions exchange values only while their major numbers
+  agree (`SchemaVersion::CompatibleWith`). A major change alters an identifier's
+  meaning, reorders the component table, exhausts its capacity or changes the
+  composition semantics; a minor change activates a reserved identifier or adds a
+  functional over reserved ones. Identifiers `0` to `6` keep the positions they
+  arrived in.
 - Aggregate field names above are API; adding fields is a minor release, changing
   semantics a major one (SemVer).
 - Kernel numerics may change only via the regeneration discipline

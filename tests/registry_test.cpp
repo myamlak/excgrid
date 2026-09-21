@@ -1,8 +1,9 @@
 // The functional registry tests: name resolution, the shipped-name
 // surface, hybrid recipes and exchange fractions, the VWN3/VWN5
-// separation, and the exchange-folding guard - the class guard against
+// separation, the exchange-folding guard - the class guard against
 // the B3LYP Slater double count fixed in 4bddaceb coming back through a
-// future entry.
+// future entry - and the tau tier's generated kernel with its generated
+// second-derivative matrix.
 
 #include "excgrid/kernel.hpp"
 #include "excgrid/kernels.hpp"
@@ -13,8 +14,18 @@
 #include <cstddef>
 #include <gtest/gtest.h>
 #include <initializer_list>
+#include <span>
 #include <string_view>
 #include <vector>
+
+// The tau tier's hand-written reference, defined in src/meta_gga_reference.cpp.
+// Declared here at namespace scope, OUTSIDE the anonymous namespace below: a
+// namespace nested inside an unnamed namespace has internal linkage, so a
+// declaration there would name a different function than the library defines and
+// fail at link time.
+namespace excgrid {
+const XcFunctional& MetaGgaReferenceFunctional() noexcept;
+} // namespace excgrid
 
 namespace {
 
@@ -31,12 +42,12 @@ TEST(RegistryTest, ShippedSurface) {
     const std::vector<std::string_view> names(excgrid::FunctionalNames().begin(),
                                               excgrid::FunctionalNames().end());
 
-    EXPECT_EQ(names.size(), 23);
+    EXPECT_EQ(names.size(), 24);
 
     for (const char* expected :
          {"slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
           "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
-          "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86"})
+          "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x"})
     {
         EXPECT_NE(std::find(names.begin(), names.end(), expected), names.end()) << expected;
     }
@@ -560,25 +571,99 @@ public:
         return _exchangeFraction;
     }
 
-    excgrid::XcKernelValue Evaluate(
-        double rhoA, double rhoB, double sigmaAa, double sigmaAb, double sigmaBb) const override {
-        excgrid::XcKernelValue result;
+    [[nodiscard]] excgrid::ComponentMask RequiredMask() const override {
+        return excgrid::ComponentMask::Collinear();
+    }
+
+    [[nodiscard]] excgrid::KernelStatus EvaluatePoint(const excgrid::PointInputs& inputs,
+                                                      excgrid::PointResult& result) const override {
+        const double rhoA = inputs.Get(excgrid::Component::RhoA);
+        const double rhoB = inputs.Get(excgrid::Component::RhoB);
+        const double sigmaAa = inputs.Get(excgrid::Component::SigmaAa);
+        const double sigmaAb = inputs.Get(excgrid::Component::SigmaAb);
+        const double sigmaBb = inputs.Get(excgrid::Component::SigmaBb);
+
+        excgrid::XcKernelValue value;
 
         for (const ReplicaTerm& term : _terms)
         {
             const excgrid::XcKernelValue part =
                 term.gga != nullptr ? term.gga(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb)
                                     : term.lda(rhoA, rhoB);
-            result += term.weight * part;
+            value += term.weight * part;
         }
 
-        return result;
+        excgrid::FoldIntoResult(value, inputs.mask, result);
+        return excgrid::KernelStatus::kOk;
     }
 
 private:
     double _exchangeFraction;
     std::vector<ReplicaTerm> _terms;
 };
+
+// ---------------------------------------------------------------------------
+// The tau tier's exemption from the folding guard
+// ---------------------------------------------------------------------------
+//
+// The recovery above fits each entry as a weighted sum over the LDA/GGA kernel
+// universe, so an entry that reads the kinetic-energy densities is outside its
+// span by construction: there is no combination of those kernels that reads tau,
+// and the fit would report a spurious ill-conditioned one rather than the tier
+// the entry belongs to.
+//
+// Such an entry is therefore EXEMPT, and the exemption is keyed on what the
+// entry's RequiredMask says it reads - never on its name, so it cannot be
+// extended by somebody choosing a string, and so the tier moves with the schema
+// rather than with a list kept here.
+//
+// The exemption is not a pass and not free.  What the guard asks in exchange for
+// it is that the mask is not a lie: tau arrives as a pair, and supplying it must
+// move the entry's energy density.  An entry claiming tau without reading it -
+// the one way the exemption could hide something - fails on the response check
+// instead of being waved through, and the exempted entries are named in the
+// messages so the record shows which entries left the guard's reach.
+
+/// Whether an entry belongs to the tau tier, with the pairing invariant checked
+/// as the mask is read.
+/// \param functional The entry.
+/// \returns True when its mask requires the kinetic-energy densities.
+[[nodiscard]] bool RequiresTau(const excgrid::XcFunctional& functional) {
+    const excgrid::ComponentMask mask = functional.RequiredMask();
+
+    EXPECT_EQ(mask.Test(excgrid::Component::TauA), mask.Test(excgrid::Component::TauB))
+        << "a mask that claims one spin channel's kinetic-energy density and not the other's is "
+           "not a tau tier";
+
+    return mask.Test(excgrid::Component::TauA);
+}
+
+/// How far an entry's energy density moves when the kinetic-energy densities are
+/// supplied, which is the evidence the exemption is earned on.
+/// \param functional The entry.
+/// \returns The absolute energy-density difference between the two evaluations.
+[[nodiscard]] double TauResponse(const excgrid::XcFunctional& functional) {
+    excgrid::PointInputs inputs;
+    inputs.Set(excgrid::Component::RhoA, 0.31);
+    inputs.Set(excgrid::Component::RhoB, 0.29);
+    inputs.Set(excgrid::Component::SigmaAa, 0.07);
+    inputs.Set(excgrid::Component::SigmaAb, 0.05);
+    inputs.Set(excgrid::Component::SigmaBb, 0.06);
+    inputs.Set(excgrid::Component::TauA, 0.11);
+    inputs.Set(excgrid::Component::TauB, 0.10);
+
+    excgrid::PointInputs densitiesOnly = inputs;
+    densitiesOnly.mask.Clear(excgrid::Component::TauA);
+    densitiesOnly.mask.Clear(excgrid::Component::TauB);
+
+    excgrid::PointResult withTau;
+    excgrid::PointResult withoutTau;
+
+    EXPECT_EQ(functional.EvaluatePoint(inputs, withTau), excgrid::KernelStatus::kOk);
+    EXPECT_EQ(functional.EvaluatePoint(densitiesOnly, withoutTau), excgrid::KernelStatus::kOk);
+
+    return std::abs(withTau.exc - withoutTau.exc);
+}
 
 TEST(RegistryFoldingGuard, EveryExchangePartitionCloses) {
     // The whole registry, name by name, through the one rule.  Nothing here
@@ -588,12 +673,25 @@ TEST(RegistryFoldingGuard, EveryExchangePartitionCloses) {
     // rather than skipping.
     int checked = 0;
     int checkedWithExactExchange = 0;
+    int exemptedTauTier = 0;
 
     for (std::string_view name : excgrid::FunctionalNames())
     {
         const excgrid::XcFunctional* functional = excgrid::FindFunctional(name);
 
         ASSERT_NE(functional, nullptr) << name;
+
+        if (RequiresTau(*functional))
+        {
+            ++exemptedTauTier;
+            EXPECT_GT(TauResponse(*functional), 0.0)
+                << name
+                << ": its RequiredMask claims the kinetic-energy densities, but its energy density "
+                   "does not move when they are supplied - the exemption from the folding rule is "
+                   "earned by reading tau, not by listing it";
+            continue;
+        }
+
         const ExchangePartition partition = MeasureExchangePartition(*functional);
 
         EXPECT_TRUE(partition.solved)
@@ -634,6 +732,13 @@ TEST(RegistryFoldingGuard, EveryExchangePartitionCloses) {
 
     EXPECT_GT(checkedWithExactExchange, 0)
         << "the guard examined no exchange-bearing entry with an exact-exchange fraction";
+
+    // The exemption branch has to be exercised, or it is dead code that would
+    // silently stop exempting the tier it exists for - and with it, the pairing
+    // and response checks that keep the exemption honest.
+    EXPECT_GT(exemptedTauTier, 0)
+        << "the guard exempted no entry from the tau tier: none is registered, or the exemption "
+           "is no longer keyed on RequiredMask";
 }
 
 TEST(RegistryFoldingGuard, TheGuardRejectsTheUnfoldedRecipeShape) {
@@ -696,6 +801,430 @@ TEST(RegistryFoldingGuard, TheGuardRejectsTheUnfoldedRecipeShape) {
             << ", folding rule requires " << partition.ClosingLdaExchange() << " (DFT exchange "
             << partition.DftExchange() << ", required " << partition.ClosingExchange() << ")";
     }
+}
+
+// ---------------------------------------------------------------------------
+// The tau tier's generated kernel and its generated second-derivative tier
+// ---------------------------------------------------------------------------
+//
+// The registry's `tau_x` is expanded from one symbolic definition
+// (xc_defs/tau_x.ey) by the codegen pipeline, which emits the order-1 kernel and
+// the second-derivative matrix from the same expression.  The tier's exact
+// conditions - the uniform-gas limit through the energy density and through the
+// density derivative along the gas's own manifold, the von Weizsacker tie
+// between the sigma and the tau slot, the exact 10/81 coefficient, the schema's
+// mask semantics on the new inputs - are asserted where they were first stated,
+// in tests/meta_gga_reference_test.cpp, which resolves its functional by NAME
+// and therefore gates the generated kernel as it gated the hand-written one.
+//
+// What is added here is the tier the generator emits beside that kernel: the
+// materialised matrix and the contracted form, which no condition file reaches.
+// They are checked against finite differences of THIS functional's own first
+// derivatives, never against another object's numbers: a Hessian is the
+// derivative of the gradient the same object returns, so the comparison is
+// internally exact, and it catches what the emission can actually get wrong - a
+// wrong row or column, a dropped or duplicated entry, a sign, and a packing that
+// follows the kernel's argument order instead of the caller's mask.
+
+/// The seven components the tau tier is emitted over, in kernel argument order.
+const std::array<excgrid::Component, 7> kTauComponents = {excgrid::Component::RhoA,
+                                                          excgrid::Component::RhoB,
+                                                          excgrid::Component::SigmaAa,
+                                                          excgrid::Component::SigmaAb,
+                                                          excgrid::Component::SigmaBb,
+                                                          excgrid::Component::TauA,
+                                                          excgrid::Component::TauB};
+
+/// The slots a request of the tier's own width fills: the upper triangle over
+/// the seven active components.
+constexpr std::size_t kTauPackedCount = kTauComponents.size() * (kTauComponents.size() + 1) / 2;
+
+/// The contract's upper-triangle index over `active` components in identifier
+/// order: entry (i, j), i <= j, at i*active - i*(i-1)/2 + (j-i).
+[[nodiscard]] std::size_t Packed(std::size_t i, std::size_t j, std::size_t active) {
+    return i * active - i * (i - 1) / 2 + (j - i);
+}
+
+/// One point's seven tau-tier components, in the same order.
+using TauPoint = std::array<double, 7>;
+
+[[nodiscard]] excgrid::PointInputs TauInputs(const TauPoint& values) {
+    excgrid::PointInputs inputs;
+
+    for (std::size_t i = 0; i < kTauComponents.size(); ++i)
+    {
+        inputs.Set(kTauComponents[i], values[i]);
+    }
+
+    return inputs;
+}
+
+/// One functional's first derivatives at one point, by tau-tier component.
+[[nodiscard]] std::array<double, 7> TauFirstDerivatives(const excgrid::XcFunctional& functional,
+                                                        const TauPoint& values) {
+    excgrid::PointResult result;
+    EXPECT_EQ(functional.EvaluatePoint(TauInputs(values), result), excgrid::KernelStatus::kOk);
+
+    std::array<double, 7> derivatives{};
+
+    for (std::size_t i = 0; i < kTauComponents.size(); ++i)
+    {
+        derivatives[i] = result.first[excgrid::IndexOf(kTauComponents[i])];
+    }
+
+    return derivatives;
+}
+
+/// The generated materialised tier at one point, which must also carry the
+/// order-1 tier's own result.
+[[nodiscard]] excgrid::PointSecondDerivativeMatrix TauMatrix(const excgrid::XcFunctional& tau,
+                                                             const TauPoint& values) {
+    excgrid::PointResult result;
+    excgrid::PointResult order1;
+    excgrid::PointSecondDerivativeMatrix matrix;
+
+    EXPECT_EQ(tau.EvaluatePointMaterialising(TauInputs(values), result, matrix),
+              excgrid::KernelStatus::kOk);
+    EXPECT_EQ(tau.EvaluatePoint(TauInputs(values), order1), excgrid::KernelStatus::kOk);
+    EXPECT_EQ(result.exc, order1.exc);
+    EXPECT_EQ(result.first[excgrid::IndexOf(excgrid::Component::TauA)],
+              order1.first[excgrid::IndexOf(excgrid::Component::TauA)]);
+
+    return matrix;
+}
+
+/// The points every finite-difference check below is taken at: a moderate one, a
+/// high-density strong-gradient one, and a low-density one, where the entries'
+/// own magnitudes spread over four orders.
+const std::array<TauPoint, 3> kTauPoints = {{
+    {0.42, 0.31, 0.021, 0.004, 0.017, 0.09, 0.07},
+    {1.7, 0.25, 0.8, 0.15, 0.55, 2.4, 0.06},
+    {0.02, 0.018, 0.05, 0.002, 0.03, 0.02, 0.9},
+}};
+
+// Every entry of the materialised matrix against the finite difference of the
+// first derivative the same functional returns, with the difference and its
+// accuracy measured on this kernel rather than assumed.
+//
+// A plain central difference at h = 1e-4 leaves an O(h^2) term that is visible
+// where the third derivative is steep: at the rhoA = 0.02 / tauB = 0.9 corner
+// it is 1.15e-4 relative, and 1.15e-6 at h = 1e-5 and 1.15e-8 at h = 1e-6 -
+// falling by four per halving, exactly as a truncation term does, which is what
+// separates it from an error in the entry.  Cancelling that term with one
+// Richardson step at h = 1e-4 leaves the round-off floor: 2.1e-9 relative over
+// the three points and all twenty-eight entries, measured.  The gate is 1e-7 -
+// fifty times that floor, and seven orders below the O(1) relative move a wrong
+// coefficient in any single entry makes.
+//
+// The entries the generator folded to zero are held exactly instead of to a
+// tolerance, because the derivative each differences is textually free of that
+// component: its two sides are bit-identical, so the difference is exactly zero
+// at any step (measured at four steps across the three points).
+TEST(RegistryTauTier, TheMatrixIsTheDerivativeOfTheGradientsTheKernelReturns) {
+    // Both numbers come from the measurement in the comment above this test.
+    constexpr double kStep = 1e-4;
+    constexpr double kRelativeTolerance = 1e-7;
+
+    const excgrid::XcFunctional* tau = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(tau, nullptr);
+
+    for (const TauPoint& point : kTauPoints)
+    {
+        const excgrid::PointSecondDerivativeMatrix matrix = TauMatrix(*tau, point);
+
+        EXPECT_EQ(matrix.mask.ActiveCount(), kTauComponents.size());
+        EXPECT_TRUE(matrix.mask.Test(excgrid::Component::TauB));
+
+        for (std::size_t i = 0; i < kTauComponents.size(); ++i)
+        {
+            for (std::size_t j = i; j < kTauComponents.size(); ++j)
+            {
+                const auto differenceAt = [&](double step) {
+                    TauPoint ahead = point;
+                    TauPoint behind = point;
+                    ahead[j] += step;
+                    behind[j] -= step;
+
+                    const std::array<double, 7> forward = TauFirstDerivatives(*tau, ahead);
+                    const std::array<double, 7> backward = TauFirstDerivatives(*tau, behind);
+                    return (forward[i] - backward[i]) / (2.0 * step);
+                };
+
+                const double coarse = differenceAt(kStep);
+                const double difference = (4.0 * differenceAt(kStep / 2.0) - coarse) / 3.0;
+
+                const double entry = matrix.upper[Packed(i, j, kTauComponents.size())];
+                const double scale = std::max({std::abs(entry), std::abs(difference), 1.0});
+
+                if (entry == 0.0)
+                {
+                    // Exact, not to a tolerance; see this test's own comment.
+                    EXPECT_DOUBLE_EQ(difference, 0.0)
+                        << "entry (" << i << ", " << j << ") at rhoA = " << point[0]
+                        << ": the matrix carries an exact zero, so the difference must be one";
+                    continue;
+                }
+
+                EXPECT_NEAR(entry, difference, kRelativeTolerance * scale)
+                    << "entry (" << i << ", " << j << ") at rhoA = " << point[0]
+                    << ": the generated matrix carries " << entry
+                    << ", the extrapolated difference of the generated first derivatives is "
+                    << difference;
+            }
+        }
+
+        // The packing stops where the contract's triangle does: the seven active
+        // components use the first 28 of the capacity's slots and no others.
+        for (std::size_t slot = kTauPackedCount; slot < matrix.upper.size(); ++slot)
+        {
+            EXPECT_DOUBLE_EQ(matrix.upper[slot], 0.0) << "slot " << slot;
+        }
+    }
+}
+
+// The other half of the schema's mask rule, on the tier that packs: the matrix a
+// caller gets is over the caller's mask, so clearing the tau bits must drop the
+// tau rows and columns rather than leave them inside a seven-wide packing.
+//
+// The two matrices below come from the SAME buffer values - the tau components
+// are supplied and zero in one case, absent in the other - so the block the two
+// packings share is bit-identical, and the entries that involve tau are gone
+// from the second rather than present as zeros.  The check is exact on purpose:
+// anything else means the packing counts something the caller did not supply.
+TEST(RegistryTauTier, TheMatrixPacksOverTheCallersMask) {
+    TauPoint point = kTauPoints[0];
+    point[5] = 0.0; // tauA
+    point[6] = 0.0; // tauB
+
+    const excgrid::XcFunctional* tau = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(tau, nullptr);
+
+    excgrid::PointInputs withoutTau = TauInputs(point);
+    withoutTau.mask.Clear(excgrid::Component::TauA);
+    withoutTau.mask.Clear(excgrid::Component::TauB);
+
+    excgrid::PointResult result;
+    excgrid::PointSecondDerivativeMatrix restricted;
+    ASSERT_EQ(tau->EvaluatePointMaterialising(withoutTau, result, restricted),
+              excgrid::KernelStatus::kOk);
+
+    const excgrid::PointSecondDerivativeMatrix full = TauMatrix(*tau, point);
+
+    EXPECT_EQ(restricted.mask.ActiveCount(), 5U);
+    EXPECT_FALSE(restricted.mask.Test(excgrid::Component::TauA));
+
+    for (std::size_t i = 0; i < 5; ++i)
+    {
+        for (std::size_t j = i; j < 5; ++j)
+        {
+            EXPECT_DOUBLE_EQ(restricted.upper[Packed(i, j, 5)], full.upper[Packed(i, j, 7)])
+                << "entry (" << i << ", " << j << ")";
+        }
+    }
+
+    for (std::size_t slot = 5 * 6 / 2; slot < restricted.upper.size(); ++slot)
+    {
+        EXPECT_DOUBLE_EQ(restricted.upper[slot], 0.0) << "slot " << slot;
+    }
+
+    // The density-tau block is not among the shared ones: at this point the
+    // functional is linear in tau, so those entries are nonzero in the full
+    // packing - which is what makes their absence above a drop rather than a
+    // value that happened to be zero.
+    EXPECT_NE(full.upper[Packed(0, 5, 7)], 0.0);
+}
+
+// The contracted tier against the materialised one.  The schema's two entry
+// points have to agree on the matrix and on the layout of a right-hand side,
+// which neither publishes on its own: the contraction is checked here as exactly
+// the materialised matrix acting on the vectors it was handed, in the order the
+// contract names them.
+TEST(RegistryTauTier, TheContractionIsTheMaterialisedMatrixOnTheRightHandSides) {
+    const std::array<double, 7> firstSide = {0.5, -1.25, 2.0, 0.75, -0.5, 1.5, -2.0};
+    const std::array<double, 7> secondSide = {1.0, 1.0, -1.0, 0.0, 3.0, -1.0, 0.25};
+    std::vector<double> rightHandSides(firstSide.begin(), firstSide.end());
+    rightHandSides.insert(rightHandSides.end(), secondSide.begin(), secondSide.end());
+
+    const excgrid::XcFunctional* tau = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(tau, nullptr);
+
+    const std::size_t active = kTauComponents.size();
+
+    for (const TauPoint& point : kTauPoints)
+    {
+        const excgrid::PointSecondDerivativeMatrix matrix = TauMatrix(*tau, point);
+
+        excgrid::PointResult result;
+        excgrid::PointResult order1;
+        excgrid::PointSecondDerivative second;
+        ASSERT_EQ(tau->EvaluatePointWithSecondDerivatives(
+                      TauInputs(point), rightHandSides, result, second),
+                  excgrid::KernelStatus::kOk);
+        ASSERT_EQ(tau->EvaluatePoint(TauInputs(point), order1), excgrid::KernelStatus::kOk);
+
+        EXPECT_EQ(result.exc, order1.exc);
+        EXPECT_EQ(second.rightHandSides, 2U);
+        EXPECT_EQ(second.mask.ActiveCount(), active);
+
+        for (std::size_t side = 0; side < 2; ++side)
+        {
+            for (std::size_t i = 0; i < active; ++i)
+            {
+                double expected = 0.0;
+
+                for (std::size_t j = 0; j < active; ++j)
+                {
+                    expected += matrix.upper[Packed(std::min(i, j), std::max(i, j), active)] *
+                                rightHandSides[side * active + j];
+                }
+
+                const double contracted = second.contracted[side * active + i];
+
+                // The two sums are the same product in the same order, so this is
+                // round-off and not an approximation.
+                EXPECT_NEAR(contracted, expected, 1e-14 * std::max(std::abs(expected), 1.0))
+                    << "right-hand side " << side << ", component " << i
+                    << ", at rhoA = " << point[0] << ": the contraction carries " << contracted
+                    << " against " << expected << " from the materialised matrix";
+            }
+        }
+    }
+}
+
+// The refusals of the new tier, by name, and the property that a refusal is not
+// answered with zeros: the capacity and the layout are checked before anything
+// is written, so a caller who receives a number can trust it.
+TEST(RegistryTauTier, TheContractedTierRefusesByShape) {
+    const excgrid::XcFunctional* tau = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(tau, nullptr);
+
+    const excgrid::PointInputs inputs = TauInputs(kTauPoints[0]);
+    const std::vector<double> ragged(10, 1.0); // not a multiple of the 7 active
+    const std::vector<double> threeSides(21, 1.0); // 3 x 7 against a capacity of 16
+
+    excgrid::PointResult result;
+    excgrid::PointSecondDerivative second;
+
+    second.rightHandSides = 42; // a sentinel: a refusal must not touch it
+    EXPECT_EQ(tau->EvaluatePointWithSecondDerivatives(inputs, ragged, result, second),
+              excgrid::KernelStatus::kRefusedUnsupportedCombination);
+    EXPECT_EQ(second.rightHandSides, 42U);
+    EXPECT_EQ(second.mask.ActiveCount(), 0U);
+
+    EXPECT_EQ(tau->EvaluatePointWithSecondDerivatives(inputs, threeSides, result, second),
+              excgrid::KernelStatus::kRefusedExhaustedCapacity);
+    EXPECT_EQ(second.rightHandSides, 42U);
+
+    // No active component at all: there is no layout to read a right-hand side
+    // in, so the request has no answer rather than an empty one.
+    excgrid::PointInputs empty;
+    EXPECT_EQ(
+        tau->EvaluatePointWithSecondDerivatives(empty, std::span<const double>{}, result, second),
+        excgrid::KernelStatus::kRefusedUnsupportedCombination);
+
+    // The order-1 tier answers the same call: a mask with no collinear component
+    // in it is a point with zero densities, not a malformed request.
+    excgrid::PointResult densitiesOnly;
+    EXPECT_EQ(tau->EvaluatePoint(empty, densitiesOnly), excgrid::KernelStatus::kOk);
+    EXPECT_DOUBLE_EQ(densitiesOnly.exc, 0.0);
+}
+
+// The generated kernel against the hand-written one that proved the tau slot, on
+// the fields the two share by construction.
+//
+// Both are the same published expansion, so the energy density, the two sigma
+// derivatives and the two tau derivatives have to agree to the precision the
+// hand-written channel's constants carry: its Slater constant is written to 13
+// digits (src/meta_gga_reference.cpp), which is a 1e-13 relative floor and
+// nothing more, and the tolerance is set there.
+//
+// The density derivative is checked the same way.  Both channels are gated
+// against the difference of the energy the generated one computes, so an error
+// in either is a mismatch here rather than a tolerance to widen.  This check
+// once carried a hundredfold looser bound because the hand-written channel's
+// vrho was wrong on its last term; the term is fixed and the bound with it.
+TEST(RegistryTauTier, TheGeneratedKernelAgreesWithTheHandWrittenReference) {
+    constexpr double kSharedTolerance = 1e-12;
+    constexpr double kStep = 1e-5;
+
+    const excgrid::XcFunctional* tau = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(tau, nullptr);
+
+    const excgrid::XcFunctional& reference = excgrid::MetaGgaReferenceFunctional();
+    const TauPoint point = {1.3, 0.31, 2.7, 0.11, 0.77, 0.66, 0.21};
+
+    excgrid::PointResult generated;
+    excgrid::PointResult handWritten;
+    ASSERT_EQ(tau->EvaluatePoint(TauInputs(point), generated), excgrid::KernelStatus::kOk);
+    ASSERT_EQ(reference.EvaluatePoint(TauInputs(point), handWritten), excgrid::KernelStatus::kOk);
+
+    EXPECT_NEAR(generated.exc, handWritten.exc, kSharedTolerance * std::abs(handWritten.exc));
+
+    for (const excgrid::Component component : {excgrid::Component::SigmaAa,
+                                               excgrid::Component::SigmaBb,
+                                               excgrid::Component::TauA,
+                                               excgrid::Component::TauB})
+    {
+        const double mine = generated.first[excgrid::IndexOf(component)];
+        const double theirs = handWritten.first[excgrid::IndexOf(component)];
+
+        EXPECT_NEAR(mine, theirs, kSharedTolerance * std::max(std::abs(theirs), 1.0))
+            << "component " << excgrid::IndexOf(component);
+    }
+
+    // The cross invariant carries no channel's own von Weizsacker density, so
+    // neither channel has a derivative with respect to it.
+    EXPECT_DOUBLE_EQ(generated.first[excgrid::IndexOf(excgrid::Component::SigmaAb)], 0.0);
+    EXPECT_DOUBLE_EQ(handWritten.first[excgrid::IndexOf(excgrid::Component::SigmaAb)], 0.0);
+
+    // The generated density derivative against the difference of the energy.
+    TauPoint ahead = point;
+    TauPoint behind = point;
+    ahead[0] += kStep;
+    behind[0] -= kStep;
+
+    excgrid::PointResult aheadResult;
+    excgrid::PointResult behindResult;
+    ASSERT_EQ(tau->EvaluatePoint(TauInputs(ahead), aheadResult), excgrid::KernelStatus::kOk);
+    ASSERT_EQ(tau->EvaluatePoint(TauInputs(behind), behindResult), excgrid::KernelStatus::kOk);
+
+    const double difference = (aheadResult.exc - behindResult.exc) / (2.0 * kStep);
+    const double analytic = generated.first[excgrid::IndexOf(excgrid::Component::RhoA)];
+
+    EXPECT_NEAR(analytic, difference, 1e-8 * std::max(std::abs(difference), 1.0));
+    EXPECT_NEAR(handWritten.first[excgrid::IndexOf(excgrid::Component::RhoA)],
+                difference,
+                1e-8 * std::max(std::abs(difference), 1.0))
+        << "the two channels' density derivatives have to agree: they are the same functional, so "
+           "a mismatch is one of them being wrong.  The bound is the difference step's own, the "
+           "same one the generated channel is held to above";
+}
+
+// Which implementation a name reaches is a fact, and it is pinned here rather
+// than assumed.  Two implementations of this functional exist - the generated
+// one and the hand-written reference - and a test that looks its subject up by
+// name follows the name wherever it points.  When the name was repointed from
+// one to the other, every such test silently changed what it was exercising,
+// and the implementation it left behind had no coverage at all.  This states
+// the binding so that a future repointing fails loudly instead.
+TEST(RegistryTauTier, TheNameReachesTheGeneratedKernelAndNotTheReference) {
+    const excgrid::XcFunctional* named = excgrid::FindFunctional("tau_x");
+    ASSERT_NE(named, nullptr);
+
+    const excgrid::XcFunctional& reference = excgrid::MetaGgaReferenceFunctional();
+    EXPECT_NE(named, &reference) << "the name and the direct reference must be different objects; "
+                                    "if they are the same, one implementation has been retired";
+
+    const TauPoint point = {1.3, 0.31, 2.7, 0.11, 0.77, 0.66, 0.21};
+    excgrid::PointResult throughName;
+    excgrid::PointResult throughReference;
+    ASSERT_EQ(named->EvaluatePoint(TauInputs(point), throughName), excgrid::KernelStatus::kOk);
+    ASSERT_EQ(reference.EvaluatePoint(TauInputs(point), throughReference),
+              excgrid::KernelStatus::kOk);
+
+    // Two implementations of one functional have to give one answer.
+    EXPECT_NEAR(throughName.exc, throughReference.exc,
+                1e-12 * std::max(std::abs(throughReference.exc), 1.0));
 }
 
 } // namespace
