@@ -130,7 +130,8 @@ if (EXCGRID_BUILD_TESTS)
         tests/kernel_test.cpp
         tests/meta_gga_reference_test.cpp
         tests/radial_grid_test.cpp
-        tests/registry_test.cpp)
+        tests/registry_test.cpp
+        tests/second_derivative_test.cpp)
     target_link_libraries(excgrid-tests PRIVATE excgrid gtest gtest_main)
 
     include(GoogleTest)

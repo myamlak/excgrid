@@ -25,6 +25,8 @@ using excgrid::kSecondDerivativeCapacity;
 using excgrid::PointInputs;
 using excgrid::PointResult;
 using excgrid::PointSecondDerivative;
+using excgrid::PointSecondDerivativeMatrix;
+using excgrid::SecondDerivativeStatus;
 using excgrid::XcFunctional;
 
 constexpr std::uint8_t kComponentCount = 32;
@@ -62,6 +64,54 @@ std::vector<Component> AllComponents() {
     }
     return ids;
 }
+
+// A functional whose second-derivative tier spans less than it reads: it reads
+// both densities, and answers on the alpha one alone.  This is the shape the
+// finer refusal names, and no shipped functional has it yet.
+class PartialTierFunctional final : public XcFunctional {
+public:
+    [[nodiscard]] bool UsesGradient() const override { return false; }
+
+    [[nodiscard]] double ExchangeFraction() const override { return 0.0; }
+
+    [[nodiscard]] ComponentMask RequiredMask() const override {
+        ComponentMask mask;
+        mask.Set(Component::RhoA);
+        mask.Set(Component::RhoB);
+        return mask;
+    }
+
+    [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
+        ComponentMask mask;
+        mask.Set(Component::RhoA);
+        return mask;
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePoint(const PointInputs& inputs,
+                                             PointResult& result) const override {
+        excgrid::XcKernelValue value;
+        value.exc = inputs.Get(Component::RhoA) + inputs.Get(Component::RhoB);
+        excgrid::FoldIntoResult(value, inputs.mask, result);
+        return KernelStatus::kOk;
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePointMaterialising(
+        const PointInputs& inputs, PointResult& result,
+        PointSecondDerivativeMatrix& matrix) const override {
+        const ComponentMask spanned = SecondDerivativeMask();
+        const KernelStatus status = SecondDerivativeStatus(inputs.mask, RequiredMask(), spanned);
+        if (status != KernelStatus::kOk) {
+            return status;
+        }
+
+        const ComponentMask published{inputs.mask.bits & spanned.bits};
+        result = PointResult{};
+        result.mask = published;
+        matrix = PointSecondDerivativeMatrix{};
+        matrix.mask = published;
+        return KernelStatus::kOk;
+    }
+};
 
 } // namespace
 
@@ -210,6 +260,7 @@ TEST(ContractTest, EachRefusalHasItsOwnName) {
         KernelStatus::kRefusedExhaustedCapacity,
         KernelStatus::kRefusedVersionMismatch,
         KernelStatus::kRefusedUnsupportedCombination,
+        KernelStatus::kRefusedSecondDerivativeCoverage,
     };
 
     std::vector<std::string> seen;
@@ -222,6 +273,32 @@ TEST(ContractTest, EachRefusalHasItsOwnName) {
     }
 
     EXPECT_EQ(std::string(excgrid::DescribeStatus(KernelStatus::kOk)), "ok");
+}
+
+// The finer grain: a caller that has a tier on a functional still has to be able
+// to tell "there is no tier" from "the tier does not reach the component you
+// asked about", and the two are separate statuses with separate names.
+TEST(ContractTest, ATierThatDoesNotSpanTheRequestSaysSo) {
+    const PartialTierFunctional partial;
+
+    PointInputs both;
+    both.Set(Component::RhoA, 0.4);
+    both.Set(Component::RhoB, 0.3);
+
+    PointResult result;
+    PointSecondDerivativeMatrix matrix;
+
+    EXPECT_EQ(partial.EvaluatePointMaterialising(both, result, matrix),
+              KernelStatus::kRefusedSecondDerivativeCoverage);
+    EXPECT_NE(KernelStatus::kRefusedSecondDerivativeCoverage,
+              KernelStatus::kRefusedUnsupportedCapability);
+
+    // The same functional answers when the request stays inside what it spans.
+    PointInputs alphaOnly;
+    alphaOnly.Set(Component::RhoA, 0.4);
+
+    EXPECT_EQ(partial.EvaluatePointMaterialising(alphaOnly, result, matrix), KernelStatus::kOk);
+    EXPECT_EQ(matrix.mask.bits, ComponentMask{}.bits | (1U << 0U));
 }
 
 // The second-derivative capacity is smaller than the input capacity, and the
