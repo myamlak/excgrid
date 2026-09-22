@@ -3,7 +3,20 @@
 // density and its spin-density derivatives, with the exact one-spin-zero
 // limit branches (the generator's limit substitution supplies the limit
 // expressions).
-// The banner and the kernel.hpp include are emitted by the calling .ey, which
+<?  // Appended to the banner only when the source asks for a tier, so a
+    // functional shipping order 1 alone carries no claim that it has one.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries))) [
+        WriteString("// It also emits the functional's SECOND-DERIVATIVE tier: one function filling" : Nl());
+        WriteString("// the contract's materialised matrix, from the same expression as the kernel." : Nl());
+        WriteString("// The matrix is the contract's upper triangle, row-major over the two" : Nl());
+        WriteString("// densities in identifier order, which is the LDA tier's whole span - an LDA" : Nl());
+        WriteString("// energy density reads no other component, so the gradient and" : Nl());
+        WriteString("// kinetic-energy-density rows and columns are not emitted at all rather than" : Nl());
+        WriteString("// emitted as zeros.  The tier is taken from the guarded expression, not from" : Nl());
+        WriteString("// the limit branches above: the Tiny guards already keep it finite at the spin" : Nl());
+        WriteString("// edges, which is what makes it a straight-line form where the order-1 kernel" : Nl());
+        WriteString("// is not." : Nl());
+    ]; ?>// The banner and the kernel.hpp include are emitted by the calling .ey, which
 // always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
@@ -56,4 +69,28 @@ XcKernelValue <? WriteString(fname); ?>(double rhoA, double rhoB)
     return result;
 }
 
+<?  // Written from inside a guard rather than as literal text because a
+    // functional whose second differentiation the codegen gate cannot afford
+    // emits order 1 alone: it gets no tier function at all rather than one
+    // that would answer zeros.  clang-format normalises what is written here,
+    // so only the token sequence has to be right.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries))) [
+        WriteString("void " : fname : "SecondDerivatives(double rhoA, double rhoB," : Nl());
+        WriteString("                                              PointSecondDerivativeMatrix& matrix)" : Nl());
+        WriteString("{" : Nl());
+        WriteString("    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;" : Nl());
+        WriteString(Nl());
+        WriteString("    if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())" : Nl());
+        WriteString("    {" : Nl());
+        WriteString("        return;" : Nl());
+        WriteString("    }" : Nl());
+        WriteString(Nl());
+        ForEach(entry, asecondDerivativeEntries) [
+            ForEach(d, Reverse(entry[5])) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ];
+            WriteString("    matrix.upper[" : String(entry[3]) : "] = " : ExCppForm(entry[4]) : ";" : Nl());
+            WriteString(Nl());
+        ];
+        WriteString("}" : Nl());
+        WriteString(Nl());
+    ]; ?>
 } // namespace excgrid

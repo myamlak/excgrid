@@ -13,5 +13,8 @@
 
     e := X'PbeCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+    // Order 1 only: this form's symbolic second differentiation runs to tens of
+    // minutes, against seconds for the exchange forms, so it ships without a
+    // second-derivative tier.
+    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
 ?>

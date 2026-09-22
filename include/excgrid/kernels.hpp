@@ -12,10 +12,13 @@ namespace excgrid {
 /// definitions live in excgrid/generated/ and are ordinary library
 /// sources - this header is the hand-written declaration surface, kept
 /// in sync by the add-a-functional procedure (docs/maintainer-guide.md).
-/// Order-1 kernels only - the energy density and the first derivatives,
-/// because Vxc assembly consumes nothing above that tier; second/third
-/// derivative tiers are a documented generator extension for the
-/// analytic-gradient track.
+///
+/// Two tiers come out of one `.ey`: the order-1 kernel - the energy density
+/// and the first derivatives, which Vxc assembly consumes - and the
+/// functional's SECOND-DERIVATIVE tier, a function filling the contract's
+/// materialised matrix from the same expression.  Both are declared here, in
+/// registry order, under one name per functional: the tier of `Foo` is
+/// `FooSecondDerivatives`.
 /// \{
 
 /// Slater (Dirac) LDA exchange.
@@ -166,5 +169,83 @@ XcKernelValue Pw91Correlation(
 /// \ingroup excgrid-kernels
 XcKernelValue P86Correlation(
     double rhoA, double rhoB, double sigmaAa, double sigmaAb, double sigmaBb);
+
+/// \name The second-derivative tiers
+///
+/// One per functional whose source can afford the symbolic second
+/// differentiation, emitted from the same expression as the kernel above it and
+/// filling the contract's upper triangle over the components that kernel reads,
+/// in identifier order.  A functional without one has no declaration here and
+/// refuses a tier request by capability; see XcFunctional::SecondDerivativeMask.
+/// The matrix is left untouched at a point the kernel's own guards do not
+/// answer.  The tau tier's is the one tier not declared here, because its
+/// kernel is wider than the two kernel-pointer types these functions return; it
+/// is named where the registry builds it.
+///
+/// These are the generated entry points.  A consumer goes through
+/// XcFunctional::EvaluatePointMaterialising, which re-packs this matrix onto
+/// the caller's own mask; the functions below are the generated layer under it
+/// and their packing is the kernel's argument order, not the caller's.
+/// \{
+/// \ingroup excgrid-kernels
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param matrix Filled with the upper triangle over (rhoA, rhoB).
+/// \ingroup excgrid-kernels
+void SlaterExchangeSecondDerivatives(double rhoA, double rhoB, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void Becke88ExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                      double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void PbeExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                  double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void RevPbeExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void RpbeExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                   double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void MPw91ExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                    double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \}
+/// \ingroup excgrid-kernels
 
 } // namespace excgrid

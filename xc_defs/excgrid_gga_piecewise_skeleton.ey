@@ -29,7 +29,15 @@
 // A kernel author adding a piecewise form must therefore state the boundary
 // and its source in the `.ey` beside the condition, as `p86_correlation.ey`
 // does; nothing here infers it.
-// The banner and the kernel.hpp include are emitted by the calling .ey, which
+<?  // Appended to the banner only when the source asks for a tier, so a
+    // functional shipping order 1 alone carries no claim that it has one.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries1) + Length(asecondDerivativeEntries2))) [
+        WriteString("// The functional's SECOND-DERIVATIVE tier is emitted beside the kernel from the" : Nl());
+        WriteString("// same two expressions, and carries the same branch: the matrix is one" : Nl());
+        WriteString("// functional's, so a request must be answered by the branch the point is in and" : Nl());
+        WriteString("// not by either branch alone.  It is the contract's upper triangle, row-major" : Nl());
+        WriteString("// over the five components the kernel takes, in identifier order." : Nl());
+    ]; ?>// The banner and the kernel.hpp include are emitted by the calling .ey, which
 // always precedes this skeleton, so they are not repeated here.
 
 #include <cmath>
@@ -102,4 +110,49 @@ XcKernelValue <? WriteString(fname); ?>(double rhoA,
     return result;
 }
 
+<?  // Written from inside a guard rather than as literal text because a
+    // functional whose second differentiation the codegen gate cannot afford
+    // emits order 1 alone: it gets no tier function at all rather than one
+    // that would answer zeros.  clang-format normalises what is written here,
+    // so only the token sequence has to be right.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries1) + Length(asecondDerivativeEntries2))) [
+        WriteString("void " : fname : "SecondDerivatives(double rhoA," : Nl());
+        WriteString("                                              double rhoB," : Nl());
+        WriteString("                                              double sigmaAa," : Nl());
+        WriteString("                                              double sigmaAb," : Nl());
+        WriteString("                                              double sigmaBb," : Nl());
+        WriteString("                                              PointSecondDerivativeMatrix& matrix)" : Nl());
+        WriteString("{" : Nl());
+        WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"}, {gab, "sigmaAb"}, {gbb, "sigmaBb"}},
+                                          {e1, deDra1, deDrb1, deGaa1, deGab1, deGbb1,
+                                           e2, deDra2, deDrb2, deGaa2, deGab2, deGbb2},
+                                          {aecsl1, adeDracsl1, adeDrbcsl1, adeGaacsl1, adeGabcsl1, adeGbbcsl1,
+                                           aecsl2, adeDracsl2, adeDrbcsl2, adeGaacsl2, adeGabcsl2, adeGbbcsl2}));
+        WriteString(Nl());
+        WriteString("    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;" : Nl());
+        WriteString(Nl());
+        WriteString("    if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())" : Nl());
+        WriteString("    {" : Nl());
+        WriteString("        return;" : Nl());
+        WriteString("    }" : Nl());
+        WriteString(Nl());
+        WriteString("    if (" : ExCppForm(pwCond) : ")" : Nl());
+        WriteString("    {" : Nl());
+        ForEach(entry, asecondDerivativeEntries1) [
+            ForEach(d, Reverse(entry[5])) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ];
+            WriteString("        matrix.upper[" : String(entry[3]) : "] = " : ExCppForm(entry[4]) : ";" : Nl());
+            WriteString(Nl());
+        ];
+        WriteString("    }" : Nl());
+        WriteString("    else" : Nl());
+        WriteString("    {" : Nl());
+        ForEach(entry, asecondDerivativeEntries2) [
+            ForEach(d, Reverse(entry[5])) [ WriteString("        const double " : ExCppForm(d) : ";" : Nl()); ];
+            WriteString("        matrix.upper[" : String(entry[3]) : "] = " : ExCppForm(entry[4]) : ";" : Nl());
+            WriteString(Nl());
+        ];
+        WriteString("    }" : Nl());
+        WriteString("}" : Nl());
+        WriteString(Nl());
+    ]; ?>
 } // namespace excgrid

@@ -1,7 +1,17 @@
 // The excgrid GGA kernel skeleton (fresh authorship; BSD-3-Clause).
 // Emits one excgrid::XcKernelValue function per GGA functional: the energy
 // density, the spin-density derivatives, and the three sigma derivatives.
-// No spin-edge branches: the definitions' Tiny guards keep every expression
+<?  // Appended to the banner only when the source asks for a tier, so a
+    // functional shipping order 1 alone carries no claim that it has one.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries))) [
+        WriteString("// It also emits the functional's SECOND-DERIVATIVE tier: one function filling" : Nl());
+        WriteString("// the contract's materialised matrix, from the same expression as the kernel." : Nl());
+        WriteString("// The matrix is the contract's upper triangle, row-major over the five" : Nl());
+        WriteString("// components the kernel takes, in identifier order - the GGA tier's whole" : Nl());
+        WriteString("// span.  Which of them a caller's matrix is over is the caller's mask, and the" : Nl());
+        WriteString("// registry re-packs the two; the kinetic-energy-density rows and columns are" : Nl());
+        WriteString("// not emitted at all, because a GGA energy density does not read tau." : Nl());
+    ]; ?>// No spin-edge branches: the definitions' Tiny guards keep every expression
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
 // contributions vanish with the spin density).
@@ -53,4 +63,36 @@ XcKernelValue <? WriteString(fname); ?>(double rhoA,
     return result;
 }
 
+<?  // Written from inside a guard rather than as literal text because a
+    // functional whose second differentiation the codegen gate cannot afford
+    // emits order 1 alone: it gets no tier function at all rather than one
+    // that would answer zeros.  clang-format normalises what is written here,
+    // so only the token sequence has to be right.
+    ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries))) [
+        WriteString("void " : fname : "SecondDerivatives(double rhoA," : Nl());
+        WriteString("                                              double rhoB," : Nl());
+        WriteString("                                              double sigmaAa," : Nl());
+        WriteString("                                              double sigmaAb," : Nl());
+        WriteString("                                              double sigmaBb," : Nl());
+        WriteString("                                              PointSecondDerivativeMatrix& matrix)" : Nl());
+        WriteString("{" : Nl());
+        WriteString(ExUnusedParamSilence({{ra, "rhoA"}, {rb, "rhoB"}, {gaa, "sigmaAa"}, {gab, "sigmaAb"}, {gbb, "sigmaBb"}},
+                                          {e, deDra, deDrb, deGaa, deGab, deGbb},
+                                          {aecsl, adeDracsl, adeDrbcsl, adeGaacsl, adeGabcsl, adeGbbcsl}));
+        WriteString(Nl());
+        WriteString("    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;" : Nl());
+        WriteString(Nl());
+        WriteString("    if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())" : Nl());
+        WriteString("    {" : Nl());
+        WriteString("        return;" : Nl());
+        WriteString("    }" : Nl());
+        WriteString(Nl());
+        ForEach(entry, asecondDerivativeEntries) [
+            ForEach(d, Reverse(entry[5])) [ WriteString("    const double " : ExCppForm(d) : ";" : Nl()); ];
+            WriteString("    matrix.upper[" : String(entry[3]) : "] = " : ExCppForm(entry[4]) : ";" : Nl());
+            WriteString(Nl());
+        ];
+        WriteString("}" : Nl());
+        WriteString(Nl());
+    ]; ?>
 } // namespace excgrid

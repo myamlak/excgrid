@@ -237,13 +237,42 @@ Function("ExUnusedParamSilence", {params, exprs, lists})
 RuleBaseListed("ExKernelGenerate", {fname, e, args});
 
 100 # ExKernelGenerate(fname_IsString, e_IsFunction, {ra_IsAtom, rb_IsAtom}) <--
-    ExLdaGenerate(fname, e, ra, rb);
+    ExLdaGenerate(fname, e, ra, rb, True);
 
 100 # ExKernelGenerate(fname_IsString, e_IsFunction,
                      {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom}) <--
-    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb);
+    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, True);
 
-ExLdaGenerate(fname, e, ra, rb) := [
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, tier_IsAtom}) <--
+    ExLdaGenerate(fname, e, ra, rb, tier);
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom,
+                      tier_IsAtom}) <--
+    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier);
+
+// The second-derivative tier costs a full symbolic second differentiation of the
+// expression per entry, which for the correlation forms is minutes to tens of
+// minutes against seconds for the exchange forms.  A source that passes False
+// emits the order-1 kernel alone, so a functional whose tier is not affordable
+// is still a functional.
+//
+// A one-element list when there is at least one entry to emit and an empty one
+// when there is not, so a skeleton can wrap the whole emission in a single
+// ForEach and read the count without iterating.  A functional without a tier
+// then gets no function at all rather than one that answers zeros.
+Function("ExTierEmissionGuard", {count})
+[
+    If (count > 0, {True}, {});
+];
+
+ExLdaGenerate(fname, e, ra, rb, tier) := [
+    // The second-derivative tier first, while `e` is still the untagged
+    // expression - Deriv() cannot differentiate a CSE tag.
+    asecondDerivativeEntries := {};
+    If (tier, asecondDerivativeEntries := ExSecondDerivativeEntries(e, {ra, rb}, {}));
+
     // The exact spin-zero limits (the Tiny guard inside the formulas keeps
     // them finite; the explicit limits give the EXACT one-spin edge values).
     leA := WithValue(ra, 0, e);
@@ -275,7 +304,14 @@ ExLdaGenerate(fname, e, ra, rb) := [
     PatchLoad("excgrid_lda_skeleton.ey");
 ];
 
-ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb) := [
+ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
+    // The second-derivative tier first, while `e` is still the untagged
+    // expression - Deriv() cannot differentiate a CSE tag.
+    asecondDerivativeEntries := {};
+    If (tier,
+        asecondDerivativeEntries :=
+            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;
     deGaa := Deriv(gaa) e;
@@ -361,8 +397,17 @@ ExPiecewiseBranch(e, ra, rb, gaa, gab, gbb) := [
 // contract, and p86_correlation.ey for the only user so far).
 // The branch names (1 for the condition-true side, 2 for the else side) are
 // what the skeleton's PatchLoad scope reads.
-ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb) := [
+ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb, tier) := [
     Local(b1, b2);
+
+    // The second-derivative tier, one entry list per branch, taken from the two
+    // expressions while they are still untagged.  Each branch's list is emitted
+    // inside its own braces, exactly as the order-1 branches are, so the two
+    // branches' CSE tag namespaces stay separate.
+    asecondDerivativeEntries1 := {};
+    asecondDerivativeEntries2 := {};
+    If (tier, asecondDerivativeEntries1 := ExSecondDerivativeEntries(eLow, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+    If (tier, asecondDerivativeEntries2 := ExSecondDerivativeEntries(eHigh, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
 
     b1 := ExPiecewiseBranch(eLow, ra, rb, gaa, gab, gbb);
     e1 := b1[1];
@@ -404,7 +449,7 @@ ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb) := [
 // user function", measured), while indexing the bound list works.
 ExPiecewiseKernelGenerate(fname, cond, eLow, eHigh, args) := [
     ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh,
-                           args[1], args[2], args[3], args[4], args[5]);
+                           args[1], args[2], args[3], args[4], args[5], args[6]);
 ];
 
 // --- The meta-GGA (tau-dependent) tier -------------------------------------
@@ -482,20 +527,51 @@ Function("ExIsQuotientZero", {e})
 // The expressions are differentiated from the ORIGINAL energy density, before
 // the order-1 path substitutes the CSE tags into it, because Deriv() cannot
 // differentiate a tag.
+//
+// `radicalVars` names the reduced-gradient variables, and it is what keeps the
+// entries that span one finite at an exactly zero gradient.  A reduced gradient
+// enters as Sqrt(gamma), and the radical survives inside the enhancement as a
+// squared occurrence - `pow(sqrt(gamma) / (2 * kF * rho), 2)` - which no factor
+// cancellation can reach.  Differentiating that w.r.t. gamma leaves a quotient
+// carrying Sqrt(gamma) in numerator and denominator alike, so each
+// differentiation of a radical-carrying variable is followed by the same
+// top-level cancellation the order-1 path applies to its own vsigma.  The
+// cancellation is applied to the INNER derivative and then to the outer one
+// rather than once to the finished entry, because a cancellation reaches only
+// the division at the top of the tree: the outer derivative of an uncancelled
+// inner quotient buries the shared radical below a sum, where the flat factor
+// scan of ExCancelSharedFactors no longer sees it and the entry is NaN at
+// gamma == 0.
+// The mixed partials commute, so a pair spanning a radical variable and a plain
+// one is differentiated w.r.t. the radical variable first; a pair spanning two
+// or none is left in its own order.  A pair with no radical variable is
+// differentiated exactly as it was before this argument existed, which is what
+// leaves a functional without reduced gradients, and the tau tier,
+// byte-identical.
 // `For` is the C-style four-argument form here (start, predicate, increment,
 // body) - yacas 1.8's controlflow.rep defines it that way, and a three-argument
 // call reads its middle argument as the predicate, so it silently runs zero
 // times rather than complaining.
-Function("ExSecondDerivativeEntries", {e, vars})
+Function("ExSecondDerivativeEntries", {e, vars, radicalVars})
 [
-    Local(n, entries, d2, reduced, i, j);
+    Local(n, entries, inner, d2, reduced, i, j, swap, first, second);
     n := Length(vars);
     entries := {};
     For(i := 1, i <= n, i++)
     [
         For(j := i, j <= n, j++)
         [
-            d2 := Deriv(vars[j]) Deriv(vars[i]) e;
+            swap := ExHas(radicalVars, vars[j]) And Not ExHas(radicalVars, vars[i]);
+            first := i;
+            second := j;
+            If (swap, first := j);
+            If (swap, second := i);
+
+            inner := Deriv(vars[first]) e;
+            If (ExHas(radicalVars, vars[first]), inner := ExCancelRadical(inner));
+
+            d2 := Deriv(vars[second]) inner;
+            If (ExHas(radicalVars, vars[second]), d2 := ExCancelRadical(d2));
             If (ExIsQuotientZero(d2), d2 := 0);
             reduced := CSE(d2);
             Push(entries, {i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), reduced[1],
@@ -509,7 +585,7 @@ ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
     // The second-derivative tier first, while `e` is still the untagged
     // expression.
     asecondDerivativeEntries :=
-        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb});
+        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {});
 
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;
