@@ -18,6 +18,8 @@ std::string_view DescribeStatus(KernelStatus status) noexcept {
             return "refused: the caller's schema version does not match this build's";
         case KernelStatus::kRefusedUnsupportedCombination:
             return "refused: this combination is not one this library answers";
+        case KernelStatus::kRefusedSecondDerivativeCoverage:
+            return "refused: the second-derivative tier does not span the components requested";
     }
     return "refused: unrecognised status";
 }
@@ -48,8 +50,16 @@ void FoldIntoResult(const XcKernelValue& value, const ComponentMask& mask,
     }
 }
 
-KernelStatus XcFunctional::EvaluatePointWithSecondDerivatives(
-    const PointInputs&, std::span<const double>, PointResult&, PointSecondDerivative&) const {
+ComponentMask XcFunctional::SecondDerivativeMask() const noexcept { return {}; }
+
+// The two defaults refuse outright rather than reporting what
+// SecondDerivativeStatus would say about this class's own mask: a derived class
+// that publishes a mask without overriding these writes no numbers, and kOk
+// over an untouched matrix is the one answer a caller cannot detect.
+KernelStatus XcFunctional::EvaluatePointWithSecondDerivatives(const PointInputs&,
+                                                              std::span<const double>,
+                                                              PointResult&,
+                                                              PointSecondDerivative&) const {
     return KernelStatus::kRefusedUnsupportedCapability;
 }
 

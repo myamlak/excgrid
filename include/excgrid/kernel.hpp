@@ -109,6 +109,7 @@ enum class KernelStatus : std::uint8_t {
     kRefusedExhaustedCapacity = 3, ///< The request needs more components than the capacity.
     kRefusedVersionMismatch = 4, ///< The version differs, or the mask carries an unknown component.
     kRefusedUnsupportedCombination = 5, ///< The combination is not one this library answers.
+    kRefusedSecondDerivativeCoverage = 6, ///< The tier exists but does not span the request.
 };
 
 /// One status's name, for a refusal message.
@@ -223,6 +224,73 @@ struct PointSecondDerivativeMatrix {
     std::array<double, kSecondDerivativeCapacity * kSecondDerivativeCapacity> upper{};
 };
 
+/// LDA second-derivative tier: the materialised matrix over the two densities.
+///
+/// The matrix is the upper triangle, row-major over (rhoA, rhoB) - the pair the
+/// kernel reads, in identifier order.  It is left untouched at a point the
+/// kernel's own guards do not answer.
+/// \ingroup excgrid-kernel
+using LdaSecondDerivative = void (*)(double rhoA, double rhoB, PointSecondDerivativeMatrix& matrix);
+
+/// GGA second-derivative tier: the materialised matrix over the five components
+/// a GGA kernel reads, in identifier order.
+/// \ingroup excgrid-kernel
+using GgaSecondDerivative = void (*)(double rhoA,
+                                     double rhoB,
+                                     double sigmaAa,
+                                     double sigmaAb,
+                                     double sigmaBb,
+                                     PointSecondDerivativeMatrix& matrix);
+
+/// Which of a caller's components a functional's second-derivative tier does
+/// not span.
+///
+/// The tier answers for the components the FUNCTIONAL reads; a component the
+/// caller supplies that the functional does not read is not part of the
+/// request and is not reported.  A request naming one that the functional reads
+/// and the tier leaves out is the case this names, and it is the difference
+/// between "no tier" and "no tier for this component".
+/// \param requested The caller's mask.
+/// \param required The components the functional reads.
+/// \param spanned The components its second-derivative tier covers.
+/// \returns The uncovered components of the request.
+/// \ingroup excgrid-kernel
+[[nodiscard]] constexpr ComponentMask UnspannedRequestComponents(
+    const ComponentMask& requested,
+    const ComponentMask& required,
+    const ComponentMask& spanned) noexcept {
+    return ComponentMask{requested.bits & required.bits & ~spanned.bits};
+}
+
+/// The refusal a second-derivative request earns, or kOk.
+///
+/// Three answers, in this order: a functional shipping no tier refuses with
+/// kRefusedUnsupportedCapability; a request touching a component the functional
+/// reads and the tier does not span refuses with
+/// kRefusedSecondDerivativeCoverage; anything else is kOk.  The order is what
+/// keeps the two distinguishable: an uncovered component is only worth naming
+/// once there is a tier to be uncovered by.
+/// \param requested The caller's mask.
+/// \param required The components the functional reads.
+/// \param spanned The components its second-derivative tier covers.
+/// \returns kOk, or the named refusal.
+/// \ingroup excgrid-kernel
+[[nodiscard]] constexpr KernelStatus SecondDerivativeStatus(const ComponentMask& requested,
+                                                            const ComponentMask& required,
+                                                            const ComponentMask& spanned) noexcept {
+    if (spanned.bits == 0)
+    {
+        return KernelStatus::kRefusedUnsupportedCapability;
+    }
+
+    if (UnspannedRequestComponents(requested, required, spanned).bits != 0)
+    {
+        return KernelStatus::kRefusedSecondDerivativeCoverage;
+    }
+
+    return KernelStatus::kOk;
+}
+
 /// A named, composed XC functional.
 /// \ingroup excgrid-kernel
 class XcFunctional {
@@ -241,6 +309,15 @@ public:
     /// The components this functional reads.
     /// \returns Its required mask.
     [[nodiscard]] virtual ComponentMask RequiredMask() const = 0;
+
+    /// The components this functional's second-derivative tier covers.
+    ///
+    /// The capability report.  An empty mask means no tier; a non-empty one
+    /// means the tier answers for exactly those components, so a caller can
+    /// tell a functional with no tier from one whose tier leaves the caller's
+    /// components out.  The default returns an empty mask.
+    /// \returns The spanned components.
+    [[nodiscard]] virtual ComponentMask SecondDerivativeMask() const noexcept;
 
     /// One per-point evaluation on the first-derivative tier.
     /// \param inputs The point's components and mask.
