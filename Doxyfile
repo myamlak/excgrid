@@ -20,7 +20,7 @@
 
 PROJECT_NAME           = excgrid
 PROJECT_BRIEF          = "Grid + XC-kernel + dispersion library"
-PROJECT_NUMBER         = 0.2.0
+PROJECT_NUMBER         = 0.3.0
 
 OUTPUT_DIRECTORY       = build/doxygen
 HTML_OUTPUT            = html

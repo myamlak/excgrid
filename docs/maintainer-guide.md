@@ -54,10 +54,11 @@ number`, ...) or lacks the kernel shape (an `excgrid` namespace line plus a
 Before assuming a functional's form fits, check which skeleton it needs. There
 are three: the LDA and GGA shapes, and — for a functional that reads the
 reserved tau slots — `xc_defs/excgrid_meta_gga_skeleton.ey`, which emits the
-seven-argument order-1 kernel **and** the functional's second-derivative matrix
-from the one expression. The tau tier's own example is `xc_defs/tau_x.ey`, and
-it is four lines: the rule is in `excgrid_defs.ys`, the `.ey` is the call plus
-`ExKernelGenerate` with its seven named components.
+seven-argument order-1 kernel where the other two emit a narrower one. All
+three emit the functional's second-derivative matrix from the same expression.
+The tau tier's own example is `xc_defs/tau_x.ey`, and it is four lines: the rule
+is in `excgrid_defs.ys`, the `.ey` is the call plus `ExKernelGenerate` with its
+seven named components.
 
 ### 3. Run `tools/regenerate.py` once
 
@@ -194,14 +195,51 @@ merely untidy:
 
 ## The derivative tiers
 
-The order-1 tier (energy density + first derivatives) is what plain Vxc
-assembly consumes, and the LDA and GGA skeletons emit that tier alone.
+The derivative tiers every kernel skeleton emits are the same two.
+`xc_defs/excgrid_lda_skeleton.ey`, `xc_defs/excgrid_gga_skeleton.ey`,
+`xc_defs/excgrid_gga_piecewise_skeleton.ey` and
+`xc_defs/excgrid_meta_gga_skeleton.ey` each expand one expression into the
+functional's **materialised second derivatives** beside its order-1 kernel,
+because the contract already crosses that tier (`PointSecondDerivativeMatrix`)
+and this is the tier an analytic gradient reaches for. The order-1 tier (energy
+density + first derivatives) is what plain Vxc assembly consumes.
 
-The tau tier emits one tier further: `xc_defs/excgrid_meta_gga_skeleton.ey`
-expands the same expression into the functional's **materialised second
-derivatives** as well, because the contract already crosses that tier
-(`PointSecondDerivativeMatrix`) and this is the tier an analytic gradient
-reaches for. Two pieces of the generator carry it, both in
+**A source can decline the tier.** The second differentiation is taken
+symbolically, in full, once per upper-triangle entry, and the exchange forms
+cost seconds to a few minutes each while the correlation forms are expensive
+enough to be unaffordable: `vwn5_correlation`'s tier, whose order-1 kernel takes
+about 3 minutes, ran 55 minutes when it was timed on the development machine,
+which is past the 1800 s per-kernel bound above. A driver that passes `False` as
+the last argument of `ExKernelGenerate` — or as the last element of the argument
+list `ExPiecewiseKernelGenerate` takes — emits its order-1 kernel alone. The
+three LDA/GGA skeletons wrap their whole tier function
+in `ExTierEmissionGuard`, so a declined tier produces **no function at all**
+rather than one that would answer zeros; the cost of declining is that callers
+get the tier's own refusal, not a silently empty matrix. `tau_x` is not on this
+path — the meta-GGA generator takes no such flag and always emits its tier.
+
+**Cost is not the only reason to decline.** A tier owes finiteness wherever its
+own order-1 kernel has it, and the cancellation above reaches only a division at
+the top of the differentiated tree. A functional whose second derivative is a
+SUM carrying the shared radical therefore keeps the singularity, and ships no
+tier rather than one with a hole at a point the kernel answers: that is why
+`pbesol` — whose `mu` crosses as the division `10/81` rather than as one decimal
+— emits its order-1 kernel alone while the three PBE-shaped exchanges that state
+`mu` as a decimal emit both. The reverse is not a reason to decline: `becke88`
+and `mpw91` ship a tier while their own order-1 `vsigma` is not finite at an
+exactly zero gradient, because the tier introduces no hole the kernel does not
+already have.
+
+Declining a tier means the declaration must go with it, and the second fact is
+not in the source: the tier functions are declared by hand — in
+`include/excgrid/kernels.hpp`, or for the tau tier where the registry builds
+it, `src/kernels_registry.cpp` — while their definitions are generated, and a
+declaration without a definition compiles and then fails at link time on the
+registry. `regenerate.py` therefore reads both sides and refuses — in `--check`
+as well as on the regenerating path — when the declared set and the defined set
+differ, and it does not rewrite the blessing manifest when they do.
+
+Two pieces of the generator carry the second derivatives, both in
 `xc_defs/excgrid_generate.ys`: `ExSecondDerivativeEntries` differentiates the
 expression over its arguments and folds the entries that are identically zero,
 and `ExUpperTriangleIndex` places each survivor in the contract's upper
@@ -210,13 +248,32 @@ triangle over the active components in identifier order.
 `matrix.upper[<k>] = ...` line is a root exactly as a `result.<field> = ...`
 line is.
 
+A GGA skeleton passes its three sigma arguments as radical-carrying variables, and
+that is what the third parameter of `ExSecondDerivativeEntries` is for. A
+gradient invariant enters the expression through `Sqrt`, and the expansion
+squares it back — `pow(sqrt(sigma)/(2 kF rho), 2)` — so by the time the
+enhancement is written the radical is no longer a free factor and no
+factor cancellation reaches it. Each differentiation with respect to a
+radical-carrying variable therefore produces a quotient with a shared `sqrt` at
+the top of the tree, and the generator applies the same top-level cancellation
+the order-1 path applies to `vsigma` after the inner derivative and again after
+the outer one. Without it the tier's sigma entries are `NaN` at an exactly zero
+gradient. The mixed partials commute, so a mixed pair is differentiated with
+respect to the radical-carrying variable first; a pair with no radical variable
+is differentiated exactly as before, which is why `tau_x` — the one kernel whose
+argument list carries no radical — regenerates byte for byte.
+
 Two things to know when reading that output. The skeleton emits the entries in
-the order of the seven components its kernel takes; which of them a caller's
-matrix is actually over is the caller's mask, and `src/kernels_registry.cpp`
-re-packs the two — an input outside the mask has no row and no column rather
-than a zero one. And the contracted tier is computed from the materialised
-matrix rather than emitted beside it, so the schema's two second-derivative
-entry points cannot disagree.
+the order of the components its kernel takes; which of them a caller's matrix is
+actually over is the caller's mask, and `src/kernels_registry.cpp` re-packs the
+two — an input outside the mask has no row and no column rather than a zero one.
+And the contracted tier is computed from the materialised matrix rather than
+emitted beside it, so the schema's two second-derivative entry points cannot
+disagree.
+
+A recipe takes a tier only when every one of its terms has one, so a hybrid
+built on a declined correlation refuses as a whole rather than returning the sum
+of the terms it happens to have.
 
 What is not built: the third derivative, which has no contract type to cross in
 — that addition is a schema change before it is a generator change.

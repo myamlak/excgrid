@@ -15,7 +15,7 @@ cmake_minimum_required(VERSION 3.25)
 # top-level project.  The verification jobs (pylibxc/pyscf point
 # checks) are CI Python steps, not CMake targets.
 
-project(excgrid VERSION 0.2.0 LANGUAGES CXX)
+project(excgrid VERSION 0.3.0 LANGUAGES CXX)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(EXCGRID_TOP_LEVEL ON)
