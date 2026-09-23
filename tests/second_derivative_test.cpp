@@ -474,14 +474,29 @@ TEST(SecondDerivativeTest, TheMatrixIsTheDerivativeOfTheKernelsOwnFirstDerivativ
 // point a caller is most likely to hand over.
 //
 // The requirement is placed where it can hold: the tier must be finite at the
-// corner wherever the kernel it differentiates is, and no further.  The two
-// names below are the exception, and they are the order-1 layer's exception
-// rather than the tier's - their enhancement's derivative carries
-// asinh(x)/sqrt(sigma), a quotient whose numerator vanishes like x without
-// being a product that carries the radical, so there is no common factor for
-// the generator's cancellation to remove.  That list is checked against the
-// kernels instead of trusted, so it cannot go stale in either direction.
-const std::array<std::string_view, 2> kOrderOneSingularAtZeroGradient = {"becke88", "mpw91"};
+// corner wherever the KERNEL is finite, and no further.  The kernel is finite
+// at the corner for every tiered functional now - the generator's
+// sigma-edge guard shifts the asinh shape's radicand (see
+// ExGuardSigmaRadical in xc_defs/excgrid_generate.ys), which is what closed the
+// last two order-1 names this list used to carry.
+//
+// The tier is a different matter, and the two names below are now the TIER's
+// exception rather than the kernel's: the tier is generated from the unguarded
+// expression on purpose, because the curvature that spans two sigma components
+// is genuinely divergent at an exactly zero gradient - the truth there is an
+// infinity, and a shifted radicand would report a large finite number instead.
+// What the tier does NOT answer is therefore stated as its own list, checked
+// against the measured matrices instead of trusted: it cannot go stale in
+// either direction, and it fails loudly if a later change makes a tier answer
+// where this file says it does not.
+//
+// Which entries: for these two the sigma-spanning ones.  The two diagonal
+// (sigma, sigma) entries are the genuine infinities; the (rho, sigma) and
+// (sigmaAa, sigmaAb) entries have finite limits and are holes of the same
+// removable kind the guard closed in the first-derivative layer - they are
+// reported and not asserted as limits, so this list is deliberately by NAME
+// and not by index.  A change that guards the tier would empty it.
+const std::array<std::string_view, 2> kTierHolesAtZeroGradient = {"becke88", "mpw91"};
 
 TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
     constexpr double kNearlyZeroGradient = 1e-30;
@@ -519,10 +534,14 @@ TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
             }
         }
 
-        const bool pinnedSingular =
-            std::find(kOrderOneSingularAtZeroGradient.begin(), kOrderOneSingularAtZeroGradient.end(),
-                      name) != kOrderOneSingularAtZeroGradient.end();
-        EXPECT_EQ(kernelFinite, !pinnedSingular) << name;
+        // Every tiered functional's kernel answers at the corner now, and that
+        // is asserted rather than assumed: it is the property the guard was
+        // added for, and this loop is where the whole tiered set meets it.
+        EXPECT_TRUE(kernelFinite) << name;
+
+        const bool pinnedTierHole =
+            std::find(kTierHolesAtZeroGradient.begin(), kTierHolesAtZeroGradient.end(), name) !=
+            kTierHolesAtZeroGradient.end();
 
         const auto corner = [&](double sigma) {
             excgrid::PointResult result;
@@ -537,16 +556,16 @@ TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
         const excgrid::PointSecondDerivativeMatrix adjacent = corner(kNearlyZeroGradient);
 
         // An entry the tier does answer must be the limit and not merely near
-        // it; an entry it does not answer is permitted only where the kernel has
-        // already stopped answering, and never silently - so the singular case
-        // has to show at least one entry carrying the kernel's own hole.
+        // it, and an entry it does not answer is permitted only for the two
+        // names pinned above - never silently, and never for a functional whose
+        // matrix is finite everywhere.
         bool anyHole = false;
         for (std::size_t k = 0; k < atZero.upper.size(); ++k)
         {
             if (!std::isfinite(atZero.upper[k]))
             {
                 anyHole = true;
-                EXPECT_FALSE(kernelFinite) << name << " entry " << k;
+                EXPECT_TRUE(pinnedTierHole) << name << " entry " << k;
                 continue;
             }
 
@@ -554,7 +573,7 @@ TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
                         1e-9 * std::max(1.0, std::abs(adjacent.upper[k])))
                 << name << " entry " << k;
         }
-        EXPECT_EQ(anyHole, !kernelFinite) << name;
+        EXPECT_EQ(anyHole, pinnedTierHole) << name;
     }
 }
 

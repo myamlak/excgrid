@@ -91,8 +91,8 @@ TIER_SUFFIX = "SecondDerivatives"
 # against about 3 minutes for the next slowest, vwn5_correlation, read off
 # the per-kernel output timestamps of a full regeneration.  The bound exists
 # to stop a NON-TERMINATING expansion, not to police the pace, so do not
-# lower it to make a run feel faster.  See the 2026-09-13 note in
-# docs/maintainer-guide.md.
+# lower it to make a run feel faster - the guide's "Two guards make an
+# interrupted run safe and a hanging one loud" carries the same numbers.
 KERNEL_TIMEOUT_SECONDS = 1800
 
 

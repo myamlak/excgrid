@@ -28,6 +28,15 @@ XcKernelValue PbeSolExchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+    // The sigma-edge guard the generator adds to a vanishing channel radical
+    // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
+    // Its value has to be written HERE rather than injected from the
+    // definitions: the printer renders a number below 1e-16 as "0.", so a
+    // constant small enough to be absorbed by every normal sigma cannot reach
+    // the expression through yacas at all.  1e-300 is absorbed by every sigma
+    // above ~1e-284 and leaves the sum at exactly sigma, which is what keeps
+    // the guarded arithmetic bit-identical to the unguarded one.
+    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;
 
@@ -64,75 +73,77 @@ XcKernelValue PbeSolExchange(
     const double C61 = 4. * sigmaAa;
     const double C62 = 6. * C49;
     const double C63 = C54 * C46;
-    const double C64 = -2. / 3.;
-    const double C65 = C63 + 1e-16;
+    const double C64 = C63 + 1e-16;
+    const double C65 = C54 / C62;
     const double C66 = std::sqrt(C61);
-    const double C67 = std::pow(C52, C64);
-    const double C68 = 2. * C65;
-    const double C69 = C67 * C62;
-    const double C70 = C66 / C68;
-    const double C71 = std::pow(C70, 2);
-    const double C72 = 10. * C71;
-    const double C73 = C72 / 0.65124e2;
-    const double C74 = C73 + 1.;
+    const double C67 = 2. * C64;
+    const double C68 = C66 / C67;
+    const double C69 = std::pow(C68, 2);
+    const double C70 = 10. * C69;
+    const double C71 = C70 / 0.65124e2;
+    const double C72 = C71 + 1.;
 
-    result.vrhoA = -((1.804 - 0.804 / C74) * (rhoA * 3. * C69 / 3. + C60) +
-                     rhoA * C60 * -0.3216e2 * (2. * C54 + 2. * rhoA * C69 / 3.) * C61 /
-                         (0.130248e3 * C65 * std::pow(C68, 2) * std::pow(C74, 2))) /
+    result.vrhoA = -((1.804 - 0.804 / C72) * (18. * C49 * C65 / 3. + C60) +
+                     rhoA * C60 * -0.3216e2 * (2. * C54 + 2. * C62 * C65 / 3.) * C61 /
+                         (0.130248e3 * C64 * std::pow(C67, 2) * std::pow(C72, 2))) /
                    (4. * Pi);
 
-    const double C76 = 3. * C55;
-    const double C77 = 4. * sigmaBb;
-    const double C78 = 6. * C49;
-    const double C79 = C55 * C47;
-    const double C80 = -2. / 3.;
-    const double C81 = C79 + 1e-16;
-    const double C82 = std::sqrt(C77);
-    const double C83 = std::pow(C53, C80);
-    const double C84 = 2. * C81;
-    const double C85 = C83 * C78;
-    const double C86 = C82 / C84;
-    const double C87 = std::pow(C86, 2);
-    const double C88 = 10. * C87;
-    const double C89 = C88 / 0.65124e2;
-    const double C90 = C89 + 1.;
+    const double C74 = 3. * C55;
+    const double C75 = 4. * sigmaBb;
+    const double C76 = 6. * C49;
+    const double C77 = C55 * C47;
+    const double C78 = C77 + 1e-16;
+    const double C79 = C55 / C76;
+    const double C80 = std::sqrt(C75);
+    const double C81 = 2. * C78;
+    const double C82 = C80 / C81;
+    const double C83 = std::pow(C82, 2);
+    const double C84 = 10. * C83;
+    const double C85 = C84 / 0.65124e2;
+    const double C86 = C85 + 1.;
 
-    result.vrhoB = -((1.804 - 0.804 / C90) * (rhoB * 3. * C85 / 3. + C76) +
-                     rhoB * C76 * -0.3216e2 * (2. * C55 + 2. * rhoB * C85 / 3.) * C77 /
-                         (0.130248e3 * C81 * std::pow(C84, 2) * std::pow(C90, 2))) /
+    result.vrhoB = -((1.804 - 0.804 / C86) * (18. * C49 * C79 / 3. + C74) +
+                     rhoB * C74 * -0.3216e2 * (2. * C55 + 2. * C76 * C79 / 3.) * C75 /
+                         (0.130248e3 * C78 * std::pow(C81, 2) * std::pow(C86, 2))) /
                    (4. * Pi);
 
-    const double C92 = 2. * rhoA;
-    const double C93 = 1. / 3.;
-    const double C94 = std::pow(Pi, 2);
-    const double C95 = C94 * C92;
-    const double C96 = 3. * C95;
-    const double C97 = std::pow(C96, C93);
-    const double C98 = C97 * C92;
-    const double C99 = C98 + 1e-16;
+    const double C88 = 2. * rhoA;
+    const double C89 = 1. / 3.;
+    const double C90 = std::pow(Pi, 2);
+    const double C91 = C90 * C88;
+    const double C92 = 3. * C91;
+    const double C93 = std::pow(C92, C89);
+    const double C94 = C93 * C88;
+    const double C95 = C94 + 1e-16;
 
     result.vsigmaAa =
-        -0.19296e3 * C97 * rhoA /
+        -0.19296e3 * C93 * rhoA /
         (0.2083968e4 * Pi *
-         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * C99), 2) / 0.65124e2 + 1., 2) *
-         std::pow(C99, 2));
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) / (2. * C95), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         std::pow(C95, 2));
 
     result.vsigmaAb = 0;
 
-    const double C102 = 2. * rhoB;
-    const double C103 = 1. / 3.;
-    const double C104 = std::pow(Pi, 2);
-    const double C105 = C104 * C102;
-    const double C106 = 3. * C105;
-    const double C107 = std::pow(C106, C103);
-    const double C108 = C107 * C102;
-    const double C109 = C108 + 1e-16;
+    const double C98 = 2. * rhoB;
+    const double C99 = 1. / 3.;
+    const double C100 = std::pow(Pi, 2);
+    const double C101 = C100 * C98;
+    const double C102 = 3. * C101;
+    const double C103 = std::pow(C102, C99);
+    const double C104 = C103 * C98;
+    const double C105 = C104 + 1e-16;
 
     result.vsigmaBb =
-        -0.19296e3 * C107 * rhoB /
+        -0.19296e3 * C103 * rhoB /
         (0.2083968e4 * Pi *
-         std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * C109), 2) / 0.65124e2 + 1., 2) *
-         std::pow(C109, 2));
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) / (2. * C105), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         std::pow(C105, 2));
 
     return result;
 }

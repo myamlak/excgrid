@@ -219,16 +219,37 @@ get the tier's own refusal, not a silently empty matrix. `tau_x` is not on this
 path — the meta-GGA generator takes no such flag and always emits its tier.
 
 **Cost is not the only reason to decline.** A tier owes finiteness wherever its
-own order-1 kernel has it, and the cancellation above reaches only a division at
-the top of the differentiated tree. A functional whose second derivative is a
-SUM carrying the shared radical therefore keeps the singularity, and ships no
-tier rather than one with a hole at a point the kernel answers: that is why
-`pbesol` — whose `mu` crosses as the division `10/81` rather than as one decimal
-— emits its order-1 kernel alone while the three PBE-shaped exchanges that state
-`mu` as a decimal emit both. The reverse is not a reason to decline: `becke88`
-and `mpw91` ship a tier while their own order-1 `vsigma` is not finite at an
-exactly zero gradient, because the tier introduces no hole the kernel does not
-already have.
+own order-1 kernel has it — EXCEPT where the tier's own curvature is genuinely
+infinite, which no emission can answer finitely. That exception is the only one
+that stands: a tier whose hole is a REMOVABLE singularity the kernel does not
+have is a reason to decline, and it is why `pbesol` — whose `mu` crosses as the
+division `10/81` rather than as one decimal, so the cancellation above reaches
+only a division at the top of the differentiated tree — emits its order-1
+kernel alone while the three PBE-shaped exchanges that state `mu` as a decimal
+emit both.
+
+Two passes in `xc_defs/excgrid_generate.ys` close the ORDER-1 holes this tree
+has measured, and both run on the first-derivative expressions only:
+
+- `ExGuardSigmaRadical` shifts a vanishing single-channel radical (`asinh`
+  enhancements: `becke88`, `pw91`, `mpw91`) by a constant below the resolution
+  of every sigma a caller can hand over, so the corner answers the limit while
+  the arithmetic above it is bit-identical;
+- `ExCancelDensityPower` cancels the removable `rho * (k rho)^(-2/3)` the chain
+  rule leaves in a spin-density derivative (`pbe`, `revpbe`, `rpbe`, `pbesol`,
+  `pw91`), by the exponent identity rather than by a guard.
+
+Each carries its own measurements in its comment, including the repairs that
+were built and rejected on measurement. Because neither touches the energy
+expression, every affected tier regenerates byte for byte — and for `becke88`
+and `mpw91` that leaves the tier answering NaN in its sigma rows at an exactly
+zero gradient where the kernel now answers the limit. Those entries are the
+curvature across two sigma components, genuinely infinite there; the (rho,
+sigma) entries beside them are removable and unreached, and
+`tests/second_derivative_test.cpp` names both facts rather than skipping them.
+The correlation route's radical is over the total gradient, so it is outside
+the guard's scope and still returns NaN at its own zero (`pbe_c`, `pw91_c`,
+`p86`) — measured and reported, not guarded.
 
 Declining a tier means the declaration must go with it, and the second fact is
 not in the source: the tier functions are declared by hand — in

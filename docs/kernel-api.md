@@ -141,8 +141,14 @@ namespace excgrid {
   answers at an exactly zero gradient where its tier would not. The same
   expression with `mu` as a single decimal — `pbe`, `revpbe`, `rpbe` — cancels
   cleanly and ships. Note that `becke88` and `mpw91` DO ship a tier while their
-  order-1 `vsigma` is itself not finite at an exactly zero gradient; a tier owes
-  finiteness where its kernel has it, and no more.
+  tier's own sigma-sigma entries at an exactly zero gradient are not finite,
+  even though their order-1 `vsigma` now is: the curvature across two sigma
+  components is genuinely infinite there, so no emission answers it, and the
+  order-1 holes they used to share — the ones a tier DOES owe with its kernel —
+  are closed in the generator. A tier owes finiteness where its kernel has it
+  and its own curvature is finite, and no more;
+  `tests/second_derivative_test.cpp` names the two exceptions and holds them to
+  that.
 - **A tier spans the components its functional reads, and says which they are.**
   `SecondDerivativeMask()` is the capability report: an empty mask means the
   functional has no tier, and a non-empty one names exactly the components its

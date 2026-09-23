@@ -50,6 +50,12 @@ XcKernelValue P86Correlation(
     double rhoA, double rhoB, double sigmaAa, double sigmaAb, double sigmaBb) {
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+    // Declared where the straight-line skeleton declares it, and for the same
+    // reason: the generator's sigma-edge guard needs a constant too small for
+    // the printer to write into an expression.  No branch of the tree's one
+    // piecewise functional carries a guarded radical today; a future one that
+    // does would need it here.
+    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;
 

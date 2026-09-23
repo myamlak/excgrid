@@ -33,6 +33,15 @@ XcKernelValue Becke88Exchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+    // The sigma-edge guard the generator adds to a vanishing channel radical
+    // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
+    // Its value has to be written HERE rather than injected from the
+    // definitions: the printer renders a number below 1e-16 as "0.", so a
+    // constant small enough to be absorbed by every normal sigma cannot reach
+    // the expression through yacas at all.  1e-300 is absorbed by every sigma
+    // above ~1e-284 and leaves the sum at exactly sigma, which is what keeps
+    // the guarded arithmetic bit-identical to the unguarded one.
+    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;
 
@@ -120,60 +129,62 @@ XcKernelValue Becke88Exchange(
                      (C368 + 0.0042 * C367 / C403) * 4. * std::pow(rhoB, C355) / 3.);
 
     const double C405 = rhoA + 1e-16;
-    const double C406 = 4. / 3.;
-    const double C407 = 8. / 3.;
-    const double C408 = std::sqrt(sigmaAa);
-    const double C409 = 0.0252 * C408;
-    const double C410 = std::pow(C405, C406);
-    const double C411 = std::pow(C405, C407);
-    const double C412 = C408 * C411;
-    const double C413 = C408 / C410;
-    const double C414 = std::pow(C413, 2);
-    const double C415 = C414 + 1.;
-    const double C416 = std::sqrt(C415);
-    const double C417 = C413 + C416;
-    const double C418 = std::log(C417);
-    const double C419 = C418 * C409;
-    const double C420 = C419 / C410;
-    const double C421 = C420 + 1.;
+    const double C406 = sigmaAa + SigmaGuard;
+    const double C407 = 4. / 3.;
+    const double C408 = 8. / 3.;
+    const double C409 = std::sqrt(C406);
+    const double C410 = std::pow(C405, C407);
+    const double C411 = std::pow(C405, C408);
+    const double C412 = 0.0252 * C409;
+    const double C413 = C409 * C411;
+    const double C414 = C409 / C410;
+    const double C415 = std::pow(C414, 2);
+    const double C416 = C415 + 1.;
+    const double C417 = std::sqrt(C416);
+    const double C418 = C414 + C417;
+    const double C419 = std::log(C418);
+    const double C420 = C419 * C412;
+    const double C421 = C420 / C410;
+    const double C422 = C421 + 1.;
 
     result.vsigmaAa =
-        -std::pow(rhoA, C406) *
-        (C421 * 0.0042 * C408 / C412 -
-         0.0042 * C414 *
-             (0.0252 * C418 / (2 * C408) +
-              0.0252 * C408 * (1 / (2 * C408 * C410) + C408 / (C412 * 2 * C416)) / C417) /
+        -std::pow(rhoA, C407) *
+        (C422 * 0.0042 * C409 / C413 -
+         0.0042 * C415 *
+             (0.0252 * C419 / (2 * C409) +
+              0.0252 * C409 * (1 / (2 * C409 * C410) + C409 / (C413 * 2 * C417)) / C418) /
              C410) /
-        std::pow(C421, 2);
+        std::pow(C422, 2);
 
     result.vsigmaAb = 0;
 
-    const double C424 = rhoB + 1e-16;
-    const double C425 = 4. / 3.;
-    const double C426 = 8. / 3.;
-    const double C427 = std::sqrt(sigmaBb);
-    const double C428 = 0.0252 * C427;
-    const double C429 = std::pow(C424, C425);
-    const double C430 = std::pow(C424, C426);
-    const double C431 = C427 * C430;
-    const double C432 = C427 / C429;
-    const double C433 = std::pow(C432, 2);
-    const double C434 = C433 + 1.;
-    const double C435 = std::sqrt(C434);
-    const double C436 = C432 + C435;
-    const double C437 = std::log(C436);
-    const double C438 = C437 * C428;
-    const double C439 = C438 / C429;
-    const double C440 = C439 + 1.;
+    const double C425 = rhoB + 1e-16;
+    const double C426 = sigmaBb + SigmaGuard;
+    const double C427 = 4. / 3.;
+    const double C428 = 8. / 3.;
+    const double C429 = std::sqrt(C426);
+    const double C430 = std::pow(C425, C427);
+    const double C431 = std::pow(C425, C428);
+    const double C432 = 0.0252 * C429;
+    const double C433 = C429 * C431;
+    const double C434 = C429 / C430;
+    const double C435 = std::pow(C434, 2);
+    const double C436 = C435 + 1.;
+    const double C437 = std::sqrt(C436);
+    const double C438 = C434 + C437;
+    const double C439 = std::log(C438);
+    const double C440 = C439 * C432;
+    const double C441 = C440 / C430;
+    const double C442 = C441 + 1.;
 
     result.vsigmaBb =
-        -std::pow(rhoB, C425) *
-        (C440 * 0.0042 * C427 / C431 -
-         0.0042 * C433 *
-             (0.0252 * C437 / (2 * C427) +
-              0.0252 * C427 * (1 / (2 * C427 * C429) + C427 / (C431 * 2 * C435)) / C436) /
-             C429) /
-        std::pow(C440, 2);
+        -std::pow(rhoB, C427) *
+        (C442 * 0.0042 * C429 / C433 -
+         0.0042 * C435 *
+             (0.0252 * C439 / (2 * C429) +
+              0.0252 * C429 * (1 / (2 * C429 * C430) + C429 / (C433 * 2 * C437)) / C438) /
+             C430) /
+        std::pow(C442, 2);
 
     return result;
 }
