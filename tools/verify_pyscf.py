@@ -155,16 +155,26 @@ agree to 2.5e-15 / 8.6e-16 / 4.7e-14 / 5.7e-13 at the same points and slots.
 A point-set or unit mismatch would break those four as well, so it is not
 what separates the four kernels above.
 
-**What the run does NOT compare.** The zero-gradient corner: every shipped
-GGA kernel except `lyp` returns NaN in a vsigma slot when the sigma it feeds
-on is BIT-EXACTLY zero (the vsigma expression carries the same `sqrt(sigma)`
-factor above and below, so the exact zero evaluates 0/0 where Libxc returns a
-finite limit). That is a pinned kernel defect with its own tests
-(`tests/kernel_test.cpp`, `KernelTest.ZeroGradientVsigma*`), not something
-this script may hide: a NaN is compared against the allowed set below, a NaN
+**What the run does NOT compare.** The zero-gradient corner of the
+CORRELATION route: `pbe_c`, `pw91_c` and `p86` (and the correlation half of
+`pbe0`) return NaN in all three vsigma slots when `sigmaAa + 2 sigmaAb +
+sigmaBb` is BIT-EXACTLY zero - their energy depends on that total, and the
+expression carries `sqrt(gamma)` above and below, so the exact zero evaluates
+0/0 where Libxc returns a finite limit. That is a pinned kernel defect with
+its own tests (`tests/kernel_test.cpp`, `KernelTest.ZeroGradientCorrelation*`
+and `KernelTest.ZeroGradientNanIsTheIndefiniteQuietNan`), not something this
+script may hide: a NaN is compared against the allowed set below, a NaN
 anywhere else fails the check, and the skipped slots are counted and printed
-so a green line never means "silently passed". `exc` and the `vrho` pair stay
-finite and ARE compared at those points.
+so a green line never means "silently passed".
+
+The exchange route is NOT in that list any more, and its rule is gone from
+this tool with it rather than left latent. Every exchange kernel used to return NaN
+in its own spin's vsigma slot at a bit-exactly zero sigma; the generator now
+cancels the removable density power and shifts the sigma-edge radical
+(`xc_defs/excgrid_generate.ys`), so those slots answer the finite limit and
+are COMPARED here like any other point. Keeping an allowance for a NaN that
+no kernel produces any more would hide exactly the regression it was written
+to describe.
 
 pyscf has no Windows wheels (upstream), so the windows leg of
 `.github/workflows/ci.yml` skips this step - the linux leg is the gate;
@@ -190,15 +200,16 @@ from pyscf.dft import libxc as pyscf_libxc
 
 ROOT = Path(__file__).resolve().parent.parent
 
-# The zero-gradient vsigma rules, keyed by which sigma argument the kernel's
+# The zero-gradient vsigma rule, keyed by which sigma argument the kernel's
 # vsigma expression divides through by (see the module docstring and
-# tests/kernel_test.cpp).  "spin": each vsigma dies with its OWN per-spin
-# sigma - the exchange route.  "total": all three die with
-# sigmaAa + 2 sigmaAb + sigmaBb - the correlation route.  A functional
-# carrying both routes lists both, e.g. pbe0 (pbe exchange plus pbe
-# correlation).  An empty set is an LDA kernel (no sigma at all) or lyp
-# (its energy is linear in sigma, so its derivative is a constant).
-NAN_SPIN = "spin"
+# tests/kernel_test.cpp).  "total": all three slots die with
+# sigmaAa + 2 sigmaAb + sigmaBb - the correlation route, the one route still
+# open.  The exchange route ("spin", each vsigma dying with its own per-spin
+# sigma) was the same kind of defect and is fixed; it has no rule here any
+# more, deliberately, so that a NaN in a spin slot fails the check instead of
+# being skipped.  An empty set is an LDA kernel (no sigma at all), lyp (its
+# energy is linear in sigma, so its derivative is a constant), or one of the
+# exchange kernels whose spin corner is now a value.
 NAN_TOTAL = "total"
 
 # (excgrid kernel name, the lowercase Libxc id pyscf resolves, vsigma rules).
@@ -215,20 +226,20 @@ FUNCTIONALS = [
     ("vwn5", "lda_c_vwn", set()),
     ("vwn3", "lda_c_vwn_rpa", set()),
     ("pw92", "lda_c_pw", set()),
-    ("becke88", "gga_x_b88", {NAN_SPIN}),
-    ("pw91", "gga_x_pw91", {NAN_SPIN}),
-    ("pbe", "gga_x_pbe", {NAN_SPIN}),
-    ("revpbe", "gga_x_pbe_r", {NAN_SPIN}),
-    ("rpbe", "gga_x_rpbe", {NAN_SPIN}),
-    ("mpw91", "gga_x_mpw91", {NAN_SPIN}),
-    ("pbesol", "gga_x_pbe_sol", {NAN_SPIN}),
+    ("becke88", "gga_x_b88", set()),
+    ("pw91", "gga_x_pw91", set()),
+    ("pbe", "gga_x_pbe", set()),
+    ("revpbe", "gga_x_pbe_r", set()),
+    ("rpbe", "gga_x_rpbe", set()),
+    ("mpw91", "gga_x_mpw91", set()),
+    ("pbesol", "gga_x_pbe_sol", set()),
     ("lyp", "gga_c_lyp", set()),
     ("pbe_c", "gga_c_pbe", {NAN_TOTAL}),
     ("pw91_c", "gga_c_pw91", {NAN_TOTAL}),
     ("p86", "gga_c_p86", {NAN_TOTAL}),
-    ("b3lyp", "b3lyp5", {NAN_SPIN}),
-    ("pbe0", "pbe0", {NAN_SPIN, NAN_TOTAL}),
-    ("bhandhlyp", "bhandhlyp", {NAN_SPIN}),
+    ("b3lyp", "b3lyp5", set()),
+    ("pbe0", "pbe0", {NAN_TOTAL}),
+    ("bhandhlyp", "bhandhlyp", set()),
 ]
 
 # The six probe outputs, in the probe's own order (tools/kernel_probe.cpp).
@@ -352,11 +363,6 @@ def reference_values(libxc_name, rho_a, rho_b, s_aa, s_ab, s_bb):
 def degenerate_slots(rules, s_aa, s_ab, s_bb):
     """The vsigma slots the kernel may return NaN in at this sigma triple."""
     allowed = set()
-    if NAN_SPIN in rules:
-        if s_aa == 0.0:
-            allowed.add("vsigmaAa")
-        if s_bb == 0.0:
-            allowed.add("vsigmaBb")
     if NAN_TOTAL in rules and s_aa + 2.0 * s_ab + s_bb == 0.0:
         allowed.update(("vsigmaAa", "vsigmaAb", "vsigmaBb"))
     return allowed

@@ -13,5 +13,9 @@
 
     e := X'Pw91Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    ExKernelGenerate("Pw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+    // Order 1 only: this is the one exchange enhancement in the tree that is a
+    // rational function of Asinh and Exp rather than of s^2 alone, and its
+    // symbolic second differentiation runs to tens of minutes rather than the
+    // seconds the other exchange forms take.
+    ExKernelGenerate("Pw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
 ?>

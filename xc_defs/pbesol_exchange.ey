@@ -15,5 +15,13 @@
 
     e := X'PbeSolExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+    // Order 1 only.  The enhancement's mu crosses as the division 10/81 rather
+    // than as a single decimal, and the second differentiation of that shape
+    // leaves the shared Sqrt(sigma) uncancelled in the two sigma-sigma entries,
+    // where the generator's cancellation reaches only a division at the top of
+    // the tree.  The kernel is finite at a zero gradient, so a tier that is not
+    // would be a hole at a point the kernel answers; the same form with mu as a
+    // decimal cancels cleanly, which is why the three other PBE-shaped exchanges
+    // carry a tier.
+    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
 ?>

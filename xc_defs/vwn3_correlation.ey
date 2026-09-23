@@ -15,5 +15,8 @@
 
     e := X'Vwn3Correlation(rhoA, rhoB);
 
-    ExKernelGenerate("Vwn3Correlation", e, rhoA, rhoB);
+    // Order 1 only: this form's symbolic second differentiation runs to tens of
+    // minutes, against seconds for the exchange forms, so it ships without a
+    // second-derivative tier.
+    ExKernelGenerate("Vwn3Correlation", e, rhoA, rhoB, False);
 ?>

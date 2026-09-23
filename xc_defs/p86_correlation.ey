@@ -24,6 +24,9 @@
     eLow := X'P86CorrelationLow(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
     eHigh := X'P86CorrelationHigh(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
+    // Order 1 only: this form's symbolic second differentiation runs to tens of
+    // minutes, against seconds for the exchange forms, so it ships without a
+    // second-derivative tier.
     ExPiecewiseKernelGenerate("P86Correlation", cond, eLow, eHigh,
-                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb});
+                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False});
 ?>

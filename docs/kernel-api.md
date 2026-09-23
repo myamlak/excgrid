@@ -115,15 +115,58 @@ namespace excgrid {
   materialised form is a debug path. Each tier is asked for by calling its own
   entry point; the two above the first default to
   `kRefusedUnsupportedCapability`.
-- **Order-1 is shipped for every functional; the second-derivative tiers are
-  shipped for `tau_x` alone.** Its kernel and the matrix are emitted from one
-  symbolic definition, and its contraction is taken from that same matrix, so the
-  tier's two entry points cannot disagree. Nothing above them is built: the third
-  derivative has no contract type to cross in.
-- A second-derivative request is refused with `kRefusedUnsupportedCombination`
-  when the right-hand side is not a whole number of active-component vectors (or
-  no component is active), and with `kRefusedExhaustedCapacity` beyond
-  `kSecondDerivativeCapacity` (16).
+- **Order-1 is shipped for every functional. The second-derivative tier is
+  shipped where its second differentiation is both affordable and defined
+  everywhere the order-1 kernel is** — Slater exchange, the five GGA exchanges
+  whose tier satisfies both (`becke88`, `pbe`, `revpbe`, `rpbe`, `mpw91`), and
+  `tau_x`. Each tier is emitted from the same symbolic definition as its order-1
+  kernel, and its contraction is taken from the materialised matrix, so the
+  tier's two entry points cannot disagree. Nothing above them is built: the
+  third derivative has no contract type to cross in.
+- **A functional without a tier is still a functional, and the two reasons are
+  distinct.** A tier costs a full symbolic second differentiation of the energy
+  density, which for a correlation form runs to tens of minutes against seconds
+  for a simple exchange form; and a tier whose differentiation leaves a
+  removable singularity the generator's cancellation does not reach would be
+  non-finite at a point the kernel itself answers. A source that fails either
+  test emits its order-1 kernel alone, and no tier function is generated at all
+  rather than one that would answer zeros. `pw91` (whose enhancement carries
+  `Asinh` and `Exp` inside a rational function), the correlation functionals,
+  and every recipe built on one
+  — `vwn5`, `vwn3`, `pw92`, `lyp`, `pbe_c`, `pw91_c`, `p86`, `svwn`, `spw92`,
+  `b3lyp`, `pbe0`, `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86` — refuse for the
+  first reason. `pbesol` refuses for the second: its enhancement states `mu` as
+  the division `10/81`, and the second differentiation of that shape leaves the
+  shared `sqrt(sigma)` uncancelled in the two sigma-sigma entries, so its kernel
+  answers at an exactly zero gradient where its tier would not. The same
+  expression with `mu` as a single decimal — `pbe`, `revpbe`, `rpbe` — cancels
+  cleanly and ships. Note that `becke88` and `mpw91` DO ship a tier while their
+  tier's own sigma-sigma entries at an exactly zero gradient are not finite,
+  even though their order-1 `vsigma` now is: the curvature across two sigma
+  components is genuinely infinite there, so no emission answers it, and the
+  order-1 holes they used to share — the ones a tier DOES owe with its kernel —
+  are closed in the generator. A tier owes finiteness where its kernel has it
+  and its own curvature is finite, and no more;
+  `tests/second_derivative_test.cpp` names the two exceptions and holds them to
+  that.
+- **A tier spans the components its functional reads, and says which they are.**
+  `SecondDerivativeMask()` is the capability report: an empty mask means the
+  functional has no tier, and a non-empty one names exactly the components its
+  tier answers for. A tier is therefore narrower than the contract's capacity —
+  two components for an LDA kernel (`rhoA`, `rhoB`), five for a GGA one (those
+  plus `sigmaAa`, `sigmaAb`, `sigmaBb`), seven for `tau_x` (those plus `tauA`,
+  `tauB`) — and a caller supplies its own mask, so the two need not agree.
+- A second-derivative request is refused with `kRefusedUnsupportedCapability`
+  when the functional ships no tier; with `kRefusedSecondDerivativeCoverage`
+  when the request names a component the functional READS and the tier does not
+  cover, which is the only case in which the two are distinguishable and so the
+  reason the status exists; with `kRefusedUnsupportedCombination` when the
+  right-hand side is not a whole number of active-component vectors (or no
+  component is active); and with `kRefusedExhaustedCapacity` beyond
+  `kSecondDerivativeCapacity` (16). A component the caller supplies that the
+  functional does not read is not part of the request and is not a refusal.
+  `UnspannedRequestComponents(requested, required, spanned)` names the
+  uncovered ones.
 - **`Evaluate(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb)` is a temporary adapter** for
   consumers that have not moved to `EvaluatePoint`. It fills the five
   densities/gradient invariants and cannot express the tau inputs, and a refusal

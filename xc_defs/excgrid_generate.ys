@@ -162,6 +162,10 @@ Function("ExCancelSharedFactors", {e})
 //
 // So the recursion bought two broken kernels and one genuinely-fixed shape
 // that a non-recursive cancellation does not reach anyway.  It stays out.
+// The shape it could not reach - asinh(x)/sqrt(sigma), a numerator that
+// vanishes like x without carrying the radical as a factor - is answered by
+// ExGuardSigmaRadical below instead, which shifts the radicand rather than
+// dividing it out.
 Function("ExCancelRadical", {e})
 [
     Local(l);
@@ -173,6 +177,231 @@ Function("ExCancelRadical", {e})
                     UnList({l[1], ExCancelSharedFactors(l[2])}),
                     e),
                 ExCancelSharedFactors(e));
+        ]
+    );
+];
+
+// --- Cancelling the removable density power in a density derivative --------
+//
+// The exchange rules write their uniform part as the product rho epsX(2 rho),
+// i.e. a constant times rho * (3 pi^2 2 rho)^(1/3).  Differentiating that
+// product w.r.t. rho leaves one term in which the chain rule's
+//   D(rho)[(3 pi^2 2 rho)^(1/3)] = (1/3) (3 pi^2 2 rho)^(-2/3) * 6 pi^2
+// is multiplied by the rho the product rule carried out front:
+//   rho * (3 pi^2 2 rho)^(-2/3) * 6 pi^2 / 3,
+// which is 0 * inf = NaN at rho = 0, where the derivative's exact value is 0
+// (the whole thing vanishes like rho^(1/3)).  Measured on the shipped kernels:
+// pbe, revpbe, rpbe, pbesol and pw91 answered NaN in vrho of the empty spin
+// channel, while becke88, mpw91 and every correlation kernel - which have no
+// such product in their uniform part - were finite there.
+//
+// The singularity is REMOVABLE and the repair is the cancellation, exactly as
+// for the radical above: for a base B that is a constant multiple of rho,
+//   rho * B^(-2/3) = B^(1/3) / (B / rho),
+// an identity in the exponents (rho^1 * rho^(-2/3) = rho^(1/3)), so the
+// emitted term is the analytic derivative and is finite at rho = 0.  The
+// divisor is the base's own linear coefficient, read off symbolically as B at
+// rho = 1.
+//
+// Applied to the DENSITY derivatives only, and before their CSE: the energy
+// expression is left exactly as it was, which is what keeps the emitted
+// common subexpressions, every value away from the edge and - measured - the
+// second-derivative tier unchanged.  Writing the same function as one power
+// in the definitions was tried first and REJECTED on that measurement: it
+// left pbe, revpbe and rpbe answering NaN in the tier at an exactly zero
+// sigma, where the tier of the product form is finite.  The tier is generated
+// from the energy expression, so a repair aimed at the tier has to stay out of
+// it.
+//
+// The scale test is the same shape as the sigma guard's: the base has to be a
+// constant multiple of THIS density and of no other (the correlation rules'
+// base is the density TOTAL, which is not a channel's own), it has to vanish
+// at rho = 0, and its value at rho = 1 has to be a number.  Returns 0 for a
+// base the rewrite does not apply to.
+// The coefficient is read off STRUCTURALLY - exactly one flat factor of the
+// base is this density, and every other factor is free of every density - so
+// b = k rho holds by construction and the identity is exact.
+//
+// It is deliberately not an arithmetic test.  "b - k rho folds to zero" was
+// tried first and REJECTED on measurement: yacas does not normalise the factor
+// ORDER of a product, so 3 pi^2 2 rho minus 6 pi^2 rho is not zero to IsZero()
+// even though it is zero - and every real base the pass has to reach is in the
+// unfolded order the chain rule left it in.  (And IsNumber() alone is too
+// strict the other way: the exchange rules' coefficient is 6 pi^2, which
+// carries the symbolic Pi.)
+Function("ExDensityPowerScale", {b, rho, others})
+[
+    Local(f, i, k, rhoFactors, clean);
+    If (IsAtom(b), 0,
+        [
+            f := ExFlatFactors(b);
+            k := 1; rhoFactors := 0; clean := True;
+            ForEach(x, f) [
+                If ((x = rho),
+                    rhoFactors := rhoFactors + 1,
+                    If (ExAtomOccurs(rho, x), clean := False, k := k * x));
+            ];
+            ForEach(o, others) [ If (ExAtomOccurs(o, b), clean := False); ];
+            If (clean And (rhoFactors = 1) And Not (k = 0) And (WithValue(rho, 0, b) = 0),
+                k, 0);
+        ]);
+];
+
+// The walk: inside a product, the pair (rho, B^(-2/3)) with B a constant
+// multiple of rho becomes B^(1/3) / k.  A node with no such pair comes back
+// UNCHANGED - the repo's rule for every one of these passes, because
+// rebuilding a product re-associates it and floating-point multiplication is
+// not associative.
+Function("ExCancelDensityPower", {e, rho, others})
+[
+    Local(l, args, out, f, i, b, k, hit, kept, placed);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            args := {};
+            For (i := 2, i <= Length(l), i := i + 1)
+                [ args := Concat(args, {ExCancelDensityPower(l[i], rho, others)}); ];
+            out := UnList(Concat({l[1]}, args));
+            If (Not ExOpIs(Listify(out), ExU * ExV), out,
+                [
+                    f := ExFlatFactors(out);
+                    b := 0; k := 0; hit := 0;
+                    For (i := 1, i <= Length(f), i := i + 1)
+                        [
+                            // The factors are flattened to atoms and products,
+                            // so the Listify() has to be kept behind the atom
+                            // test: Listify(4.) is an error, not an empty list.
+                            If ((hit = 0) And Not IsAtom(f[i]),
+                                [
+                                    Local(pf);
+                                    pf := Listify(f[i]);
+                                    // The exponent is tested by its VALUE (e*3 + 2 folds
+                                    // to zero exactly), not by equality: yacas carries
+                                    // -2/3 as a division node here and as -1 * (2/3) there,
+                                    // and the two printed forms look identical while
+                                    // comparing unequal - measured.
+                                    If ((Length(pf) = 3) And (pf[1] = ^) And IsZero(pf[3] * 3. + 2.),
+                                        [
+                                            Local(scale);
+                                            scale := ExDensityPowerScale(pf[2], rho, others);
+                                            If (Not IsZero(scale),
+                                                [ b := pf[2]; k := scale; hit := i; ]);
+                                        ]);
+                                ]);
+                        ];
+                    If (hit = 0, out,
+                        [
+                            kept := {}; placed := False;
+                            For (i := 1, i <= Length(f), i := i + 1)
+                                [
+                                    If (i != hit,
+                                        [
+                                            If ((Not placed) And (f[i] = rho),
+                                                placed := True,
+                                                kept := Concat(kept, {f[i]}));
+                                        ]);
+                                ];
+                            // The rho factor has to be IN this product for the
+                            // identity to apply: the chain rule leaves the
+                            // power inside a sub-product of its own, and
+                            // rewriting there (with the rho one level up) would
+                            // multiply the term by rho instead of cancelling
+                            // it - measured, and the reason this is checked.
+                            If (placed,
+                                ExFoldProduct(Concat(kept, {UnList({^, b, 1. / 3.}) / k})),
+                                out);
+                        ]);
+                ]);
+        ]);
+];
+
+// --- Guarding the sigma-edge radical the cancellation cannot reach ---------
+//
+// Differentiating w.r.t. a sigma component leaves one factor 1 / Sqrt(gamma)
+// from the chain rule through the reduced gradient, multiplied by whatever the
+// enhancement's s-derivative carries.  Where that derivative vanishes WITH the
+// radical the cancellation above divides the shared subtree out and the
+// emitted quotient is analytic.  Where it does not - the asinh-carrying
+// enhancements of becke88, pw91 and mpw91, whose sigma derivative carries
+// asinh(x) / Sqrt(sigma), a numerator that vanishes like x but is not a
+// product carrying the radical - there is no factor to divide out and the
+// emitted quotient is 0 / 0 at an exactly zero sigma.
+//
+// The repair is to shift that radicand, in every occurrence, by an amount
+// below the resolution of every sigma a caller can hand over:
+//
+//   * the quotient is defined at sigma = 0 and answers the LIMIT.  Every
+//     occurrence of the radical is shifted, so the emitted value there is the
+//     unguarded expression evaluated at sigma = <shift>, which is the limit to
+//     ~1e-150 relative - and it is the SAME bits as the value one
+//     representable step off zero, the smallest positive subnormal 5e-324
+//     absorbing a 1e-300 shift entirely.  That bit-equality is the property
+//     the cancelled kernels are pinned by;
+//   * nothing else moves.  Above the shift's own scale the sum sigma + shift
+//     rounds back to sigma, so the emitted arithmetic is bit-identical to the
+//     unguarded one - the shift is chosen so that this holds for every normal
+//     sigma, the changed region being sigma below ~1e-284;
+//   * the second-derivative tier is deliberately NOT guarded: it is taken from
+//     the expression before this pass runs, because the curvature that spans
+//     two sigma components is genuinely divergent at sigma = 0 and a shifted
+//     radicand would report a large finite number where the truth is
+//     infinite.
+//
+// Scoped to the SPIN CHANNEL's own radical - a radicand that is a constant
+// multiple of the sigma component being differentiated, and of no other.  The
+// correlation forms' radical is over the TOTAL gradient (X'T's gamma); its
+// sigma derivative has the same 0 / 0 shape at its own zero, and that site is
+// measured and reported rather than guarded here, because gamma is a
+// different quantity from the channel gradient this guard is about.
+//
+// The scale is the radicand's own derivative w.r.t. the sigma component, so
+// Sqrt(4 sigma) and Sqrt(sigma) shift by 4 and 1 and stay exact multiples of
+// one another at the edge.  Returns 0 for a radicand the guard does not apply
+// to (never a scale an applicable one could carry: a zero derivative is one of
+// the exclusions).
+Function("ExSigmaRadicalScale", {u, sigma, others})
+[
+    Local(c, channelOnly);
+    channelOnly := True;
+    ForEach(o, others) [ If (ExAtomOccurs(o, u), channelOnly := False); ];
+    // Deriv and no Simplify: the radicands this applies to are linear in the
+    // component by construction, so the derivative IS the scale, and yacas'
+    // Simplify() both allocates CSE tags on every call (measured: ~100 per
+    // call, which renumbers every emitted kernel) and is documented above as
+    // not terminating on the derivative expressions this generator works with.
+    c := Deriv(sigma) u;
+    If (channelOnly And IsNumber(c) And (c != 0) And (WithValue(sigma, 0, u) = 0), c, 0);
+];
+
+// The walk itself: inside every radical the guard applies to, replace the
+// radicand u by u + c * SigmaGuard, where c is its scale (above) and
+// SigmaGuard is the constant the skeletons declare beside Pi.  Radicals are
+// rebuilt rather than left alone because the shift only works if EVERY
+// occurrence carries it - a quotient with a shifted numerator over an
+// unshifted denominator is a different function at the edge, not the limit.
+Function("ExGuardSigmaRadical", {e, sigma, others})
+[
+    Local(l, u, c, args, i);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 2) And (l[1] = Sqrt),
+                [
+                    u := ExGuardSigmaRadical(l[2], sigma, others);
+                    c := ExSigmaRadicalScale(u, sigma, others);
+                    If (IsZero(c), UnList({Sqrt, u}), UnList({Sqrt, u + c * SigmaGuard}));
+                ],
+                [
+                    // Rebuilt argument by argument.  Concat and not Push: yacas
+                    // PREPENDS on Push, so a Push-built argument list comes out
+                    // reversed and UnList then applies the last argument as the
+                    // head - measured, and the reason this is spelled out.
+                    args := {};
+                    For (i := 2, i <= Length(l), i := i + 1)
+                        [ args := Concat(args, {ExGuardSigmaRadical(l[i], sigma, others)}); ];
+                    UnList(Concat({l[1]}, args));
+                ]
+            );
         ]
     );
 ];
@@ -237,13 +466,42 @@ Function("ExUnusedParamSilence", {params, exprs, lists})
 RuleBaseListed("ExKernelGenerate", {fname, e, args});
 
 100 # ExKernelGenerate(fname_IsString, e_IsFunction, {ra_IsAtom, rb_IsAtom}) <--
-    ExLdaGenerate(fname, e, ra, rb);
+    ExLdaGenerate(fname, e, ra, rb, True);
 
 100 # ExKernelGenerate(fname_IsString, e_IsFunction,
                      {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom}) <--
-    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb);
+    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, True);
 
-ExLdaGenerate(fname, e, ra, rb) := [
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, tier_IsAtom}) <--
+    ExLdaGenerate(fname, e, ra, rb, tier);
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom,
+                      tier_IsAtom}) <--
+    ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier);
+
+// The second-derivative tier costs a full symbolic second differentiation of the
+// expression per entry, which for the correlation forms is minutes to tens of
+// minutes against seconds for the exchange forms.  A source that passes False
+// emits the order-1 kernel alone, so a functional whose tier is not affordable
+// is still a functional.
+//
+// A one-element list when there is at least one entry to emit and an empty one
+// when there is not, so a skeleton can wrap the whole emission in a single
+// ForEach and read the count without iterating.  A functional without a tier
+// then gets no function at all rather than one that answers zeros.
+Function("ExTierEmissionGuard", {count})
+[
+    If (count > 0, {True}, {});
+];
+
+ExLdaGenerate(fname, e, ra, rb, tier) := [
+    // The second-derivative tier first, while `e` is still the untagged
+    // expression - Deriv() cannot differentiate a CSE tag.
+    asecondDerivativeEntries := {};
+    If (tier, asecondDerivativeEntries := ExSecondDerivativeEntries(e, {ra, rb}, {}));
+
     // The exact spin-zero limits (the Tiny guard inside the formulas keeps
     // them finite; the explicit limits give the EXACT one-spin edge values).
     leA := WithValue(ra, 0, e);
@@ -275,12 +533,26 @@ ExLdaGenerate(fname, e, ra, rb) := [
     PatchLoad("excgrid_lda_skeleton.ey");
 ];
 
-ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb) := [
+ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
+    // The second-derivative tier first, while `e` is still the untagged
+    // expression - Deriv() cannot differentiate a CSE tag.
+    asecondDerivativeEntries := {};
+    If (tier,
+        asecondDerivativeEntries :=
+            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;
     deGaa := Deriv(gaa) e;
     deGab := Deriv(gab) e;
     deGbb := Deriv(gbb) e;
+
+    // The density edge: the removable rho * (k rho)^(-2/3) the chain rule
+    // leaves in each spin-density derivative (ExCancelDensityPower carries the
+    // measurement).  Before the CSE, and on the derivatives only - the energy
+    // expression is untouched, which is what keeps the tier where it was.
+    deDra := ExCancelDensityPower(deDra, ra, {rb});
+    deDrb := ExCancelDensityPower(deDrb, rb, {ra});
 
     // Cancel the removable Sqrt(gamma) the chain rule leaves in both halves of
     // each sigma derivative.  Without this the emitted quotient is 0/0 at
@@ -291,6 +563,15 @@ ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb) := [
     deGaa := ExCancelRadical(deGaa);
     deGab := ExCancelRadical(deGab);
     deGbb := ExCancelRadical(deGbb);
+
+    // The shape the cancellation cannot reach - asinh(x)/sqrt(sigma), whose
+    // numerator vanishes like x without carrying the radical - is answered by
+    // shifting that radicand instead (ExGuardSigmaRadical carries the
+    // measurement).  Also before the CSE, for the same reason: the shift has
+    // to reach every occurrence of the radical.
+    deGaa := ExGuardSigmaRadical(deGaa, gaa, {gab, gbb});
+    deGab := ExGuardSigmaRadical(deGab, gab, {gaa, gbb});
+    deGbb := ExGuardSigmaRadical(deGbb, gbb, {gaa, gab});
 
     {e, ecsl} := CSE(e);
 
@@ -332,10 +613,16 @@ ExPiecewiseBranch(e, ra, rb, gaa, gab, gbb) := [
     deGab := Deriv(gab) e;
     deGbb := Deriv(gbb) e;
 
-    // Same cancellation as the straight-line path, so the two agree.
+    // Same cancellations and same sigma-edge guard as the straight-line path,
+    // so the two agree.
+    deDra := ExCancelDensityPower(deDra, ra, {rb});
+    deDrb := ExCancelDensityPower(deDrb, rb, {ra});
     deGaa := ExCancelRadical(deGaa);
     deGab := ExCancelRadical(deGab);
     deGbb := ExCancelRadical(deGbb);
+    deGaa := ExGuardSigmaRadical(deGaa, gaa, {gab, gbb});
+    deGab := ExGuardSigmaRadical(deGab, gab, {gaa, gbb});
+    deGbb := ExGuardSigmaRadical(deGbb, gbb, {gaa, gab});
 
     {e, ecsl} := CSE(e);
     deDra := ExSubstituteTagged(ecsl, deDra);
@@ -361,8 +648,17 @@ ExPiecewiseBranch(e, ra, rb, gaa, gab, gbb) := [
 // contract, and p86_correlation.ey for the only user so far).
 // The branch names (1 for the condition-true side, 2 for the else side) are
 // what the skeleton's PatchLoad scope reads.
-ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb) := [
+ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb, tier) := [
     Local(b1, b2);
+
+    // The second-derivative tier, one entry list per branch, taken from the two
+    // expressions while they are still untagged.  Each branch's list is emitted
+    // inside its own braces, exactly as the order-1 branches are, so the two
+    // branches' CSE tag namespaces stay separate.
+    asecondDerivativeEntries1 := {};
+    asecondDerivativeEntries2 := {};
+    If (tier, asecondDerivativeEntries1 := ExSecondDerivativeEntries(eLow, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+    If (tier, asecondDerivativeEntries2 := ExSecondDerivativeEntries(eHigh, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
 
     b1 := ExPiecewiseBranch(eLow, ra, rb, gaa, gab, gbb);
     e1 := b1[1];
@@ -404,7 +700,7 @@ ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb) := [
 // user function", measured), while indexing the bound list works.
 ExPiecewiseKernelGenerate(fname, cond, eLow, eHigh, args) := [
     ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh,
-                           args[1], args[2], args[3], args[4], args[5]);
+                           args[1], args[2], args[3], args[4], args[5], args[6]);
 ];
 
 // --- The meta-GGA (tau-dependent) tier -------------------------------------
@@ -482,20 +778,51 @@ Function("ExIsQuotientZero", {e})
 // The expressions are differentiated from the ORIGINAL energy density, before
 // the order-1 path substitutes the CSE tags into it, because Deriv() cannot
 // differentiate a tag.
+//
+// `radicalVars` names the reduced-gradient variables, and it is what keeps the
+// entries that span one finite at an exactly zero gradient.  A reduced gradient
+// enters as Sqrt(gamma), and the radical survives inside the enhancement as a
+// squared occurrence - `pow(sqrt(gamma) / (2 * kF * rho), 2)` - which no factor
+// cancellation can reach.  Differentiating that w.r.t. gamma leaves a quotient
+// carrying Sqrt(gamma) in numerator and denominator alike, so each
+// differentiation of a radical-carrying variable is followed by the same
+// top-level cancellation the order-1 path applies to its own vsigma.  The
+// cancellation is applied to the INNER derivative and then to the outer one
+// rather than once to the finished entry, because a cancellation reaches only
+// the division at the top of the tree: the outer derivative of an uncancelled
+// inner quotient buries the shared radical below a sum, where the flat factor
+// scan of ExCancelSharedFactors no longer sees it and the entry is NaN at
+// gamma == 0.
+// The mixed partials commute, so a pair spanning a radical variable and a plain
+// one is differentiated w.r.t. the radical variable first; a pair spanning two
+// or none is left in its own order.  A pair with no radical variable is
+// differentiated exactly as it was before this argument existed, which is what
+// leaves a functional without reduced gradients, and the tau tier,
+// byte-identical.
 // `For` is the C-style four-argument form here (start, predicate, increment,
 // body) - yacas 1.8's controlflow.rep defines it that way, and a three-argument
 // call reads its middle argument as the predicate, so it silently runs zero
 // times rather than complaining.
-Function("ExSecondDerivativeEntries", {e, vars})
+Function("ExSecondDerivativeEntries", {e, vars, radicalVars})
 [
-    Local(n, entries, d2, reduced, i, j);
+    Local(n, entries, inner, d2, reduced, i, j, swap, first, second);
     n := Length(vars);
     entries := {};
     For(i := 1, i <= n, i++)
     [
         For(j := i, j <= n, j++)
         [
-            d2 := Deriv(vars[j]) Deriv(vars[i]) e;
+            swap := ExHas(radicalVars, vars[j]) And Not ExHas(radicalVars, vars[i]);
+            first := i;
+            second := j;
+            If (swap, first := j);
+            If (swap, second := i);
+
+            inner := Deriv(vars[first]) e;
+            If (ExHas(radicalVars, vars[first]), inner := ExCancelRadical(inner));
+
+            d2 := Deriv(vars[second]) inner;
+            If (ExHas(radicalVars, vars[second]), d2 := ExCancelRadical(d2));
             If (ExIsQuotientZero(d2), d2 := 0);
             reduced := CSE(d2);
             Push(entries, {i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), reduced[1],
@@ -509,7 +836,7 @@ ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
     // The second-derivative tier first, while `e` is still the untagged
     // expression.
     asecondDerivativeEntries :=
-        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb});
+        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {});
 
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;

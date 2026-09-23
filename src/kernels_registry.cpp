@@ -46,12 +46,197 @@ void TauXExchangeSecondDerivatives(double rhoA,
                                    PointSecondDerivativeMatrix& matrix);
 
 namespace {
+// The components each generated second-derivative tier is emitted over: the
+// argument count of the kernel it sits beside, and the width of the matrix
+// packing its generated source fills.
+//
+// A tier spans a PREFIX of the identifier table - the components its kernel
+// reads, in identifier order - so the widths differ by family and the kernel
+// argument slot of a component is the identifier's own value.  That is what
+// lets a caller's mask be read onto any of them by counting.
+constexpr std::size_t kLdaTierComponents = 2;
+constexpr std::size_t kGgaTierComponents = 5;
+constexpr std::size_t kTauTierComponents = 7;
 
-// A pure functional: one generated kernel, no exact-exchange fraction.
+static_assert(static_cast<std::size_t>(Component::RhoB) == kLdaTierComponents - 1,
+              "an LDA tier is emitted over (rhoA, rhoB) in identifier order");
+static_assert(static_cast<std::size_t>(Component::SigmaBb) == kGgaTierComponents - 1,
+              "a GGA tier is emitted over rhoA..sigmaBb in identifier order");
+static_assert(ComponentMask::Collinear().ActiveCount() == kTauTierComponents,
+              "the tau tier's kernel is emitted over the seven collinear components; the collinear "
+              "set has changed, so xc_defs/tau_x.ey must be regenerated against it");
+static_assert(static_cast<std::size_t>(Component::RhoA) == 0 &&
+                  static_cast<std::size_t>(Component::TauB) == kTauTierComponents - 1,
+              "the tau tier's kernel argument order is the identifier order RhoA..TauB");
+static_assert(kTauTierComponents <= kSecondDerivativeCapacity,
+              "the tau tier's packing is wider than the contract's second-derivative capacity");
+
+// The components a tier of the given width spans.
+[[nodiscard]] constexpr ComponentMask TierMask(std::size_t components) noexcept {
+    ComponentMask mask;
+
+    for (std::size_t component = 0; component < components; ++component)
+    {
+        mask.Set(static_cast<Component>(component));
+    }
+
+    return mask;
+}
+
+// The contract's upper-triangle index over `active` components in identifier
+// order: entry (i, j), i <= j, at i*active - i*(i-1)/2 + (j-i).
+[[nodiscard]] constexpr std::size_t PackedIndex(std::size_t i,
+                                                std::size_t j,
+                                                std::size_t active) noexcept {
+    return i * active - i * (i - 1) / 2 + (j - i);
+}
+
+// The caller's mask restricted to the components the generated tier reads, with
+// the kernel argument slot of each of its active components.
+template <std::size_t Components> struct TierSlots {
+    ComponentMask mask{}; ///< The intersection: what a result or matrix is over.
+    std::size_t active = 0; ///< Its active-component count.
+    std::array<std::size_t, Components> slot{}; ///< Kernel slot, per active component.
+};
+
+// Reads a caller's mask onto the generated kernel's argument order.  The
+// intersection is always a subsequence of the kernel's own components, in the
+// same relative order, so the packed positions of one are the packed positions
+// of the other once the dropped slots are counted out.
+template <std::size_t Components>
+[[nodiscard]] constexpr TierSlots<Components> TierSlotsOf(const ComponentMask& caller) noexcept {
+    TierSlots<Components> slots;
+
+    for (std::size_t component = 0; component < Components; ++component)
+    {
+        const auto id = static_cast<Component>(component);
+
+        if (caller.Test(id))
+        {
+            slots.mask.Set(id);
+            slots.slot[slots.active] = component;
+            ++slots.active;
+        }
+    }
+
+    return slots;
+}
+
+// One entry of the generated tier's matrix, by kernel argument slots.  The
+// generated packing carries the upper triangle only, and a Hessian is
+// symmetric, so the pair is read at (min, max).
+template <std::size_t Components>
+[[nodiscard]] constexpr double GeneratedEntry(const PointSecondDerivativeMatrix& matrix,
+                                              std::size_t a,
+                                              std::size_t b) noexcept {
+    return matrix.upper[PackedIndex(a < b ? a : b, a < b ? b : a, Components)];
+}
+
+// The contracted and the materialised entry points, written once over the slot
+// machinery above so that every tier in this file reconciles the generated
+// packing with the caller's mask the same way.
+//
+// The contraction is taken from the materialised matrix rather than from a
+// second generated emission, which is what makes the two entry points one
+// result: a tier cannot answer the two differently.
+template <std::size_t Components>
+[[nodiscard]] KernelStatus ContractFromMatrix(const TierSlots<Components>& slots,
+                                              const PointSecondDerivativeMatrix& generated,
+                                              std::span<const double> rightHandSide,
+                                              PointSecondDerivative& second) noexcept {
+    // One value per active component per right-hand side has to fit the
+    // contract's array, and an empty active set has no layout to divide by.
+    if (slots.active == 0 || rightHandSide.size() % slots.active != 0)
+    {
+        return KernelStatus::kRefusedUnsupportedCombination;
+    }
+
+    if (rightHandSide.size() > kSecondDerivativeCapacity)
+    {
+        return KernelStatus::kRefusedExhaustedCapacity;
+    }
+
+    const std::size_t rightHandSides = rightHandSide.size() / slots.active;
+    second.mask = slots.mask;
+    second.rightHandSides = rightHandSides;
+
+    for (std::size_t side = 0; side < rightHandSides; ++side)
+    {
+        for (std::size_t i = 0; i < slots.active; ++i)
+        {
+            double contracted = 0.0;
+
+            for (std::size_t j = 0; j < slots.active; ++j)
+            {
+                contracted += GeneratedEntry<Components>(generated, slots.slot[i], slots.slot[j]) *
+                              rightHandSide[side * slots.active + j];
+            }
+
+            second.contracted[side * slots.active + i] = contracted;
+        }
+    }
+
+    return KernelStatus::kOk;
+}
+
+// Re-packs a generated matrix from the kernel's argument order onto the
+// caller's mask.  Nothing of the caller's buffer survives, so an entry the tier
+// has no value for is a zero rather than a leftover.
+template <std::size_t Components>
+[[nodiscard]] constexpr PointSecondDerivativeMatrix RepackMatrix(
+    const TierSlots<Components>& slots,
+    const PointSecondDerivativeMatrix& generated) noexcept {
+    PointSecondDerivativeMatrix matrix;
+    matrix.mask = slots.mask;
+
+    for (std::size_t i = 0; i < slots.active; ++i)
+    {
+        for (std::size_t j = i; j < slots.active; ++j)
+        {
+            matrix.upper[PackedIndex(i, j, slots.active)] =
+                GeneratedEntry<Components>(generated, slots.slot[i], slots.slot[j]);
+        }
+    }
+
+    return matrix;
+}
+
+// Places a two-wide LDA tier's matrix in the five-wide packing a GGA term's
+// matrix is already in.  The gradient rows and columns it does not read stay
+// zero, which is what an LDA kernel contributes to a gradient-corrected
+// recipe's Hessian.
+[[nodiscard]] constexpr PointSecondDerivativeMatrix WidenLdaMatrix(
+    const PointSecondDerivativeMatrix& narrow) noexcept {
+    PointSecondDerivativeMatrix wide;
+
+    for (std::size_t i = 0; i < kLdaTierComponents; ++i)
+    {
+        for (std::size_t j = i; j < kLdaTierComponents; ++j)
+        {
+            wide.upper[PackedIndex(i, j, kGgaTierComponents)] =
+                narrow.upper[PackedIndex(i, j, kLdaTierComponents)];
+        }
+    }
+
+    return wide;
+}
+
+// A pure functional: one generated kernel, no exact-exchange fraction, and the
+// second-derivative tier the same generated source emits beside it.
+//
+// The tier is optional because a kernel the generator could not emit one for is
+// still a functional: it ships order-1 and refuses the second derivatives by
+// name, and SecondDerivativeMask() is what says so.
 class PureFunctional final : public XcFunctional {
 public:
-    PureFunctional(std::string_view name, bool usesGradient, LdaKernel lda, GgaKernel gga) noexcept
-        : _name(name), _usesGradient(usesGradient), _lda(lda), _gga(gga) {}
+    PureFunctional(std::string_view name,
+                   bool usesGradient,
+                   LdaKernel lda,
+                   GgaKernel gga,
+                   LdaSecondDerivative ldaSecondDerivative = nullptr,
+                   GgaSecondDerivative ggaSecondDerivative = nullptr) noexcept :
+        _name(name), _usesGradient(usesGradient), _lda(lda), _gga(gga),
+        _ldaSecondDerivative(ldaSecondDerivative), _ggaSecondDerivative(ggaSecondDerivative) {}
 
     [[nodiscard]] bool UsesGradient() const override {
         return _usesGradient;
@@ -93,77 +278,121 @@ public:
         return KernelStatus::kOk;
     }
 
+    /// The tier's span is the components the kernel reads, which for this
+    /// functional is a prefix of the identifier table - two for an LDA kernel,
+    /// five for a GGA one, matching the generated tier's own argument count.
+    [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
+        if (_usesGradient ? _ggaSecondDerivative == nullptr : _ldaSecondDerivative == nullptr)
+        {
+            return {};
+        }
+
+        return TierMask(_usesGradient ? kGgaTierComponents : kLdaTierComponents);
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePointWithSecondDerivatives(
+        const PointInputs& inputs,
+        std::span<const double> rightHandSide,
+        PointResult& result,
+        PointSecondDerivative& second) const override {
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
+
+        if (coverage != KernelStatus::kOk)
+        {
+            return coverage;
+        }
+
+        PointSecondDerivativeMatrix generated;
+
+        if (_usesGradient)
+        {
+            const TierSlots<kGgaTierComponents> slots =
+                TierSlotsOf<kGgaTierComponents>(inputs.mask);
+            _ggaSecondDerivative(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB),
+                                 inputs.Get(Component::SigmaAa), inputs.Get(Component::SigmaAb),
+                                 inputs.Get(Component::SigmaBb), generated);
+
+            const KernelStatus contracted = ContractFromMatrix<kGgaTierComponents>(
+                slots, generated, rightHandSide, second);
+
+            if (contracted != KernelStatus::kOk)
+            {
+                return contracted;
+            }
+        } else
+        {
+            const TierSlots<kLdaTierComponents> slots =
+                TierSlotsOf<kLdaTierComponents>(inputs.mask);
+            _ldaSecondDerivative(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB),
+                                 generated);
+
+            const KernelStatus contracted = ContractFromMatrix<kLdaTierComponents>(
+                slots, generated, rightHandSide, second);
+
+            if (contracted != KernelStatus::kOk)
+            {
+                return contracted;
+            }
+        }
+
+        FoldIntoResult(Value(inputs), inputs.mask, result);
+        return KernelStatus::kOk;
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePointMaterialising(
+        const PointInputs& inputs,
+        PointResult& result,
+        PointSecondDerivativeMatrix& matrix) const override {
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
+
+        if (coverage != KernelStatus::kOk)
+        {
+            return coverage;
+        }
+
+        PointSecondDerivativeMatrix generated;
+
+        if (_usesGradient)
+        {
+            _ggaSecondDerivative(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB),
+                                 inputs.Get(Component::SigmaAa), inputs.Get(Component::SigmaAb),
+                                 inputs.Get(Component::SigmaBb), generated);
+            matrix = RepackMatrix<kGgaTierComponents>(TierSlotsOf<kGgaTierComponents>(inputs.mask),
+                                                      generated);
+        } else
+        {
+            _ldaSecondDerivative(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB),
+                                 generated);
+            matrix = RepackMatrix<kLdaTierComponents>(TierSlotsOf<kLdaTierComponents>(inputs.mask),
+                                                      generated);
+        }
+
+        FoldIntoResult(Value(inputs), inputs.mask, result);
+        return KernelStatus::kOk;
+    }
+
 private:
+    /// The generated kernel's value at the point.
+    [[nodiscard]] XcKernelValue Value(const PointInputs& inputs) const noexcept {
+        if (_usesGradient)
+        {
+            return _gga(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB),
+                        inputs.Get(Component::SigmaAa), inputs.Get(Component::SigmaAb),
+                        inputs.Get(Component::SigmaBb));
+        }
+
+        return _lda(inputs.Get(Component::RhoA), inputs.Get(Component::RhoB));
+    }
+
     std::string_view _name;
     bool _usesGradient;
     LdaKernel _lda;
     GgaKernel _gga;
+    LdaSecondDerivative _ldaSecondDerivative;
+    GgaSecondDerivative _ggaSecondDerivative;
 };
-
-// The components the generated tau tier is emitted over: the argument count of
-// its kernel, and the width of the matrix packing its generated source fills.
-constexpr std::size_t kTauComponents = 7;
-
-// The tier is emitted over the seven collinear components, and its argument
-// position is the identifier's own value - which is what lets a caller's mask be
-// read onto it by counting.  Both are dependencies on the generated source, so
-// both are checked where they can still be fixed: a widened collinear set or a
-// reordered identifier table has to regenerate it.
-static_assert(ComponentMask::Collinear().ActiveCount() == kTauComponents,
-              "the tau tier's kernel is emitted over the seven collinear components; the collinear "
-              "set has changed, so xc_defs/tau_x.ey must be regenerated against it");
-static_assert(static_cast<std::size_t>(Component::RhoA) == 0 &&
-                  static_cast<std::size_t>(Component::TauB) == kTauComponents - 1,
-              "the tau tier's kernel argument order is the identifier order RhoA..TauB");
-static_assert(kTauComponents <= kSecondDerivativeCapacity,
-              "the tau tier's packing is wider than the contract's second-derivative capacity");
-
-// The contract's upper-triangle index over `active` components in identifier
-// order: entry (i, j), i <= j, at i*active - i*(i-1)/2 + (j-i).
-[[nodiscard]] constexpr std::size_t PackedIndex(std::size_t i,
-                                                std::size_t j,
-                                                std::size_t active) noexcept {
-    return i * active - i * (i - 1) / 2 + (j - i);
-}
-
-// The caller's mask restricted to the components the generated tier reads, with
-// the kernel argument slot of each of its active components.
-struct TauSlots {
-    ComponentMask mask{}; ///< The intersection: what a result or matrix is over.
-    std::size_t active = 0; ///< Its active-component count.
-    std::array<std::size_t, kTauComponents> slot{}; ///< Kernel slot, per active component.
-};
-
-// Reads a caller's mask onto the generated kernel's argument order.  The
-// intersection is always a subsequence of the kernel's seven, in the same
-// relative order, so the packed positions of one are the packed positions of the
-// other once the dropped slots are counted out.
-[[nodiscard]] constexpr TauSlots TauSlotsOf(const ComponentMask& caller) noexcept {
-    TauSlots slots;
-
-    for (std::size_t component = 0; component < kTauComponents; ++component)
-    {
-        const auto id = static_cast<Component>(component);
-
-        if (caller.Test(id))
-        {
-            slots.mask.Set(id);
-            slots.slot[slots.active] = component;
-            ++slots.active;
-        }
-    }
-
-    return slots;
-}
-
-// One entry of the generated tier's matrix, by kernel argument slots.  The
-// generated packing carries the upper triangle only, and a Hessian is
-// symmetric, so the pair is read at (min, max).
-[[nodiscard]] constexpr double GeneratedEntry(const PointSecondDerivativeMatrix& matrix,
-                                              std::size_t a,
-                                              std::size_t b) noexcept {
-    return matrix.upper[PackedIndex(a < b ? a : b, a < b ? b : a, kTauComponents)];
-}
 
 // The tau tier: the generated kernel behind the registry's tau_x, and the
 // second-derivative tier the same generated source emits beside it.
@@ -192,6 +421,10 @@ public:
         return ComponentMask::Collinear();
     }
 
+    [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
+        return TierMask(kTauTierComponents);
+    }
+
     [[nodiscard]] KernelStatus EvaluatePoint(const PointInputs& inputs,
                                              PointResult& result) const override {
         FoldIntoResult(Value(inputs), inputs.mask, result);
@@ -203,41 +436,25 @@ public:
         std::span<const double> rightHandSide,
         PointResult& result,
         PointSecondDerivative& second) const override {
-        const TauSlots slots = TauSlotsOf(inputs.mask);
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
 
-        // One value per active component per right-hand side has to fit the
-        // contract's array, and an empty active set has no layout to divide by.
-        if (slots.active == 0 || rightHandSide.size() % slots.active != 0)
+        if (coverage != KernelStatus::kOk)
         {
-            return KernelStatus::kRefusedUnsupportedCombination;
+            return coverage;
         }
 
-        if (rightHandSide.size() > kSecondDerivativeCapacity)
-        {
-            return KernelStatus::kRefusedExhaustedCapacity;
-        }
+        const TierSlots<kTauTierComponents> slots = TierSlotsOf<kTauTierComponents>(inputs.mask);
 
         PointSecondDerivativeMatrix generated;
         FillGeneratedMatrix(inputs, generated);
 
-        const std::size_t rightHandSides = rightHandSide.size() / slots.active;
-        second.mask = slots.mask;
-        second.rightHandSides = rightHandSides;
+        const KernelStatus contracted =
+            ContractFromMatrix<kTauTierComponents>(slots, generated, rightHandSide, second);
 
-        for (std::size_t side = 0; side < rightHandSides; ++side)
+        if (contracted != KernelStatus::kOk)
         {
-            for (std::size_t i = 0; i < slots.active; ++i)
-            {
-                double contracted = 0.0;
-
-                for (std::size_t j = 0; j < slots.active; ++j)
-                {
-                    contracted += GeneratedEntry(generated, slots.slot[i], slots.slot[j]) *
-                                  rightHandSide[side * slots.active + j];
-                }
-
-                second.contracted[side * slots.active + i] = contracted;
-            }
+            return contracted;
         }
 
         FoldIntoResult(Value(inputs), inputs.mask, result);
@@ -248,24 +465,19 @@ public:
         const PointInputs& inputs,
         PointResult& result,
         PointSecondDerivativeMatrix& matrix) const override {
-        const TauSlots slots = TauSlotsOf(inputs.mask);
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
+
+        if (coverage != KernelStatus::kOk)
+        {
+            return coverage;
+        }
 
         PointSecondDerivativeMatrix generated;
         FillGeneratedMatrix(inputs, generated);
 
-        // Nothing of the caller's buffer survives, so an entry the tier has no
-        // value for is a zero rather than a leftover.
-        matrix = {};
-        matrix.mask = slots.mask;
-
-        for (std::size_t i = 0; i < slots.active; ++i)
-        {
-            for (std::size_t j = i; j < slots.active; ++j)
-            {
-                matrix.upper[PackedIndex(i, j, slots.active)] =
-                    GeneratedEntry(generated, slots.slot[i], slots.slot[j]);
-            }
-        }
+        matrix = RepackMatrix<kTauTierComponents>(
+            TierSlotsOf<kTauTierComponents>(inputs.mask), generated);
 
         FoldIntoResult(Value(inputs), inputs.mask, result);
         return KernelStatus::kOk;
@@ -432,11 +644,17 @@ public:
     /// One weighted kernel of a recipe.  The role travels WITH the weight: the
     /// folding rule reads them together, and the constructor below refuses a
     /// recipe whose exchange partition does not close.
+    ///
+    /// The second-derivative pointers default to null so a recipe states the
+    /// tier only where it has one; a recipe whose terms do not all carry theirs
+    /// publishes no tier at all rather than a partial sum.
     struct Term {
         TermRole role;
         LdaKernel lda;
         GgaKernel gga;
         double weight;
+        LdaSecondDerivative ldaSecondDerivative = nullptr;
+        GgaSecondDerivative ggaSecondDerivative = nullptr;
     };
 
     /// The terms arrive as an array rather than an initializer list so that
@@ -498,7 +716,156 @@ public:
         return KernelStatus::kOk;
     }
 
+    /// A composed functional's tier is the weighted sum of its terms', so it
+    /// spans the recipe's width only when every term carries its own.
+    [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
+        if (!TierIsComplete())
+        {
+            return {};
+        }
+
+        return TierMask(Width());
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePointWithSecondDerivatives(
+        const PointInputs& inputs,
+        std::span<const double> rightHandSide,
+        PointResult& result,
+        PointSecondDerivative& second) const override {
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
+
+        if (coverage != KernelStatus::kOk)
+        {
+            return coverage;
+        }
+
+        PointSecondDerivativeMatrix generated;
+        FillGeneratedMatrix(inputs, generated);
+
+        const KernelStatus contracted =
+            Width() == kGgaTierComponents
+                ? ContractFromMatrix<kGgaTierComponents>(
+                      TierSlotsOf<kGgaTierComponents>(inputs.mask), generated, rightHandSide, second)
+                : ContractFromMatrix<kLdaTierComponents>(
+                      TierSlotsOf<kLdaTierComponents>(inputs.mask), generated, rightHandSide, second);
+
+        if (contracted != KernelStatus::kOk)
+        {
+            return contracted;
+        }
+
+        FoldIntoResult(Value(inputs), inputs.mask, result);
+        return KernelStatus::kOk;
+    }
+
+    [[nodiscard]] KernelStatus EvaluatePointMaterialising(
+        const PointInputs& inputs,
+        PointResult& result,
+        PointSecondDerivativeMatrix& matrix) const override {
+        const KernelStatus coverage =
+            SecondDerivativeStatus(inputs.mask, RequiredMask(), SecondDerivativeMask());
+
+        if (coverage != KernelStatus::kOk)
+        {
+            return coverage;
+        }
+
+        PointSecondDerivativeMatrix generated;
+        FillGeneratedMatrix(inputs, generated);
+
+        matrix = Width() == kGgaTierComponents
+                     ? RepackMatrix<kGgaTierComponents>(TierSlotsOf<kGgaTierComponents>(inputs.mask),
+                                                        generated)
+                     : RepackMatrix<kLdaTierComponents>(TierSlotsOf<kLdaTierComponents>(inputs.mask),
+                                                        generated);
+
+        FoldIntoResult(Value(inputs), inputs.mask, result);
+        return KernelStatus::kOk;
+    }
+
 private:
+    /// The width of the packing the recipe's matrices live in: its GGA terms
+    /// are five-wide, and a recipe with none is two-wide.
+    [[nodiscard]] std::size_t Width() const noexcept {
+        return _usesGradient ? kGgaTierComponents : kLdaTierComponents;
+    }
+
+    /// Whether every term carries the tier its role's width needs.  An LDA term
+    /// inside a GGA recipe contributes to the five-wide sum, so it needs its own
+    /// two-wide tier to place.
+    [[nodiscard]] bool TierIsComplete() const noexcept {
+        for (const Term& term : _terms)
+        {
+            const bool absent = term.gga != nullptr ? term.ggaSecondDerivative == nullptr
+                                                    : term.ldaSecondDerivative == nullptr;
+
+            if (absent)
+            {
+                return false;
+            }
+        }
+
+        return !_terms.empty();
+    }
+
+    /// The generated kernel's value at the point.
+    [[nodiscard]] XcKernelValue Value(const PointInputs& inputs) const noexcept {
+        const double rhoA = inputs.Get(Component::RhoA);
+        const double rhoB = inputs.Get(Component::RhoB);
+        const double sigmaAa = inputs.Get(Component::SigmaAa);
+        const double sigmaAb = inputs.Get(Component::SigmaAb);
+        const double sigmaBb = inputs.Get(Component::SigmaBb);
+
+        XcKernelValue value;
+        for (const Term& term : _terms)
+        {
+            const XcKernelValue part = term.gga != nullptr
+                                           ? term.gga(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb)
+                                           : term.lda(rhoA, rhoB);
+            value += term.weight * part;
+        }
+
+        return value;
+    }
+
+    /// The recipe's matrix, in the width's own packing.  An LDA term's
+    /// two-wide matrix is placed in the top-left of the five-wide one, the
+    /// dropped gradient rows and columns being the zeros a term that reads no
+    /// gradient contributes.
+    void FillGeneratedMatrix(const PointInputs& inputs,
+                             PointSecondDerivativeMatrix& generated) const noexcept {
+        const double rhoA = inputs.Get(Component::RhoA);
+        const double rhoB = inputs.Get(Component::RhoB);
+        const double sigmaAa = inputs.Get(Component::SigmaAa);
+        const double sigmaAb = inputs.Get(Component::SigmaAb);
+        const double sigmaBb = inputs.Get(Component::SigmaBb);
+
+        generated = {};
+
+        for (const Term& term : _terms)
+        {
+            PointSecondDerivativeMatrix part;
+
+            if (term.gga != nullptr)
+            {
+                term.ggaSecondDerivative(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, part);
+            } else
+            {
+                PointSecondDerivativeMatrix narrow;
+                term.ldaSecondDerivative(rhoA, rhoB, narrow);
+                part = Width() == kGgaTierComponents ? WidenLdaMatrix(narrow) : narrow;
+            }
+
+            const std::size_t entries = PackedIndex(Width() - 1, Width() - 1, Width()) + 1;
+
+            for (std::size_t k = 0; k < entries; ++k)
+            {
+                generated.upper[k] += term.weight * part.upper[k];
+            }
+        }
+    }
+
     std::string_view _name;
     double _exchangeFraction;
     bool _usesGradient;
@@ -508,19 +875,23 @@ private:
 // The shipped registry (name string -> functional).  The names are the
 // consumer-facing schema strings (never an enum - enums drift with repo
 // releases).
-const PureFunctional kSlater("slater", false, &SlaterExchange, nullptr);
-const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr);
-const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr);
-const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr);
+const PureFunctional kSlater("slater", false, &SlaterExchange, nullptr, &SlaterExchangeSecondDerivatives);
+const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr, nullptr);
+const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr, nullptr);
+const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr, nullptr);
 
 // Every hybrid below is written as this three-step shape - a named constexpr
 // term list, the static_assert that the folding rule closes on it, and the
 // object built from that same list - so a recipe's terms exist once and the
 // compiler checks them.  The constructor refuses a list that reaches it
 // without an assert, so this is a shape to copy, not a convention to remember.
+//
+// Each term also names the second-derivative tier of its kernel, because a
+// composed functional's Hessian is the weighted sum of its terms' and a term
+// without one would make the sum a lie.
 constexpr std::array<HybridFunctional::Term, 2> kSvwnTerms = {{
-    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0},
+    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0, nullptr},
 }};
 static_assert(FoldingRuleHolds(kSvwnTerms, 0.0),
               "svwn: the folding rule is violated - the DFT exchange weights must sum to "
@@ -528,34 +899,46 @@ static_assert(FoldingRuleHolds(kSvwnTerms, 0.0),
 const HybridFunctional kSvwn("svwn", 0.0, false, kSvwnTerms);
 
 constexpr std::array<HybridFunctional::Term, 2> kSpw92Terms = {{
-    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0},
-    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0},
+    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
+    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0, nullptr},
 }};
 static_assert(FoldingRuleHolds(kSpw92Terms, 0.0),
               "spw92: the folding rule is violated - the DFT exchange weights must sum to "
               "1 - exchangeFraction, with the LSDA weight FOLDED against the full GGA kernels");
 const HybridFunctional kSpw92("spw92", 0.0, false, kSpw92Terms);
 
-const PureFunctional kBecke88("becke88", true, nullptr, &Becke88Exchange);
-const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange);
-const PureFunctional kPbe("pbe", true, nullptr, &PbeExchange);
-const PureFunctional kRevPbe("revpbe", true, nullptr, &RevPbeExchange);
-const PureFunctional kRpbe("rpbe", true, nullptr, &RpbeExchange);
-const PureFunctional kMPw91("mpw91", true, nullptr, &MPw91Exchange);
-const PureFunctional kPbeSol("pbesol", true, nullptr, &PbeSolExchange);
+const PureFunctional kBecke88("becke88", true, nullptr, &Becke88Exchange, nullptr,
+                             &Becke88ExchangeSecondDerivatives);
+const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange, nullptr, nullptr);
+const PureFunctional kPbe("pbe", true, nullptr, &PbeExchange, nullptr,
+                         &PbeExchangeSecondDerivatives);
+const PureFunctional kRevPbe("revpbe", true, nullptr, &RevPbeExchange, nullptr,
+                            &RevPbeExchangeSecondDerivatives);
+const PureFunctional kRpbe("rpbe", true, nullptr, &RpbeExchange, nullptr,
+                          &RpbeExchangeSecondDerivatives);
+const PureFunctional kMPw91("mpw91", true, nullptr, &MPw91Exchange, nullptr,
+                           &MPw91ExchangeSecondDerivatives);
+const PureFunctional kPbeSol("pbesol", true, nullptr, &PbeSolExchange, nullptr,
+                            nullptr);
 
-const PureFunctional kLyp("lyp", true, nullptr, &LypCorrelation);
-const PureFunctional kPbeC("pbe_c", true, nullptr, &PbeCorrelation);
-const PureFunctional kPw91c("pw91_c", true, nullptr, &Pw91Correlation);
-const PureFunctional kP86("p86", true, nullptr, &P86Correlation);
+const PureFunctional kLyp("lyp", true, nullptr, &LypCorrelation, nullptr,
+                         nullptr);
+const PureFunctional kPbeC("pbe_c", true, nullptr, &PbeCorrelation, nullptr,
+                          nullptr);
+const PureFunctional kPw91c("pw91_c", true, nullptr, &Pw91Correlation, nullptr,
+                           nullptr);
+const PureFunctional kP86("p86", true, nullptr, &P86Correlation, nullptr,
+                         nullptr);
 
 // 0.08, not the published 0.80: the Slater term is folded in against a
 // FULL B88 kernel - see the HybridFunctional note above for the arithmetic.
 constexpr std::array<HybridFunctional::Term, 4> kB3LypTerms = {{
-    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08},
-    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19},
-    {TermRole::kCorrelation, nullptr, &LypCorrelation, 0.81},
+    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
+    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
+     &Becke88ExchangeSecondDerivatives},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, nullptr, &LypCorrelation, 0.81, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kB3LypTerms, 0.20),
               "b3lyp: the folding rule is violated - the DFT exchange weights must sum to "
@@ -563,8 +946,9 @@ static_assert(FoldingRuleHolds(kB3LypTerms, 0.20),
 const HybridFunctional kB3Lyp("b3lyp", 0.20, true, kB3LypTerms);
 
 constexpr std::array<HybridFunctional::Term, 2> kPbe0Terms = {{
-    {TermRole::kGgaExchange, nullptr, &PbeExchange, 0.75},
-    {TermRole::kCorrelation, nullptr, &PbeCorrelation, 1.0},
+    {TermRole::kGgaExchange, nullptr, &PbeExchange, 0.75, nullptr, &PbeExchangeSecondDerivatives},
+    {TermRole::kCorrelation, nullptr, &PbeCorrelation, 1.0, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kPbe0Terms, 0.25),
               "pbe0: the folding rule is violated - the DFT exchange weights must sum to "
@@ -572,10 +956,12 @@ static_assert(FoldingRuleHolds(kPbe0Terms, 0.25),
 const HybridFunctional kPbe0("pbe0", 0.25, true, kPbe0Terms);
 
 constexpr std::array<HybridFunctional::Term, 4> kB3Pw91Terms = {{
-    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08},
-    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19},
-    {TermRole::kCorrelation, nullptr, &Pw91Correlation, 0.81},
+    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
+    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
+     &Becke88ExchangeSecondDerivatives},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, nullptr, &Pw91Correlation, 0.81, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kB3Pw91Terms, 0.20),
               "b3pw91: the folding rule is violated - the DFT exchange weights must sum to "
@@ -583,8 +969,10 @@ static_assert(FoldingRuleHolds(kB3Pw91Terms, 0.20),
 const HybridFunctional kB3Pw91("b3pw91", 0.20, true, kB3Pw91Terms);
 
 constexpr std::array<HybridFunctional::Term, 2> kMPw1Pw91Terms = {{
-    {TermRole::kGgaExchange, nullptr, &MPw91Exchange, 0.75},
-    {TermRole::kCorrelation, nullptr, &Pw91Correlation, 1.0},
+    {TermRole::kGgaExchange, nullptr, &MPw91Exchange, 0.75, nullptr,
+     &MPw91ExchangeSecondDerivatives},
+    {TermRole::kCorrelation, nullptr, &Pw91Correlation, 1.0, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kMPw1Pw91Terms, 0.25),
               "mpw1pw91: the folding rule is violated - the DFT exchange weights must sum to "
@@ -596,8 +984,10 @@ const HybridFunctional kMPw1Pw91("mpw1pw91", 0.25, true, kMPw1Pw91Terms);
 // exchange legs are 0.50 becke88 and nothing else - which is what libxc's
 // BHandHLYP resolves to (measured identical to `0.5*HF + 0.5*B88 + LYP`).
 constexpr std::array<HybridFunctional::Term, 2> kBHandHLypTerms = {{
-    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.50},
-    {TermRole::kCorrelation, nullptr, &LypCorrelation, 1.0},
+    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.50, nullptr,
+     &Becke88ExchangeSecondDerivatives},
+    {TermRole::kCorrelation, nullptr, &LypCorrelation, 1.0, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kBHandHLypTerms, 0.50),
               "bhandhlyp: the folding rule is violated - the DFT exchange weights must sum to "
@@ -608,10 +998,12 @@ const HybridFunctional kBHandHLyp("bhandhlyp", 0.50, true, kBHandHLypTerms);
 // residual against libxc 403, one the folding rule cannot see and does
 // not speak to.
 constexpr std::array<HybridFunctional::Term, 4> kB3P86Terms = {{
-    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08},
-    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19},
-    {TermRole::kCorrelation, nullptr, &P86Correlation, 0.81},
+    {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
+    {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
+     &Becke88ExchangeSecondDerivatives},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, nullptr, &P86Correlation, 0.81, nullptr,
+     nullptr},
 }};
 static_assert(FoldingRuleHolds(kB3P86Terms, 0.20),
               "b3p86: the folding rule is violated - the DFT exchange weights must sum to "

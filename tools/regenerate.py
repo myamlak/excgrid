@@ -74,13 +74,25 @@ CLANG_FORMAT_CANDIDATES = [
     r"C:\Program Files\Microsoft Visual Studio\18\Community\VC\Tools\Llvm\x64\bin\clang-format.exe",
 ]
 
+#: Where the tier functions are declared, and the suffix that names them.  The
+#: definitions are the ones the generator writes into generated/.  Two
+#: declaration sites, not one: a tier is declared beside its kernel in the
+#: public header, except the tau tier's, whose kernel is wider than the two
+#: kernel-pointer types that header's own functions return and so is named where
+#: the registry builds it.
+TIER_DECLARATION_SITES = (
+    ROOT / "include" / "excgrid" / "kernels.hpp",
+    ROOT / "src" / "kernels_registry.cpp",
+)
+TIER_SUFFIX = "SecondDerivatives"
+
 # The per-kernel bound.  Deliberately far above the slowest HEALTHY kernel -
 # pbe_correlation at about 12.5 minutes, timed from the child process itself,
 # against about 3 minutes for the next slowest, vwn5_correlation, read off
 # the per-kernel output timestamps of a full regeneration.  The bound exists
 # to stop a NON-TERMINATING expansion, not to police the pace, so do not
-# lower it to make a run feel faster.  See the 2026-09-13 note in
-# docs/maintainer-guide.md.
+# lower it to make a run feel faster - the guide's "Two guards make an
+# interrupted run safe and a hanging one loud" carries the same numbers.
 KERNEL_TIMEOUT_SECONDS = 1800
 
 
@@ -129,7 +141,7 @@ YACAS_ERROR_MARKERS = (
 )
 
 #: What the captured text must carry to be a kernel: the excgrid namespace and
-#: at least one `result.<field> = ` assignment.  15 of 15 committed generated
+#: at least one `result.<field> = ` assignment.  16 of 16 committed generated
 #: files carry both.  This is the half of the check that does not depend on
 #: yacas' wording, so it catches an empty or unrelated output; it does NOT
 #: catch the undefined-rule failure, which emits a plausible kernel with the
@@ -363,6 +375,39 @@ def prune_in_place(path):
         path.write_text(pruned, encoding="utf-8", newline="\n")
 
 
+def check_tier_declarations(generated_dir):
+    """Cross-check the second-derivative tiers' declarations against their definitions.
+
+    A tier function's DECLARATION is hand-written while its DEFINITION is
+    generated, and the two are built from different facts: a source declines its
+    tier on a cost ground the declaration cannot see.  Declaring a tier for such
+    a functional compiles and then fails at LINK time on the registry, which is a
+    build nobody can use rather than a message about the change - so the
+    disagreement is named here, where the maintainer is already standing.
+
+    Returns a list of complaint strings; empty means the two sides agree.
+    """
+    declaration = re.compile(rf"^void\s+(\w+{TIER_SUFFIX})\s*\(", re.MULTILINE)
+    declared = set()
+    for site in TIER_DECLARATION_SITES:
+        declared.update(declaration.findall(site.read_text(encoding="utf-8")))
+    defined = set()
+    for _, cpp_name in FUNCTIONALS:
+        text = (generated_dir / cpp_name).read_text(encoding="utf-8")
+        defined.update(declaration.findall(text))
+
+    where = " or ".join(site.relative_to(ROOT).as_posix() for site in TIER_DECLARATION_SITES)
+    complaints = []
+    for name in sorted(declared - defined):
+        complaints.append(
+            f"{name} is declared in {where} but no generated kernel defines it - "
+            "either its .ey asks for a tier or the declaration goes")
+    for name in sorted(defined - declared):
+        complaints.append(
+            f"{name} is defined by a generated kernel but not declared in {where}")
+    return complaints
+
+
 def regenerate(output_dir, yacas_arg=None, clang_format_arg=None):
     yacas = find_tool(yacas_arg, os.environ.get("EXCGRID_YACAS"),
                       [str(p) for p in YACAS_CANDIDATES], "yacas")
@@ -402,13 +447,28 @@ def main():
                         fromfile=f"generated/{cpp_name}", tofile="regenerated",
                         lineterm=""))
                     print(diff)
-            if mismatches:
-                print(f"freshness check FAILED: {len(mismatches)} generated file(s) out of sync")
+            tier_complaints = check_tier_declarations(tmp_dir)
+            for complaint in tier_complaints:
+                print(complaint)
+            if mismatches or tier_complaints:
+                print(f"freshness check FAILED: {len(mismatches)} generated file(s) out of sync, "
+                      f"{len(tier_complaints)} tier declaration(s) unaccounted for")
                 return 1
-            print("freshness check OK: every generated file matches its .ey source")
+            print("freshness check OK: every generated file matches its .ey source, and every "
+                  "declared tier has a definition")
             return 0
 
     regenerate(GENERATED_DIR, args.yacas, args.clang_format)
+
+    # Before the manifest, not after: the manifest is what blesses these sources
+    # as regenerated, and a tree whose tiers do not link has not earned that.
+    tier_complaints = check_tier_declarations(GENERATED_DIR)
+    for complaint in tier_complaints:
+        print(complaint)
+    if tier_complaints:
+        print(f"regeneration wrote generated/, but {len(tier_complaints)} tier declaration(s) "
+              "are unaccounted for; the manifest is NOT rewritten")
+        return 1
 
     # The manifest is written only here, on the path that actually regenerated:
     # the commit-time checker (tools/check_freshness.py) reads it to decide
