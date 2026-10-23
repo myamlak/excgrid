@@ -352,8 +352,9 @@ TEST(SecondDerivativeTest, TheMatrixIsTheDerivativeOfTheKernelsOwnFirstDerivativ
 
 // At an exactly zero gradient the tier must be finite wherever the kernel is, and equal the
 // limit. Pinned: mpw91's x^3.72 curvature diverges there; p86's gamma*exp(-a*sqrt(gamma)) has a
-// -3a/(4 sqrt(gamma)) curvature, so every sigma-carrying entry is singular in the unguarded
-// source; mpw1pw91 and b3p86 inherit their component's holes.
+// -3a/(4 sqrt(gamma)) curvature, so its sigma-sigma entries (9-14) diverge, while its rho-sigma
+// entries (2,3,4,6,7,8) are singular in the unguarded source but have finite limits; mpw1pw91 and
+// b3p86 inherit their component's holes.
 const std::array<std::string_view, 4> kTierHolesAtZeroGradient = {"mpw91", "mpw1pw91", "p86",
                                                                   "b3p86"};
 
