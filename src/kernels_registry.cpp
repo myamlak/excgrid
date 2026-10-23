@@ -876,9 +876,12 @@ private:
 // consumer-facing schema strings (never an enum - enums drift with repo
 // releases).
 const PureFunctional kSlater("slater", false, &SlaterExchange, nullptr, &SlaterExchangeSecondDerivatives);
-const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr, nullptr);
-const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr, nullptr);
-const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr, nullptr);
+const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr,
+                           &Vwn5CorrelationSecondDerivatives);
+const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr,
+                           &Vwn3CorrelationSecondDerivatives);
+const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr,
+                           &Pw92CorrelationSecondDerivatives);
 
 // Every hybrid below is written as this three-step shape - a named constexpr
 // term list, the static_assert that the folding rule closes on it, and the
@@ -891,7 +894,8 @@ const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr, nullptr);
 // without one would make the sum a lie.
 constexpr std::array<HybridFunctional::Term, 2> kSvwnTerms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0,
+     &Vwn5CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kSvwnTerms, 0.0),
               "svwn: the folding rule is violated - the DFT exchange weights must sum to "
@@ -900,7 +904,8 @@ const HybridFunctional kSvwn("svwn", 0.0, false, kSvwnTerms);
 
 constexpr std::array<HybridFunctional::Term, 2> kSpw92Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0, nullptr},
+    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0,
+     &Pw92CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kSpw92Terms, 0.0),
               "spw92: the folding rule is violated - the DFT exchange weights must sum to "
@@ -909,7 +914,8 @@ const HybridFunctional kSpw92("spw92", 0.0, false, kSpw92Terms);
 
 const PureFunctional kBecke88("becke88", true, nullptr, &Becke88Exchange, nullptr,
                              &Becke88ExchangeSecondDerivatives);
-const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange, nullptr, nullptr);
+const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange, nullptr,
+                            &Pw91ExchangeSecondDerivatives);
 const PureFunctional kPbe("pbe", true, nullptr, &PbeExchange, nullptr,
                          &PbeExchangeSecondDerivatives);
 const PureFunctional kRevPbe("revpbe", true, nullptr, &RevPbeExchange, nullptr,
@@ -919,16 +925,16 @@ const PureFunctional kRpbe("rpbe", true, nullptr, &RpbeExchange, nullptr,
 const PureFunctional kMPw91("mpw91", true, nullptr, &MPw91Exchange, nullptr,
                            &MPw91ExchangeSecondDerivatives);
 const PureFunctional kPbeSol("pbesol", true, nullptr, &PbeSolExchange, nullptr,
-                            nullptr);
+                            &PbeSolExchangeSecondDerivatives);
 
 const PureFunctional kLyp("lyp", true, nullptr, &LypCorrelation, nullptr,
-                         nullptr);
+                         &LypCorrelationSecondDerivatives);
 const PureFunctional kPbeC("pbe_c", true, nullptr, &PbeCorrelation, nullptr,
-                          nullptr);
+                          &PbeCorrelationSecondDerivatives);
 const PureFunctional kPw91c("pw91_c", true, nullptr, &Pw91Correlation, nullptr,
-                           nullptr);
+                           &Pw91CorrelationSecondDerivatives);
 const PureFunctional kP86("p86", true, nullptr, &P86Correlation, nullptr,
-                         nullptr);
+                         &P86CorrelationSecondDerivatives);
 
 // 0.08, not the published 0.80: the Slater term is folded in against a
 // FULL B88 kernel - see the HybridFunctional note above for the arithmetic.
@@ -936,9 +942,10 @@ constexpr std::array<HybridFunctional::Term, 4> kB3LypTerms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &LypCorrelation, 0.81, nullptr,
-     nullptr},
+     &LypCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3LypTerms, 0.20),
               "b3lyp: the folding rule is violated - the DFT exchange weights must sum to "
@@ -948,7 +955,7 @@ const HybridFunctional kB3Lyp("b3lyp", 0.20, true, kB3LypTerms);
 constexpr std::array<HybridFunctional::Term, 2> kPbe0Terms = {{
     {TermRole::kGgaExchange, nullptr, &PbeExchange, 0.75, nullptr, &PbeExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &PbeCorrelation, 1.0, nullptr,
-     nullptr},
+     &PbeCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kPbe0Terms, 0.25),
               "pbe0: the folding rule is violated - the DFT exchange weights must sum to "
@@ -959,9 +966,10 @@ constexpr std::array<HybridFunctional::Term, 4> kB3Pw91Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &Pw91Correlation, 0.81, nullptr,
-     nullptr},
+     &Pw91CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3Pw91Terms, 0.20),
               "b3pw91: the folding rule is violated - the DFT exchange weights must sum to "
@@ -972,7 +980,7 @@ constexpr std::array<HybridFunctional::Term, 2> kMPw1Pw91Terms = {{
     {TermRole::kGgaExchange, nullptr, &MPw91Exchange, 0.75, nullptr,
      &MPw91ExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &Pw91Correlation, 1.0, nullptr,
-     nullptr},
+     &Pw91CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kMPw1Pw91Terms, 0.25),
               "mpw1pw91: the folding rule is violated - the DFT exchange weights must sum to "
@@ -987,7 +995,7 @@ constexpr std::array<HybridFunctional::Term, 2> kBHandHLypTerms = {{
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.50, nullptr,
      &Becke88ExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &LypCorrelation, 1.0, nullptr,
-     nullptr},
+     &LypCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kBHandHLypTerms, 0.50),
               "bhandhlyp: the folding rule is violated - the DFT exchange weights must sum to "
@@ -1001,9 +1009,10 @@ constexpr std::array<HybridFunctional::Term, 4> kB3P86Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &P86Correlation, 0.81, nullptr,
-     nullptr},
+     &P86CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3P86Terms, 0.20),
               "b3p86: the folding rule is violated - the DFT exchange weights must sum to "

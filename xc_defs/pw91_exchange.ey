@@ -13,9 +13,67 @@
 
     e := X'Pw91Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this is the one exchange enhancement in the tree that is a
-    // rational function of Asinh and Exp rather than of s^2 alone, and its
-    // symbolic second differentiation runs to tens of minutes rather than the
-    // seconds the other exchange forms take.
-    ExKernelGenerate("Pw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // The two sigma-sigma entries are supplied in their stable closed form.
+    // The plain second derivative of Fx(s) cancels two terms of order
+    // 1/sigma, so in double the value depends on the guard and no guard is
+    // both representable and invisible; with s = sqrt(sigma)/B (B = kF(2 rho)
+    // 2 rho + Tiny), z = s^2 and Fx = EN(z)/ED(z), the second derivative is
+    //   E_ss = rho EpsX(2 rho) * Phizz(z) / B^4,
+    // and Phizz through the z-derivatives below:
+    //   EN  = 1 + a b z w + (c - d q) z,   ED  = 1 + a b z w + e z^2,
+    //   x = b s,  q = exp(-100 z),  w = asinh(x)/x,
+    //   u'  = (w + r)/2,   u'' = b^2 (wp - r^3/2)/2,
+    //   r = 1/sqrt(1+x^2),  wp = d/d(x^2)[asinh(x)/x]  (both helpers).
+    // Verified against the symbolic second derivative to 1e-57 at five points;
+    // at the corner it reduces to the same finite limit as the tiny-sigma form.
+    hA := 0.19645;
+    hB := 7.7956;
+    hC := 0.2743;
+    hD := 0.1508;
+    hE := 0.004;
+    hSA := X'S(2 * rhoA, 4 * sigmaAa);
+    hSB := X'S(2 * rhoB, 4 * sigmaBb);
+    hDenA := X'KF(2 * rhoA) * 2 * rhoA + X'Tiny;
+    hDenB := X'KF(2 * rhoB) * 2 * rhoB + X'Tiny;
+    hZA := hSA^2;
+    hZB := hSB^2;
+    hXA := hB * hSA;
+    hXB := hB * hSB;
+    hQA := Exp(-100 * hZA);
+    hQB := Exp(-100 * hZB);
+    hWA := X'AsinhOverX(hXA);
+    hWB := X'AsinhOverX(hXB);
+    hRA := 1 / Sqrt(1 + hXA^2);
+    hRB := 1 / Sqrt(1 + hXB^2);
+    hWpA := X'AsinhOverXDeriv(hXA);
+    hWpB := X'AsinhOverXDeriv(hXB);
+    hU1A := (hWA + hRA) / 2;
+    hU1B := (hWB + hRB) / 2;
+    hU2A := hB^2 * (hWpA - hRA^3 / 2) / 2;
+    hU2B := hB^2 * (hWpB - hRB^3 / 2) / 2;
+    hENA := 1 + hA * hB * hZA * hWA + (hC - hD * hQA) * hZA;
+    hENB := 1 + hA * hB * hZB * hWB + (hC - hD * hQB) * hZB;
+    hEDA := 1 + hA * hB * hZA * hWA + hE * hZA^2;
+    hEDB := 1 + hA * hB * hZB * hWB + hE * hZB^2;
+    hENzA := hA * hB * hU1A + (hC - hD * hQA) + 100 * hD * hQA * hZA;
+    hENzB := hA * hB * hU1B + (hC - hD * hQB) + 100 * hD * hQB * hZB;
+    hEDzA := hA * hB * hU1A + 2 * hE * hZA;
+    hEDzB := hA * hB * hU1B + 2 * hE * hZB;
+    hENzzA := hA * hB * hU2A + 100 * hD * hQA * (2 - 100 * hZA);
+    hENzzB := hA * hB * hU2B + 100 * hD * hQB * (2 - 100 * hZB);
+    hEDzzA := hA * hB * hU2A + 2 * hE;
+    hEDzzB := hA * hB * hU2B + 2 * hE;
+    hPhizzA := (hENzzA * hEDA - hENA * hEDzzA) / hEDA^2 -
+        2 * (hENzA * hEDA - hENA * hEDzA) * hEDzA / hEDA^3;
+    hPhizzB := (hENzzB * hEDB - hENB * hEDzzB) / hEDB^2 -
+        2 * (hENzB * hEDB - hENB * hEDzB) * hEDzB / hEDB^3;
+    hEaa := rhoA * X'EpsX(2 * rhoA) * hPhizzA / hDenA^4;
+    hEbb := rhoB * X'EpsX(2 * rhoB) * hPhizzB / hDenB^4;
+    ahandDerivedEntries := {{sigmaAa, sigmaAa, hEaa}, {sigmaBb, sigmaBb, hEbb}};
+
+    // TierGuard for the remaining entries: they still carry asinh(x)/sqrt(sigma)
+    // and share the becke88 exchange's removable corner, where the radicand
+    // shift evaluates the ratio accurately because nothing of order 1/sigma
+    // cancels in the cross derivatives.
+    ExKernelGenerate("Pw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
 ?>

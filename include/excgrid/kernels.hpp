@@ -197,6 +197,27 @@ void SlaterExchangeSecondDerivatives(double rhoA, double rhoB, PointSecondDeriva
 
 /// \param rhoA The alpha-spin density.
 /// \param rhoB The beta-spin density.
+/// \param matrix Filled with the upper triangle over (rhoA, rhoB).
+/// \ingroup excgrid-kernels
+void Vwn5CorrelationSecondDerivatives(double rhoA, double rhoB,
+                                      PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param matrix Filled with the upper triangle over (rhoA, rhoB).
+/// \ingroup excgrid-kernels
+void Vwn3CorrelationSecondDerivatives(double rhoA, double rhoB,
+                                      PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param matrix Filled with the upper triangle over (rhoA, rhoB).
+/// \ingroup excgrid-kernels
+void Pw92CorrelationSecondDerivatives(double rhoA, double rhoB,
+                                      PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
 /// \param sigmaAa grad(rhoA) . grad(rhoA).
 /// \param sigmaAb grad(rhoA) . grad(rhoB).
 /// \param sigmaBb grad(rhoB) . grad(rhoB).
@@ -204,6 +225,16 @@ void SlaterExchangeSecondDerivatives(double rhoA, double rhoB, PointSecondDeriva
 /// \ingroup excgrid-kernels
 void Becke88ExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
                                       double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void Pw91ExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                   double sigmaBb, PointSecondDerivativeMatrix& matrix);
 
 /// \param rhoA The alpha-spin density.
 /// \param rhoB The beta-spin density.
@@ -244,6 +275,56 @@ void RpbeExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, dou
 /// \ingroup excgrid-kernels
 void MPw91ExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void PbeSolExchangeSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void LypCorrelationSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void PbeCorrelationSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void Pw91CorrelationSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                      double sigmaBb, PointSecondDerivativeMatrix& matrix);
+
+/// \param rhoA The alpha-spin density.
+/// \param rhoB The beta-spin density.
+/// \param sigmaAa grad(rhoA) . grad(rhoA).
+/// \param sigmaAb grad(rhoA) . grad(rhoB).
+/// \param sigmaBb grad(rhoB) . grad(rhoB).
+/// \param matrix Filled with the upper triangle over rhoA..sigmaBb.
+/// \ingroup excgrid-kernels
+void P86CorrelationSecondDerivatives(double rhoA, double rhoB, double sigmaAa, double sigmaAb,
+                                     double sigmaBb, PointSecondDerivativeMatrix& matrix);
 
 /// \}
 /// \ingroup excgrid-kernels

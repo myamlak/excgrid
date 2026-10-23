@@ -110,7 +110,11 @@ LocalSymbols(exCppFormMathFunctions) [
       {"ArcSinh", "std::asinh"}, {"ArcTan", "std::atan"}, {"Abs", "std::abs"},
       {"Cos", "std::cos"}, {"Sin", "std::sin"}, {"ArcCos", "std::acos"},
       {"ArcSin", "std::asin"}, {"Tan", "std::tan"}, {"Max", "std::max"},
-      {"Min", "std::min"}
+      {"Min", "std::min"},
+      // The two stable asinh ratios a hand-supplied tier entry writes
+      // (include/excgrid/internal/asinh_over_x.hpp carries the limits).
+      {"X'AsinhOverX", "excgrid::internal::AsinhOverX"},
+      {"X'AsinhOverXDeriv", "excgrid::internal::AsinhOverXDerivX2"}
     };
 
     ExCppFormMathFunctions() := exCppFormMathFunctions;

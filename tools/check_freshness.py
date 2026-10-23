@@ -7,7 +7,7 @@ deliberately not the same check as `regenerate.py --check`:
   * `regenerate.py --check` re-runs Yacas over every functional and diffs the
     output against the committed generated files.  That is what proves the
     generated code matches its sources - and it is far too slow to sit in a
-    pre-commit hook, because it expands all fourteen kernels symbolically.
+    pre-commit hook, because it expands all sixteen kernels symbolically.
 
   * This script proves something narrower and much cheaper: that no codegen
     INPUT has changed since the manifest was blessed.  It reads

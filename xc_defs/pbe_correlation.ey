@@ -13,8 +13,10 @@
 
     e := X'PbeCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
-    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // TierGuard: the order-1 kernel now guards the TOTAL-gradient radical, so
+    // it answers the finite limit at exactly zero gradient instead of dividing
+    // a CSE temporary by its own zero (owner ruling 2026-10-19).  The tier is
+    // generated with the same shift; values above ~1e-284 in the gradient are
+    // bit-identical to the old arithmetic.
+    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
 ?>

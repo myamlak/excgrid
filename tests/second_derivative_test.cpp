@@ -250,33 +250,34 @@ const std::array<std::string_view, 24> kEveryShippedName = {
     "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
 };
 
-// The names whose kernels ship a second-derivative tier.  A name is absent when
-// the symbolic second differentiation of its energy density is too expensive to
-// carry, and for the exchange forms that turns on the enhancement: the five that
-// are rational functions of s^2 alone generate in under two minutes on the
-// development machine, mpw91's - which carries Exp and Asinh - in about three
-// and a half, and pw91's, which carries both inside a rational function, was
-// still running at 22 minutes and was abandoned.  For the correlation forms it
-// is every one of them.  A recipe takes a tier only when every one of its
-// terms has one, so a hybrid of a tiered exchange with an untiered correlation is
-// absent too.
-// `pbesol` is absent for a different reason from the ones above it: its tier
-// generates quickly but is not finite at an exactly zero gradient in the two
-// sigma-sigma entries, where the kernel itself is.  A tier that has a hole at a
-// point its own kernel answers is not shippable, and the shape that would need
-// repairing is a sum at the top of the differentiated tree, which the
-// generator's cancellation deliberately does not rewrite.
-const std::array<std::string_view, 7> kEveryTieredName = {
-    "slater", "becke88", "pbe", "revpbe", "rpbe", "mpw91", "tau_x",
+// Every shipped name carries a second-derivative tier.  The owner ruling of
+// 2026-10-19 lifted the per-kernel generation bound for the one-time tier
+// generation, and the three classes of absence it closed are recorded where
+// their machinery lives: the cost-gated nine were generated (the wall times
+// are in the maintainer guide), pbesol's two sigma-sigma entries are finite
+// through the generator's sum-level cancellation (ExCancelSumQuotients), and
+// the correlation forms' total-gradient edge is inside the radicand guard, in
+// the order-1 kernel and in the tier alike.  The two asinh exchange forms
+// carry their sigma-sigma entries in a stable closed form
+// (include/excgrid/internal/asinh_over_x.hpp), because the plain second
+// derivative cancels two terms of order 1/sigma and no guard is both
+// representable in double and invisible.
+// `mpw91` remains the one kernel whose tier is analytically divergent at a
+// zero gradient (its x^3.72 term), with two removable (rho, sigma) holes the
+// same unguarded mode leaves; the corner test pins it and the one hybrid that
+// composes it, `mpw1pw91`, as such.
+const std::array<std::string_view, 24> kEveryTieredName = {
+    "slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
+    "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
+    "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
 };
 
-// Every other shipped name, which is where the refusal grain has to hold: a
-// caller asking one of these for a derivative gets "no tier", not a matrix.
-const std::array<std::string_view, 17> kEveryUntieredName = {
-    "vwn5",  "vwn3",   "pw92",     "svwn",  "spw92",    "pw91",  "lyp",   "pbe_c",
-    "pw91_c", "p86",   "b3lyp",    "pbe0",  "b3pw91",   "mpw1pw91", "bhandhlyp", "b3p86",
-    "pbesol",
-};
+// Empty by construction: every shipped name is in the list above.  The refusal
+// path is still asserted, on the seam itself rather than through a shipped name
+// (AnUncoveredComponentIsRefusedByItsOwnName hands SecondDerivativeStatus an
+// empty span); a tier is absent only for a functional that ships without one,
+// and none does.
+const std::array<std::string_view, 0> kEveryUntieredName = {};
 
 } // namespace
 
@@ -475,28 +476,33 @@ TEST(SecondDerivativeTest, TheMatrixIsTheDerivativeOfTheKernelsOwnFirstDerivativ
 //
 // The requirement is placed where it can hold: the tier must be finite at the
 // corner wherever the KERNEL is finite, and no further.  The kernel is finite
-// at the corner for every tiered functional now - the generator's
-// sigma-edge guard shifts the asinh shape's radicand (see
-// ExGuardSigmaRadical in xc_defs/excgrid_generate.ys), which is what closed the
-// last two order-1 names this list used to carry.
+// at the corner for every functional now, and the tier is finite for all but
+// one: the asinh exchange forms' sigma-sigma entries are the stable closed
+// form, the generator's radicand guard closes the correlation total-gradient
+// edge and the exchange cross entries, and pbesol's sum-level cancellation
+// closes its two diagonal entries.  The one exception is `mpw91`, measured at
+// this corner as four non-finite entries: the two diagonal sigma-sigma
+// entries, where its x^3.72 term makes the curvature diverge as
+// sigma^(-0.14) - the truth there is an infinity, and a shifted radicand
+// would report a large finite number instead - and the (rhoA, sigmaAa) and
+// (rhoB, sigmaBb) entries, whose limits are finite but which stay unguarded
+// because the radicand shift that closes them also turns the divergent
+// diagonals into large finite values.  The one hybrid that carries it,
+// `mpw1pw91` (0.75 mpw91 + pw91_c), inherits those four entries through the
+// weighted sum, so its matrix has holes at the same corner.  What the tier
+// does NOT answer is therefore stated as its own list, checked against the
+// measured matrices instead of trusted: it cannot go stale in either
+// direction, and it fails loudly if a later change makes a tier answer where
+// this file says it does not.
 //
-// The tier is a different matter, and the two names below are now the TIER's
-// exception rather than the kernel's: the tier is generated from the unguarded
-// expression on purpose, because the curvature that spans two sigma components
-// is genuinely divergent at an exactly zero gradient - the truth there is an
-// infinity, and a shifted radicand would report a large finite number instead.
-// What the tier does NOT answer is therefore stated as its own list, checked
-// against the measured matrices instead of trusted: it cannot go stale in
-// either direction, and it fails loudly if a later change makes a tier answer
-// where this file says it does not.
-//
-// Which entries: for these two the sigma-spanning ones.  The two diagonal
-// (sigma, sigma) entries are the genuine infinities; the (rho, sigma) and
-// (sigmaAa, sigmaAb) entries have finite limits and are holes of the same
-// removable kind the guard closed in the first-derivative layer - they are
-// reported and not asserted as limits, so this list is deliberately by NAME
-// and not by index.  A change that guards the tier would empty it.
-const std::array<std::string_view, 2> kTierHolesAtZeroGradient = {"becke88", "mpw91"};
+// The name is pinned rather than the entries: the list is deliberately not an
+// index set - an entry that becomes finite is caught by the value comparison,
+// and a NEW hole in a name not listed here is caught by the anyHole check
+// below.  For mpw91 that means a (rho, sigma) entry repaired later must also
+// equal its limit, not merely be finite.  `mpw1pw91` is listed because it
+// composes a pinned kernel; its own terms stay pinned through that kernel, so
+// the entry-level check there is the same one.
+const std::array<std::string_view, 2> kTierHolesAtZeroGradient = {"mpw91", "mpw1pw91"};
 
 TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
     constexpr double kNearlyZeroGradient = 1e-30;
@@ -621,6 +627,33 @@ TEST(SecondDerivativeTest, PbeGradientCurvatureAtAUniformGasIsItsAnalyticValue) 
     EXPECT_NEAR(matrix.upper[Packed(2, 2, 5)], analytic, 1e-10 * std::abs(analytic));
 }
 
+// The corner of the asinh channel the stable closed form was funded to answer.
+// At a zero gradient the plain second derivative cancels two terms of order
+// 1/sigma, so the value there is decided by the algebra rather than by a guard;
+// the Taylor form of the Becke88 sigma-sigma curvature is
+//
+//   d2E/dsigma^2 (sigma = 0) = 12 beta^2 / rho^4,
+//
+// and the generated entry must reproduce it, not merely approximate it.  The
+// first number beside each entry is the owner's reference at this exact point;
+// the second is computed here from beta, so the check does not rest on the
+// same transcription twice.
+TEST(SecondDerivativeTest, TheBecke88CornerIsTheClosedFormCurvature) {
+    constexpr double kBeta = 0.0042;
+
+    const excgrid::PointSecondDerivativeMatrix matrix =
+        GgaMatrix(excgrid::Becke88ExchangeSecondDerivatives, kRhoA, kRhoB, 0.0, 0.0, 0.0);
+
+    const double alphaClosedForm = 12.0 * kBeta * kBeta / std::pow(kRhoA, 4.0);
+    const double betaClosedForm = 12.0 * kBeta * kBeta / std::pow(kRhoB, 4.0);
+
+    EXPECT_NEAR(matrix.upper[Packed(2, 2, 5)], 0.0229209731018569, 1e-15);
+    EXPECT_NEAR(matrix.upper[Packed(4, 4, 5)], 0.0903626801447989, 1e-15);
+
+    EXPECT_NEAR(matrix.upper[Packed(2, 2, 5)], alphaClosedForm, 1e-12 * alphaClosedForm);
+    EXPECT_NEAR(matrix.upper[Packed(4, 4, 5)], betaClosedForm, 1e-12 * betaClosedForm);
+}
+
 // ---------------------------------------------------------------------------
 // The capability report
 // ---------------------------------------------------------------------------
@@ -628,7 +661,9 @@ TEST(SecondDerivativeTest, PbeGradientCurvatureAtAUniformGasIsItsAnalyticValue) 
 // What a caller can ask before it asks for numbers: which components a tier
 // covers.  A tiered functional's report equals its required mask - asserted
 // rather than assumed, because it is the fact that keeps the two refusals
-// distinguishable - and an untiered one reports that it spans nothing at all.
+// distinguishable.  The untiered list is empty and stays in the test as the
+// place a later absence declares itself: the refusal it pins is exercised on
+// the seam in AnUncoveredComponentIsRefusedByItsOwnName.
 TEST(SecondDerivativeTest, TheCoverageReportNamesWhatEachTierSpans) {
     // The three lists below are hand-written, so they are pinned to the registry
     // first: a functional added later has to be placed in one of them
@@ -737,33 +772,101 @@ TEST(SecondDerivativeTest, AnUncoveredComponentIsRefusedByItsOwnName) {
 // Composition
 // ---------------------------------------------------------------------------
 
-// A composed functional's Hessian would be the weighted sum of its terms', so a
-// recipe can only carry a tier when every term carries its own.  b3lyp mixes a
-// tiered exchange with untiered correlations, so it must refuse rather than
-// return the sum of the terms it happens to have - a matrix missing a term's
-// contribution is a wrong number, not a smaller one.
-TEST(SecondDerivativeTest, ARecipeWithAnUntieredTermRefusesRatherThanSummingPartOfItself) {
+// A composed functional's Hessian is the weighted sum of its terms', and every
+// term of b3lyp carries a tier now, so the recipe must return exactly that sum
+// rather than the part of it that happens to be available.  The expectations
+// below are written in the recipe's own term order and repeat the registry's
+// widen-then-scale placement for the two LDA terms, so the comparison is an
+// identity on the arithmetic rather than an approximate agreement: a dropped
+// term, a mis-scaled one, or an LDA term leaking into a gradient slot moves a
+// bit and fails.
+TEST(SecondDerivativeTest, ARecipeWithEveryTermTieredIsTheWeightedSumOfThem) {
     const excgrid::XcFunctional* hybrid = excgrid::FindFunctional("b3lyp");
     ASSERT_NE(hybrid, nullptr);
 
     const excgrid::PointInputs inputs =
         InputsOf(MakePoint(excgrid::ComponentMask::Collinear(), GenericValues()));
 
-    EXPECT_EQ(hybrid->SecondDerivativeMask().ActiveCount(), 0u);
+    // The coverage report and the matrix come from the same completeness fact;
+    // a recipe spanning its required mask is the one allowed to answer.
+    EXPECT_EQ(hybrid->SecondDerivativeMask().bits, hybrid->RequiredMask().bits);
+
+    // b3lyp's four terms, through the generated entry points the registry calls.
+    const excgrid::PointSecondDerivativeMatrix slater =
+        LdaMatrix(excgrid::SlaterExchangeSecondDerivatives, kRhoA, kRhoB);
+    const excgrid::PointSecondDerivativeMatrix becke88 = GgaMatrix(
+        excgrid::Becke88ExchangeSecondDerivatives, kRhoA, kRhoB, kSigmaAa, kSigmaAb, kSigmaBb);
+    const excgrid::PointSecondDerivativeMatrix vwn5 =
+        LdaMatrix(excgrid::Vwn5CorrelationSecondDerivatives, kRhoA, kRhoB);
+    const excgrid::PointSecondDerivativeMatrix lyp = GgaMatrix(
+        excgrid::LypCorrelationSecondDerivatives, kRhoA, kRhoB, kSigmaAa, kSigmaAb, kSigmaBb);
+
+    excgrid::PointSecondDerivativeMatrix expected{};
+    constexpr std::size_t kEntries = Packed(4, 4, 5) + 1;
+
+    // An LDA term occupies the densities' block - the top-left of the five-wide
+    // packing - and contributes zeros elsewhere, as the registry's widening
+    // places it.
+    const auto addLda = [&expected](double weight,
+                                    const excgrid::PointSecondDerivativeMatrix& narrow) {
+        expected.upper[Packed(0, 0, 5)] += weight * narrow.upper[Packed(0, 0, 2)];
+        expected.upper[Packed(0, 1, 5)] += weight * narrow.upper[Packed(0, 1, 2)];
+        expected.upper[Packed(1, 1, 5)] += weight * narrow.upper[Packed(1, 1, 2)];
+    };
+    const auto addGga = [&expected](double weight,
+                                    const excgrid::PointSecondDerivativeMatrix& matrix) {
+        for (std::size_t k = 0; k < kEntries; ++k)
+        {
+            expected.upper[k] += weight * matrix.upper[k];
+        }
+    };
+
+    // The weights and the order are kB3LypTerms'.
+    addLda(0.08, slater);
+    addGga(0.72, becke88);
+    addLda(0.19, vwn5);
+    addGga(0.81, lyp);
 
     excgrid::PointResult result;
     excgrid::PointSecondDerivativeMatrix matrix;
-    EXPECT_EQ(hybrid->EvaluatePointMaterialising(inputs, result, matrix),
-              excgrid::KernelStatus::kRefusedUnsupportedCapability);
+    ASSERT_EQ(hybrid->EvaluatePointMaterialising(inputs, result, matrix),
+              excgrid::KernelStatus::kOk);
 
+    for (std::size_t k = 0; k < kEntries; ++k)
+    {
+        EXPECT_DOUBLE_EQ(matrix.upper[k], expected.upper[k]) << "entry " << k;
+    }
+
+    // The contracted entry point is the same matrix against the caller's
+    // right-hand side; it must answer, and it must hold the materialised
+    // matrix's contraction.  The full symmetric sum is taken, the generated
+    // packing carrying the upper triangle only.
     excgrid::PointSecondDerivative second;
-    const std::array<double, 5> rightHandSide{1.0, 0.0, 0.0, 0.0, 0.0};
-    EXPECT_EQ(hybrid->EvaluatePointWithSecondDerivatives(inputs, rightHandSide, result, second),
-              excgrid::KernelStatus::kRefusedUnsupportedCapability);
+    const std::array<double, 5> rightHandSide{1.0, 0.5, 0.25, -0.125, 2.0};
+    ASSERT_EQ(hybrid->EvaluatePointWithSecondDerivatives(inputs, rightHandSide, result, second),
+              excgrid::KernelStatus::kOk);
 
-    // The order-1 answer is untouched by any of this: the refusal is the tier's
-    // alone, and a caller that never asks for a derivative still gets its value.
+    EXPECT_EQ(second.rightHandSides, 1u);
+    for (std::size_t i = 0; i < 5; ++i)
+    {
+        double contraction = 0.0;
+        for (std::size_t j = 0; j < 5; ++j)
+        {
+            const std::size_t row = std::min(i, j);
+            const std::size_t column = std::max(i, j);
+            contraction += matrix.upper[Packed(row, column, 5)] * rightHandSide[j];
+        }
+        EXPECT_DOUBLE_EQ(second.contracted[i], contraction) << "component " << i;
+    }
+
+    // The order-1 answer is the terms' weighted sum as well, and acquiring the
+    // tier does not disturb it.
     excgrid::PointResult plain;
-    EXPECT_EQ(hybrid->EvaluatePoint(inputs, plain), excgrid::KernelStatus::kOk);
-    EXPECT_NE(plain.first[excgrid::IndexOf(excgrid::Component::RhoA)], 0.0);
+    ASSERT_EQ(hybrid->EvaluatePoint(inputs, plain), excgrid::KernelStatus::kOk);
+    for (std::size_t i = 0; i < 5; ++i)
+    {
+        const auto id = static_cast<excgrid::Component>(i);
+        EXPECT_DOUBLE_EQ(plain.first[excgrid::IndexOf(id)], result.first[excgrid::IndexOf(id)])
+            << "component " << i;
+    }
 }

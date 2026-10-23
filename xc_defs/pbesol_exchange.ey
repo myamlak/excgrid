@@ -15,13 +15,15 @@
 
     e := X'PbeSolExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only.  The enhancement's mu crosses as the division 10/81 rather
-    // than as a single decimal, and the second differentiation of that shape
-    // leaves the shared Sqrt(sigma) uncancelled in the two sigma-sigma entries,
-    // where the generator's cancellation reaches only a division at the top of
-    // the tree.  The kernel is finite at a zero gradient, so a tier that is not
-    // would be a hole at a point the kernel answers; the same form with mu as a
-    // decimal cancels cleanly, which is why the three other PBE-shaped exchanges
-    // carry a tier.
-    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // The enhancement's mu crosses as the division 10/81 rather than as a
+    // single decimal, and the second differentiation of that shape leaves the
+    // shared Sqrt(sigma) in a nested quotient inside the outer derivative's
+    // numerator SUM, where the top-level cancellation cannot reach it.  The
+    // kernel is finite at a zero gradient, so the tier must be too.  The owner
+    // ruling of 2026-10-19 funded the sum-level cancellation rewrite:
+    // TierCancelSum cancels at the divisions the numerator sum carries, and
+    // leaves the order-1 kernel untouched.  The same form with mu as a decimal
+    // is one quotient and cancels at the top, which is why the three other
+    // PBE-shaped exchanges need no mode.
+    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierCancelSum);
 ?>

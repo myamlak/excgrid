@@ -10,6 +10,13 @@
 // The excgrid GGA kernel skeleton (fresh authorship; BSD-3-Clause).
 // Emits one excgrid::XcKernelValue function per GGA functional: the energy
 // density, the spin-density derivatives, and the three sigma derivatives.
+// It also emits the functional's SECOND-DERIVATIVE tier: one function filling
+// the contract's materialised matrix, from the same expression as the kernel.
+// The matrix is the contract's upper triangle, row-major over the five
+// components the kernel takes, in identifier order - the GGA tier's whole
+// span.  Which of them a caller's matrix is over is the caller's mask, and the
+// registry re-packs the two; the kinetic-energy-density rows and columns are
+// not emitted at all, because a GGA energy density does not read tau.
 // No spin-edge branches: the definitions' Tiny guards keep every expression
 // finite at the spin and gamma edges (the LDA skeleton's exact-limit
 // machinery is not needed for the gradient-corrected forms, whose edge
@@ -28,7 +35,7 @@ XcKernelValue PbeSolExchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    // The sigma-edge guard the generator adds to a vanishing channel radical
+    // The sigma-edge guard the generator adds to a vanishing gradient radical
     // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
     // Its value has to be written HERE rather than injected from the
     // definitions: the printer renders a number below 1e-16 as "0.", so a
@@ -45,107 +52,856 @@ XcKernelValue PbeSolExchange(
         return result;
     }
 
-    const double C46 = 2. * rhoA;
-    const double C47 = 2. * rhoB;
-    const double C48 = 1. / 3.;
-    const double C49 = std::pow(Pi, 2);
-    const double C50 = C49 * C46;
-    const double C51 = C49 * C47;
-    const double C52 = 3. * C50;
-    const double C53 = 3. * C51;
-    const double C54 = std::pow(C52, C48);
-    const double C55 = std::pow(C53, C48);
+    const double C70 = 2. * rhoA;
+    const double C71 = 2. * rhoB;
+    const double C72 = 1. / 3.;
+    const double C73 = std::pow(Pi, 2);
+    const double C74 = C73 * C70;
+    const double C75 = C73 * C71;
+    const double C76 = 3. * C74;
+    const double C77 = 3. * C75;
+    const double C78 = std::pow(C76, C72);
+    const double C79 = std::pow(C77, C72);
 
     result.exc =
         -((1.804 -
-           0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+           0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
                         0.65124e2 +
                     1.)) *
-              rhoB * 3. * C55 +
+              rhoB * 3. * C79 +
           (1.804 -
-           0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+           0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
                         0.65124e2 +
                     1.)) *
-              rhoA * 3. * C54) /
+              rhoA * 3. * C78) /
         (4. * Pi);
 
-    const double C60 = 3. * C54;
-    const double C61 = 4. * sigmaAa;
-    const double C62 = 6. * C49;
-    const double C63 = C54 * C46;
-    const double C64 = C63 + 1e-16;
-    const double C65 = C54 / C62;
-    const double C66 = std::sqrt(C61);
-    const double C67 = 2. * C64;
-    const double C68 = C66 / C67;
-    const double C69 = std::pow(C68, 2);
-    const double C70 = 10. * C69;
-    const double C71 = C70 / 0.65124e2;
-    const double C72 = C71 + 1.;
+    const double C81 = 2.;
+    const double C82 = C73 * C81;
+    const double C83 = 3. * C82;
+    const double C84 = C72 * std::pow(C76, C72 - 1) * C83;
 
-    result.vrhoA = -((1.804 - 0.804 / C72) * (18. * C49 * C65 / 3. + C60) +
-                     rhoA * C60 * -0.3216e2 * (2. * C54 + 2. * C62 * C65 / 3.) * C61 /
-                         (0.130248e3 * C64 * std::pow(C67, 2) * std::pow(C72, 2))) /
-                   (4. * Pi);
+    result.vrhoA = -(
+        C81 * rhoA * 3. * C78 * -0.3216e2 * C78 * 4. * sigmaAa /
+            (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
+             std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
+                              0.65124e2 +
+                          1.,
+                      2) *
+             4. * Pi) +
+        (C84 * ((1.804 -
+                 0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
+                              0.65124e2 +
+                          1.)) *
+                    3. * rhoA +
+                rhoA * 3. * C78 * -0.3216e2 * C70 * 4. * sigmaAa /
+                    (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) +
+         (1.804 - 0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) *
+             3. * C78) /
+            (4. * Pi));
 
-    const double C74 = 3. * C55;
-    const double C75 = 4. * sigmaBb;
-    const double C76 = 6. * C49;
-    const double C77 = C55 * C47;
-    const double C78 = C77 + 1e-16;
-    const double C79 = C55 / C76;
-    const double C80 = std::sqrt(C75);
-    const double C81 = 2. * C78;
-    const double C82 = C80 / C81;
-    const double C83 = std::pow(C82, 2);
-    const double C84 = 10. * C83;
-    const double C85 = C84 / 0.65124e2;
-    const double C86 = C85 + 1.;
+    const double C85 = 2.;
+    const double C86 = C73 * C85;
+    const double C87 = 3. * C86;
+    const double C88 = C72 * std::pow(C77, C72 - 1) * C87;
 
-    result.vrhoB = -((1.804 - 0.804 / C86) * (18. * C49 * C79 / 3. + C74) +
-                     rhoB * C74 * -0.3216e2 * (2. * C55 + 2. * C76 * C79 / 3.) * C75 /
-                         (0.130248e3 * C78 * std::pow(C81, 2) * std::pow(C86, 2))) /
-                   (4. * Pi);
+    result.vrhoB = -(
+        C85 * rhoB * 3. * C79 * -0.3216e2 * C79 * 4. * sigmaBb /
+            (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
+             std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
+                              0.65124e2 +
+                          1.,
+                      2) *
+             4. * Pi) +
+        (C88 * ((1.804 -
+                 0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
+                              0.65124e2 +
+                          1.)) *
+                    3. * rhoB +
+                rhoB * 3. * C79 * -0.3216e2 * C71 * 4. * sigmaBb /
+                    (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) +
+         (1.804 - 0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) *
+             3. * C79) /
+            (4. * Pi));
 
-    const double C88 = 2. * rhoA;
-    const double C89 = 1. / 3.;
-    const double C90 = std::pow(Pi, 2);
-    const double C91 = C90 * C88;
-    const double C92 = 3. * C91;
-    const double C93 = std::pow(C92, C89);
-    const double C94 = C93 * C88;
-    const double C95 = C94 + 1e-16;
-
-    result.vsigmaAa =
-        -0.19296e3 * C93 * rhoA /
-        (0.2083968e4 * Pi *
-         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) / (2. * C95), 2) /
-                          0.65124e2 +
-                      1.,
-                  2) *
-         std::pow(C95, 2));
+    result.vsigmaAa = -0.6432e2 * C78 * 3. * rhoA /
+                      (Pi * 4. *
+                       std::pow(10. *
+                                        std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                                     (2. * (C78 * C70 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.,
+                                2) *
+                       (C78 * C70 + 1e-16) * 2. * 2 * (C78 * C70 + 1e-16) * 0.130248e3);
 
     result.vsigmaAb = 0;
 
-    const double C98 = 2. * rhoB;
-    const double C99 = 1. / 3.;
-    const double C100 = std::pow(Pi, 2);
-    const double C101 = C100 * C98;
-    const double C102 = 3. * C101;
-    const double C103 = std::pow(C102, C99);
-    const double C104 = C103 * C98;
-    const double C105 = C104 + 1e-16;
+    result.vsigmaBb = -0.6432e2 * C79 * 3. * rhoB /
+                      (Pi * 4. *
+                       std::pow(10. *
+                                        std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                                     (2. * (C79 * C71 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.,
+                                2) *
+                       (C79 * C71 + 1e-16) * 2. * 2 * (C79 * C71 + 1e-16) * 0.130248e3);
 
-    result.vsigmaBb =
-        -0.19296e3 * C103 * rhoB /
-        (0.2083968e4 * Pi *
-         std::pow(10. * std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) / (2. * C105), 2) /
+    return result;
+}
+
+void PbeSolExchangeSecondDerivatives(double rhoA,
+                                     double rhoB,
+                                     double sigmaAa,
+                                     double sigmaAb,
+                                     double sigmaBb,
+                                     PointSecondDerivativeMatrix& matrix) {
+    (void)sigmaAb;
+
+    [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+
+    if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())
+    {
+        return;
+    }
+
+    const double C46 = 2. * rhoA;
+    const double C48 = 1. / 3.;
+    const double C49 = std::pow(Pi, 2);
+    const double C50 = C49 * C46;
+    const double C52 = 3. * C50;
+    const double C54 = std::pow(C52, C48);
+    const double C60 = 2.;
+    const double C61 = C49 * C60;
+    const double C62 = 3. * C61;
+    const double C63 = C48 * std::pow(C52, C48 - 1) * C62;
+    const double C68 = C48 * (C48 - 1) * std::pow(C52, C48 - 2) * std::pow(C62, 2);
+    matrix.upper[0] = -(
+        (sigmaAa * C54 * 0. * C60 /
+             (Pi *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              std::pow(2. * (C54 * C46 + 1e-16), 2) * (C54 * C46 + 1e-16) * 0.130248e3) +
+         (C63 * 0. * C46 * 4. * sigmaAa /
+              (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+               std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2)) +
+          ((1.804 -
+            0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                         0.65124e2 +
+                     1.)) *
+               3. * rhoA +
+           rhoA * 3. * C54 * -0.3216e2 * C46 * 4. * sigmaAa /
+               (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)))) /
+             (4. * Pi)) *
+            C68 +
+        (((0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+               std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+               4. * Pi * C60 * 0. * C54 * 4. * sigmaAa -
+           C60 * rhoA * 3. * C54 * -0.3216e2 * C54 * 4. * sigmaAa * 0.130248e3 *
+               (sigmaAa * 4. * C54 * -80. *
+                    (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                         0.65124e2 +
+                     1.) /
+                    0.130248e3 +
+                ((C54 * C46 + 1e-16) * 4. * C54 * 2. * (C54 * C46 + 1e-16) +
+                 C54 * std::pow(2. * (C54 * C46 + 1e-16), 2)) *
+                    std::pow(
+                        10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2)) *
+               4. * Pi) /
+              std::pow(
+                  0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      4. * Pi,
+                  2) +
+          (C63 *
+               (3. * rhoA * -0.3216e2 * C54 * 4. * sigmaAa /
+                    (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)) +
+                (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                     (rhoA * 3. * C54 * -0.12864e3 * sigmaAa + 0. * C46 * 4. * sigmaAa) -
+                 rhoA * 3. * C54 * -0.3216e2 * C46 * 4. * sigmaAa * 0.130248e3 *
+                     (sigmaAa * 4. * C54 * -80. *
+                          (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.) /
+                          0.130248e3 +
+                      ((C54 * C46 + 1e-16) * 4. * C54 * 2. * (C54 * C46 + 1e-16) +
+                       C54 * std::pow(2. * (C54 * C46 + 1e-16), 2)) *
+                          std::pow(10. *
+                                           std::pow(std::sqrt(4. * sigmaAa) /
+                                                        (2. * (C54 * C46 + 1e-16)),
+                                                    2) /
+                                           0.65124e2 +
+                                       1.,
+                                   2))) /
+                    std::pow(0.130248e3 * (C54 * C46 + 1e-16) *
+                                 std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                                 std::pow(10. *
+                                                  std::pow(std::sqrt(4. * sigmaAa) /
+                                                               (2. * (C54 * C46 + 1e-16)),
+                                                           2) /
+                                                  0.65124e2 +
+                                              1.,
+                                          2),
+                             2)) +
+           3. * C54 * -0.3216e2 * C54 * 4. * sigmaAa /
+               (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) /
+              (4. * Pi)) *
+             C60 +
+         (((0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                4. * Pi * C60 *
+                (rhoA * 3. * C54 * -0.12864e3 * sigmaAa +
+                 3. * rhoA * -0.3216e2 * C54 * 4. * sigmaAa) -
+            C60 * rhoA * 3. * C54 * -0.3216e2 * C54 * 4. * sigmaAa * 0.130248e3 *
+                (sigmaAa * 4. * C46 * -80. *
+                     (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.) /
+                     0.130248e3 +
+                 ((C54 * C46 + 1e-16) * 4. * C46 * 2. * (C54 * C46 + 1e-16) +
+                  C46 * std::pow(2. * (C54 * C46 + 1e-16), 2)) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)) *
+                4. * Pi) /
+               std::pow(
+                   0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                       std::pow(
+                           10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                       4. * Pi,
+                   2) +
+           (C63 *
+                (3. * rhoA * -0.3216e2 * C46 * 4. * sigmaAa /
+                     (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2)) +
+                 (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      3. * rhoA * -0.3216e2 * C46 * 4. * sigmaAa -
+                  rhoA * 3. * C54 * -0.3216e2 * C46 * 4. * sigmaAa * 0.130248e3 *
+                      (sigmaAa * 4. * C46 * -80. *
+                           (10. *
+                                std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.) /
+                           0.130248e3 +
+                       ((C54 * C46 + 1e-16) * 4. * C46 * 2. * (C54 * C46 + 1e-16) +
+                        C46 * std::pow(2. * (C54 * C46 + 1e-16), 2)) *
+                           std::pow(10. *
+                                            std::pow(std::sqrt(4. * sigmaAa) /
+                                                         (2. * (C54 * C46 + 1e-16)),
+                                                     2) /
+                                            0.65124e2 +
+                                        1.,
+                                    2))) /
+                     std::pow(0.130248e3 * (C54 * C46 + 1e-16) *
+                                  std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                                  std::pow(10. *
+                                                   std::pow(std::sqrt(4. * sigmaAa) /
+                                                                (2. * (C54 * C46 + 1e-16)),
+                                                            2) /
+                                                   0.65124e2 +
+                                               1.,
+                                           2),
+                              2)) +
+            (3. *
+                 (1.804 -
+                  0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) +
+             3. * C54 * -0.3216e2 * C46 * 4. * sigmaAa /
+                 (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                  std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2)))) /
+               (4. * Pi)) *
+              C63 +
+          (sigmaAa * C54 * -0.3216e2 * C54 * 3. * C60 /
+               (Pi *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                std::pow(2. * (C54 * C46 + 1e-16), 2) * (C54 * C46 + 1e-16) * 0.130248e3) +
+           C63 *
+               (3. * (1.804 -
+                      0.804 /
+                          (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) +
+                3. * C54 * -0.3216e2 * C46 * 4. * sigmaAa /
+                    (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) /
+               (4. * Pi)))));
+
+    matrix.upper[1] =
+        -(C60 * 0. * C54 * 4. * sigmaAa + C63 * 0. * C46 * 4. * sigmaAa) /
+        (0.130248e3 * (C54 * C46 + 1e-16) * std::pow(2. * (C54 * C46 + 1e-16), 2) *
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
                           0.65124e2 +
                       1.,
                   2) *
-         std::pow(C105, 2));
+         4. * Pi);
 
-    return result;
+    matrix.upper[2] = -(
+        C60 *
+            (Pi * 4. *
+                 std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                 (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3 *
+                 (0. * C54 + 0. * C54 * rhoA) -
+             0.6432e2 * C54 * 3. * rhoA * 0.130248e3 *
+                 (Pi * 4. *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      (C54 * C46 + 1e-16) * 2. * 2 * C54 +
+                  4. *
+                      (Pi * 4. *
+                           std::pow(10. *
+                                            std::pow(std::sqrt(4. * sigmaAa) /
+                                                         (2. * (C54 * C46 + 1e-16)),
+                                                     2) /
+                                            0.65124e2 +
+                                        1.,
+                                    2) *
+                           C54 +
+                       sigmaAa * 4. * C54 * -80. *
+                           (10. *
+                                std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.) *
+                           4. * Pi / (std::pow(2. * (C54 * C46 + 1e-16), 2) * 0.130248e3)) *
+                      (C54 * C46 + 1e-16))) /
+            std::pow(
+                Pi * 4. *
+                    std::pow(
+                        10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+                    (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3,
+                2) +
+        (C63 *
+             (Pi * 4. *
+                  std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                  (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3 *
+                  (0. * C54 + (0. * C54 + 0.19296e3) * rhoA) -
+              0.6432e2 * C54 * 3. * rhoA * 0.130248e3 *
+                  (Pi * 4. *
+                       std::pow(
+                           10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                       (C54 * C46 + 1e-16) * 2. * 2 * C46 +
+                   4. *
+                       (Pi * 4. *
+                            std::pow(10. *
+                                             std::pow(std::sqrt(4. * sigmaAa) /
+                                                          (2. * (C54 * C46 + 1e-16)),
+                                                      2) /
+                                             0.65124e2 +
+                                         1.,
+                                     2) *
+                            C46 +
+                        sigmaAa * 4. * C46 * -80. *
+                            (10. *
+                                 std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.) *
+                            4. * Pi / (std::pow(2. * (C54 * C46 + 1e-16), 2) * 0.130248e3)) *
+                       (C54 * C46 + 1e-16))) /
+             std::pow(
+                 Pi * 4. *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                     (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3,
+                 2) +
+         (0.19296e3 * C54 + 0. * C54 * rhoA) /
+             (Pi * 4. *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3)));
+
+    matrix.upper[3] = 0;
+
+    const double C47 = 2. * rhoB;
+    const double C51 = C49 * C47;
+    const double C53 = 3. * C51;
+    const double C55 = std::pow(C53, C48);
+    matrix.upper[4] =
+        -(0. * C55 + 0. * C55 * rhoB) /
+        (Pi * 4. *
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3);
+
+    const double C64 = 2.;
+    const double C65 = C49 * C64;
+    const double C66 = 3. * C65;
+    const double C67 = C48 * std::pow(C53, C48 - 1) * C66;
+    const double C69 = C48 * (C48 - 1) * std::pow(C53, C48 - 2) * std::pow(C66, 2);
+    matrix.upper[5] = -(
+        (sigmaBb * C55 * 0. * C64 /
+             (Pi *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              std::pow(2. * (C55 * C47 + 1e-16), 2) * (C55 * C47 + 1e-16) * 0.130248e3) +
+         (C67 * 0. * C47 * 4. * sigmaBb /
+              (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+               std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2)) +
+          ((1.804 -
+            0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                         0.65124e2 +
+                     1.)) *
+               3. * rhoB +
+           rhoB * 3. * C55 * -0.3216e2 * C47 * 4. * sigmaBb /
+               (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)))) /
+             (4. * Pi)) *
+            C69 +
+        (((0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+               std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+               4. * Pi * C64 * 0. * C55 * 4. * sigmaBb -
+           C64 * rhoB * 3. * C55 * -0.3216e2 * C55 * 4. * sigmaBb * 0.130248e3 *
+               (sigmaBb * 4. * C55 * -80. *
+                    (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                         0.65124e2 +
+                     1.) /
+                    0.130248e3 +
+                ((C55 * C47 + 1e-16) * 4. * C55 * 2. * (C55 * C47 + 1e-16) +
+                 C55 * std::pow(2. * (C55 * C47 + 1e-16), 2)) *
+                    std::pow(
+                        10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2)) *
+               4. * Pi) /
+              std::pow(
+                  0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      4. * Pi,
+                  2) +
+          (C67 *
+               (3. * rhoB * -0.3216e2 * C55 * 4. * sigmaBb /
+                    (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)) +
+                (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                     (rhoB * 3. * C55 * -0.12864e3 * sigmaBb + 0. * C47 * 4. * sigmaBb) -
+                 rhoB * 3. * C55 * -0.3216e2 * C47 * 4. * sigmaBb * 0.130248e3 *
+                     (sigmaBb * 4. * C55 * -80. *
+                          (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.) /
+                          0.130248e3 +
+                      ((C55 * C47 + 1e-16) * 4. * C55 * 2. * (C55 * C47 + 1e-16) +
+                       C55 * std::pow(2. * (C55 * C47 + 1e-16), 2)) *
+                          std::pow(10. *
+                                           std::pow(std::sqrt(4. * sigmaBb) /
+                                                        (2. * (C55 * C47 + 1e-16)),
+                                                    2) /
+                                           0.65124e2 +
+                                       1.,
+                                   2))) /
+                    std::pow(0.130248e3 * (C55 * C47 + 1e-16) *
+                                 std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                                 std::pow(10. *
+                                                  std::pow(std::sqrt(4. * sigmaBb) /
+                                                               (2. * (C55 * C47 + 1e-16)),
+                                                           2) /
+                                                  0.65124e2 +
+                                              1.,
+                                          2),
+                             2)) +
+           3. * C55 * -0.3216e2 * C55 * 4. * sigmaBb /
+               (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) /
+              (4. * Pi)) *
+             C64 +
+         (((0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                4. * Pi * C64 *
+                (rhoB * 3. * C55 * -0.12864e3 * sigmaBb +
+                 3. * rhoB * -0.3216e2 * C55 * 4. * sigmaBb) -
+            C64 * rhoB * 3. * C55 * -0.3216e2 * C55 * 4. * sigmaBb * 0.130248e3 *
+                (sigmaBb * 4. * C47 * -80. *
+                     (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.) /
+                     0.130248e3 +
+                 ((C55 * C47 + 1e-16) * 4. * C47 * 2. * (C55 * C47 + 1e-16) +
+                  C47 * std::pow(2. * (C55 * C47 + 1e-16), 2)) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2)) *
+                4. * Pi) /
+               std::pow(
+                   0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                       std::pow(
+                           10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                       4. * Pi,
+                   2) +
+           (C67 *
+                (3. * rhoB * -0.3216e2 * C47 * 4. * sigmaBb /
+                     (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2)) +
+                 (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      3. * rhoB * -0.3216e2 * C47 * 4. * sigmaBb -
+                  rhoB * 3. * C55 * -0.3216e2 * C47 * 4. * sigmaBb * 0.130248e3 *
+                      (sigmaBb * 4. * C47 * -80. *
+                           (10. *
+                                std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.) /
+                           0.130248e3 +
+                       ((C55 * C47 + 1e-16) * 4. * C47 * 2. * (C55 * C47 + 1e-16) +
+                        C47 * std::pow(2. * (C55 * C47 + 1e-16), 2)) *
+                           std::pow(10. *
+                                            std::pow(std::sqrt(4. * sigmaBb) /
+                                                         (2. * (C55 * C47 + 1e-16)),
+                                                     2) /
+                                            0.65124e2 +
+                                        1.,
+                                    2))) /
+                     std::pow(0.130248e3 * (C55 * C47 + 1e-16) *
+                                  std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                                  std::pow(10. *
+                                                   std::pow(std::sqrt(4. * sigmaBb) /
+                                                                (2. * (C55 * C47 + 1e-16)),
+                                                            2) /
+                                                   0.65124e2 +
+                                               1.,
+                                           2),
+                              2)) +
+            (3. *
+                 (1.804 -
+                  0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) +
+             3. * C55 * -0.3216e2 * C47 * 4. * sigmaBb /
+                 (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                  std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2)))) /
+               (4. * Pi)) *
+              C67 +
+          (sigmaBb * C55 * -0.3216e2 * C55 * 3. * C64 /
+               (Pi *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                std::pow(2. * (C55 * C47 + 1e-16), 2) * (C55 * C47 + 1e-16) * 0.130248e3) +
+           C67 *
+               (3. * (1.804 -
+                      0.804 /
+                          (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.)) +
+                3. * C55 * -0.3216e2 * C47 * 4. * sigmaBb /
+                    (0.130248e3 * (C55 * C47 + 1e-16) * std::pow(2. * (C55 * C47 + 1e-16), 2) *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2))) /
+               (4. * Pi)))));
+
+    matrix.upper[6] =
+        -(0. * C54 + 0. * C54 * rhoA) /
+        (Pi * 4. *
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3);
+
+    matrix.upper[7] = 0;
+
+    matrix.upper[8] = -(
+        C64 *
+            (Pi * 4. *
+                 std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                 (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3 *
+                 (0. * C55 + 0. * C55 * rhoB) -
+             0.6432e2 * C55 * 3. * rhoB * 0.130248e3 *
+                 (Pi * 4. *
+                      std::pow(
+                          10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                  0.65124e2 +
+                              1.,
+                          2) *
+                      (C55 * C47 + 1e-16) * 2. * 2 * C55 +
+                  4. *
+                      (Pi * 4. *
+                           std::pow(10. *
+                                            std::pow(std::sqrt(4. * sigmaBb) /
+                                                         (2. * (C55 * C47 + 1e-16)),
+                                                     2) /
+                                            0.65124e2 +
+                                        1.,
+                                    2) *
+                           C55 +
+                       sigmaBb * 4. * C55 * -80. *
+                           (10. *
+                                std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.) *
+                           4. * Pi / (std::pow(2. * (C55 * C47 + 1e-16), 2) * 0.130248e3)) *
+                      (C55 * C47 + 1e-16))) /
+            std::pow(
+                Pi * 4. *
+                    std::pow(
+                        10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+                    (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3,
+                2) +
+        (C67 *
+             (Pi * 4. *
+                  std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                  (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3 *
+                  (0. * C55 + (0. * C55 + 0.19296e3) * rhoB) -
+              0.6432e2 * C55 * 3. * rhoB * 0.130248e3 *
+                  (Pi * 4. *
+                       std::pow(
+                           10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                   0.65124e2 +
+                               1.,
+                           2) *
+                       (C55 * C47 + 1e-16) * 2. * 2 * C47 +
+                   4. *
+                       (Pi * 4. *
+                            std::pow(10. *
+                                             std::pow(std::sqrt(4. * sigmaBb) /
+                                                          (2. * (C55 * C47 + 1e-16)),
+                                                      2) /
+                                             0.65124e2 +
+                                         1.,
+                                     2) *
+                            C47 +
+                        sigmaBb * 4. * C47 * -80. *
+                            (10. *
+                                 std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.) *
+                            4. * Pi / (std::pow(2. * (C55 * C47 + 1e-16), 2) * 0.130248e3)) *
+                       (C55 * C47 + 1e-16))) /
+             std::pow(
+                 Pi * 4. *
+                     std::pow(
+                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                     (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3,
+                 2) +
+         (0.19296e3 * C55 + 0. * C55 * rhoB) /
+             (Pi * 4. *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3)));
+
+    matrix.upper[9] =
+        -(Pi * 4. *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3 *
+              (0. * C54 + 0. * C54 * rhoA) -
+          160. *
+              (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) / 0.65124e2 +
+               1.) *
+              4. * Pi * 4. * rhoA * 3. * C54 * 0.6432e2 / (2. * 2)) /
+        std::pow(
+            Pi * 4. *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3,
+            2);
+
+    matrix.upper[10] =
+        -(0. * C54 + 0. * C54 * rhoA) /
+        (Pi * 4. *
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3);
+
+    matrix.upper[11] =
+        -(0. * C54 + 0. * C54 * rhoA) /
+        (Pi * 4. *
+         std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C54 * C46 + 1e-16)), 2) /
+                          0.65124e2 +
+                      1.,
+                  2) *
+         (C54 * C46 + 1e-16) * 2. * 2 * (C54 * C46 + 1e-16) * 0.130248e3);
+
+    matrix.upper[12] = 0;
+
+    matrix.upper[13] = 0;
+
+    matrix.upper[14] =
+        -(Pi * 4. *
+              std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                               0.65124e2 +
+                           1.,
+                       2) *
+              (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3 *
+              (0. * C55 + 0. * C55 * rhoB) -
+          160. *
+              (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) / 0.65124e2 +
+               1.) *
+              4. * Pi * 4. * rhoB * 3. * C55 * 0.6432e2 / (2. * 2)) /
+        std::pow(
+            Pi * 4. *
+                std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C55 * C47 + 1e-16)), 2) /
+                                 0.65124e2 +
+                             1.,
+                         2) *
+                (C55 * C47 + 1e-16) * 2. * 2 * (C55 * C47 + 1e-16) * 0.130248e3,
+            2);
 }
 
 } // namespace excgrid

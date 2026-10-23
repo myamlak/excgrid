@@ -13,8 +13,8 @@
 
     e := X'Pw92Correlation(rhoA, rhoB);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
-    ExKernelGenerate("Pw92Correlation", e, rhoA, rhoB, False);
+    // The LDA class has no reduced-gradient radical, so the tier needs no
+    // guard: True.  The owner ruling of 2026-10-19 lifted the 1800 s per-kernel
+    // bound for this one-time tier completion.
+    ExKernelGenerate("Pw92Correlation", e, rhoA, rhoB, True);
 ?>

@@ -14,14 +14,17 @@ constexpr double k3 = -4.0; // The C6-interpolation exponent (k3 = 4, with
                             // the paper's negative sign folded in).
 constexpr double kDistanceThreshold = 2000.0; // Pair R^2 cutoff, Bohr^2.
 
-// The pair cut-off radius r0(ab) in Bohr: the committed upper-triangle
-// table (elements 1..kMaxElement), converted from Angstrom.
+// The pair cut-off radius r0(ab) in Bohr. kR0Angstrom is stored in the
+// order setr0ab fills it - larger element outer, smaller inner, no
+// padding entry - so the flat index is j(j-1)/2 + i-1. setr0ab converts
+// with r0ab/autoang (autoang = 0.52917726 Angstrom per Bohr); the table
+// carries the 2018 CODATA Bohr radius, so divide, never multiply.
 double R0Pair(std::size_t a, std::size_t b) {
     const std::size_t i = a <= b ? a : b;
     const std::size_t j = a <= b ? b : a;
-    const std::size_t index = j + (i - 1) * (2 * d3tables::kMaxElement - i) / 2;
+    const std::size_t index = j * (j - 1) / 2 + (i - 1);
 
-    return d3tables::kR0Angstrom[index] * d3tables::kBohrPerAngstrom;
+    return d3tables::kR0Angstrom[index] / d3tables::kAngstromPerBohr;
 }
 
 // The CN-interpolated C6 of one element pair and its CN derivatives:
@@ -41,7 +44,7 @@ C6Pair C6Of(std::size_t a, std::size_t b, double cnA, double cnB) {
 
     C6Pair result;
 
-    if (countA == 1 && countB == 1)
+    if (countA == 1 && countB == 1 && d3tables::kC6[base] > 0.0)
     {
         result.c6 = d3tables::kC6[base];
         return result;
@@ -61,6 +64,14 @@ C6Pair C6Of(std::size_t a, std::size_t b, double cnA, double cnB) {
         for (int j = 0; j < countB; ++j)
         {
             const double c6 = d3tables::kC6[base + i * countB + j];
+
+            // getc6 skips absent reference combinations with exactly this
+            // test (dftd3.f line 2578: if(c6.gt.0)); the table stores 0.
+            if (c6 <= 0.0)
+            {
+                continue;
+            }
+
             const double cnI = d3tables::kRefCnFlat[a * d3tables::kMaxRef + i];
             const double cnJ = d3tables::kRefCnFlat[b * d3tables::kMaxRef + j];
             const double da = cnI - cnA;
@@ -133,8 +144,11 @@ Coordination CoordinationNumbers(const Geometry& geometry) {
             }
 
             const double r = std::sqrt(r2);
-            const double cov = 0.5 * (d3tables::kRcov[geometry.atoms[a].atomicNumber] +
-                                      d3tables::kRcov[geometry.atoms[b].atomicNumber]);
+            // ncoord's covalent distance is the sum rcov(i) + rcov(j),
+            // not half of it; both radii are k2-scaled and already in
+            // Bohr.
+            const double cov = d3tables::kRcov[geometry.atoms[a].atomicNumber] +
+                               d3tables::kRcov[geometry.atoms[b].atomicNumber];
             const double h = std::exp(-k1 * (cov / r - 1.0));
             const double g = 1.0 / (1.0 + h);
 

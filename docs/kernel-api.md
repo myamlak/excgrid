@@ -115,40 +115,36 @@ namespace excgrid {
   materialised form is a debug path. Each tier is asked for by calling its own
   entry point; the two above the first default to
   `kRefusedUnsupportedCapability`.
-- **Order-1 is shipped for every functional. The second-derivative tier is
-  shipped where its second differentiation is both affordable and defined
-  everywhere the order-1 kernel is** — Slater exchange, the five GGA exchanges
-  whose tier satisfies both (`becke88`, `pbe`, `revpbe`, `rpbe`, `mpw91`), and
-  `tau_x`. Each tier is emitted from the same symbolic definition as its order-1
-  kernel, and its contraction is taken from the materialised matrix, so the
-  tier's two entry points cannot disagree. Nothing above them is built: the
-  third derivative has no contract type to cross in.
-- **A functional without a tier is still a functional, and the two reasons are
-  distinct.** A tier costs a full symbolic second differentiation of the energy
-  density, which for a correlation form runs to tens of minutes against seconds
-  for a simple exchange form; and a tier whose differentiation leaves a
-  removable singularity the generator's cancellation does not reach would be
-  non-finite at a point the kernel itself answers. A source that fails either
-  test emits its order-1 kernel alone, and no tier function is generated at all
-  rather than one that would answer zeros. `pw91` (whose enhancement carries
-  `Asinh` and `Exp` inside a rational function), the correlation functionals,
-  and every recipe built on one
-  — `vwn5`, `vwn3`, `pw92`, `lyp`, `pbe_c`, `pw91_c`, `p86`, `svwn`, `spw92`,
-  `b3lyp`, `pbe0`, `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86` — refuse for the
-  first reason. `pbesol` refuses for the second: its enhancement states `mu` as
-  the division `10/81`, and the second differentiation of that shape leaves the
-  shared `sqrt(sigma)` uncancelled in the two sigma-sigma entries, so its kernel
-  answers at an exactly zero gradient where its tier would not. The same
-  expression with `mu` as a single decimal — `pbe`, `revpbe`, `rpbe` — cancels
-  cleanly and ships. Note that `becke88` and `mpw91` DO ship a tier while their
-  tier's own sigma-sigma entries at an exactly zero gradient are not finite,
-  even though their order-1 `vsigma` now is: the curvature across two sigma
-  components is genuinely infinite there, so no emission answers it, and the
-  order-1 holes they used to share — the ones a tier DOES owe with its kernel —
-  are closed in the generator. A tier owes finiteness where its kernel has it
-  and its own curvature is finite, and no more;
-  `tests/second_derivative_test.cpp` names the two exceptions and holds them to
-  that.
+- **Order-1 and the second-derivative tier are shipped for every functional in
+  the registry.**
+  Each tier is emitted from the same symbolic definition as its order-1 kernel,
+  and its contraction is taken from the materialised matrix, so the tier's two
+  entry points cannot disagree. One tier's corner is still not finite:
+  `mpw91`'s two diagonal sigma-sigma entries, whose curvature its `x^3.72` term
+  makes genuinely divergent (the emitted arithmetic is non-finite at exactly
+  zero), and its two `(rho, sigma)` entries, whose limits are finite but which
+  stay unguarded because the radicand shift that would close them would also
+  turn the divergent diagonals into large finite values. The `mpw1pw91`
+  recipe contains that kernel and inherits the same four entries through its
+  weighted sum. The tier reports the non-finite entries rather than a finite
+  substitute, and `tests/second_derivative_test.cpp` pins the names rather
+  than the numbers.
+  Nothing above the second tier is built: the third derivative has no contract
+  type to cross in.
+- **The refusal path remains, exercised by a stub and by any future source that
+  declines.** A tier costs a full symbolic second differentiation of the energy
+  density, and it owes finiteness wherever its order-1 kernel is finite with a
+  finite curvature. Every shipped kernel meets the cost test: the cost-gated
+  tiers were generated in a one-time owner-funded run. Every removable corner
+  outside `mpw91` is answered — the correlation forms' total-gradient edge by a
+  radicand guard, `pbesol`'s sigma-sigma entries by a sum-level cancellation
+  (its `mu` crosses as the exact division `10/81`, so a per-factor cancellation
+  cannot reach them), and `becke88`/`pw91`'s sigma-sigma entries by a stable
+  closed form (the `asinh` ratios of
+  `include/excgrid/internal/asinh_over_x.hpp`, exact at zero). A source that
+  failed either test would emit its order-1 kernel alone — no tier function at
+  all, not one that answers zeros — and callers would get the named refusal
+  rather than a silently empty matrix.
 - **A tier spans the components its functional reads, and says which they are.**
   `SecondDerivativeMask()` is the capability report: an empty mask means the
   functional has no tier, and a non-empty one names exactly the components its

@@ -77,11 +77,22 @@ Two guards make an interrupted run safe and a hanging one loud. Generation
 builds into a sibling `<name>.cpp.partial` and renames it into place only once
 it is complete, formatted, and pruned, so an interrupted generation cannot
 leave a truncated file where a committed kernel used to be. And the child is
-killed at `KERNEL_TIMEOUT_SECONDS` (1800), which is deliberately far above the
-slowest healthy kernel: `pbe_correlation` legitimately takes **about 12.5
-minutes**, `vwn5_correlation` about 3, and most kernels under one. The bound
-exists to stop a non-terminating expansion, not to police the pace — do not
-"fix" a slow kernel by lowering it.
+killed at the per-kernel bound — `KERNEL_TIMEOUT_SECONDS` (1800) unless
+`--kernel-timeout SECONDS` says otherwise, and `0` means no bound at all. The
+default is deliberately far above the slowest healthy ORDER-1 kernel:
+`pbe_correlation` legitimately takes **about 12.5 minutes**, `vwn5_correlation`
+about 3, and most kernels under one. The bound exists to stop a
+non-terminating expansion, not to police the pace — do not "fix" a slow kernel
+by lowering it.
+
+The second-derivative tier is a second full symbolic differentiation, and it
+can cost far more than that default (the measured table is under
+[The measured cost of the tiers](#the-measured-cost-of-the-tiers)). A run that
+needs more time passes `--kernel-timeout 0` and is a deliberate long run: the
+driver prints each kernel's wall time as it goes, on the failure path too,
+because a timed-out kernel's actual cost is the number the next bound has to
+rest on. The 0.4.0 tier generation was such a run, and it is the one that
+produced the table.
 
 ### 4. Verify before committing
 
@@ -205,51 +216,96 @@ and this is the tier an analytic gradient reaches for. The order-1 tier (energy
 density + first derivatives) is what plain Vxc assembly consumes.
 
 **A source can decline the tier.** The second differentiation is taken
-symbolically, in full, once per upper-triangle entry, and the exchange forms
-cost seconds to a few minutes each while the correlation forms are expensive
-enough to be unaffordable: `vwn5_correlation`'s tier, whose order-1 kernel takes
-about 3 minutes, ran 55 minutes when it was timed on the development machine,
-which is past the 1800 s per-kernel bound above. A driver that passes `False` as
-the last argument of `ExKernelGenerate` — or as the last element of the argument
-list `ExPiecewiseKernelGenerate` takes — emits its order-1 kernel alone. The
-three LDA/GGA skeletons wrap their whole tier function
-in `ExTierEmissionGuard`, so a declined tier produces **no function at all**
-rather than one that would answer zeros; the cost of declining is that callers
-get the tier's own refusal, not a silently empty matrix. `tau_x` is not on this
-path — the meta-GGA generator takes no such flag and always emits its tier.
+symbolically, in full, once per upper-triangle entry, and it costs seconds for
+the exchange forms and minutes for some correlation forms; the measured
+per-kernel times are under
+[The measured cost of the tiers](#the-measured-cost-of-the-tiers). A driver
+that passes `False` as the last argument of `ExKernelGenerate` — or as the last
+element of the argument list `ExPiecewiseKernelGenerate` takes — emits its
+order-1 kernel alone. The three LDA/GGA skeletons wrap their whole tier
+function in `ExTierEmissionGuard`, so a declined tier produces **no function at
+all** rather than one that would answer zeros; the cost of declining is that
+callers get the tier's own refusal, not a silently empty matrix. No shipped
+source declines any more — the owner ruling of 2026-10-19 funded the tier for
+every kernel — but the mechanism stays for a source whose differentiation is
+genuinely unaffordable. `tau_x` is not on this path — the meta-GGA generator
+takes no such flag and always emits its tier.
 
-**Cost is not the only reason to decline.** A tier owes finiteness wherever its
-own order-1 kernel has it — EXCEPT where the tier's own curvature is genuinely
-infinite, which no emission can answer finitely. That exception is the only one
-that stands: a tier whose hole is a REMOVABLE singularity the kernel does not
-have is a reason to decline, and it is why `pbesol` — whose `mu` crosses as the
-division `10/81` rather than as one decimal, so the cancellation above reaches
-only a division at the top of the differentiated tree — emits its order-1
-kernel alone while the three PBE-shaped exchanges that state `mu` as a decimal
-emit both.
+**The tier mode chooses which repair the differentiation needs.** The last
+element of `ExKernelGenerate`'s argument list is the mode:
+
+- `True` leaves the entry as the differentiation produced it, with only the
+  top-level shared-radical cancellation every tier gets. The LDA tiers, the tau
+  tier and the kernels whose expressions carry no vanishing radical stay
+  byte-identical under it.
+- `TierGuard` shifts every applicable radical by `SigmaGuard` in the radicand —
+  the same `ExGuardSigmaRadical` the order-1 derivatives carry, applied to the
+  first derivative before the second differentiation — and leaves the
+  arithmetic above it bit-identical. The correlation forms (`pbe_c`, `pw91_c`,
+  `p86`) use it for their total-gradient edge, whose radicand is not a factor
+  the cancellation can reach. `becke88` and `pw91` also pass it for their
+  entries other than the two hand-derived ones.
+- `TierCancelSum` cancels the nested quotients of the numerator sum
+  (`ExCancelSumQuotients`). `pbesol` is the one source that needs it: its `mu`
+  crosses as the exact division `10/81` rather than as one decimal, so the
+  singularity sits at the sum's level and a per-factor cancellation cannot
+  reach it.
+- `False` declines the tier altogether, above.
+
+**Some entries are supplied rather than differentiated.** A source may write an
+entry's expression in the driver through the global `ahandDerivedEntries`, a
+list of `{variable, variable, expression}`. A matching pair — in either order —
+is taken verbatim: no differentiation and none of the automatic repairs,
+because the expression is the derivative already. It then reaches CSE and the
+printer like any other entry. `becke88` and `pw91` use this for their two
+sigma-sigma entries: the plain second derivative cancels two terms of order
+`1/sigma`, and no guard is simultaneously representable in double and invisible
+in the answer. The closed forms are written in the drivers against
+`AsinhOverX` and `AsinhOverXDerivX2`
+(`include/excgrid/internal/asinh_over_x.hpp`), which answer their exact values
+at zero and a series below `z = 1e-4`. The emitted tier is finite at the corner
+and agrees with the true limit — `0.0229209731018569` and `0.0903626801447989` for
+the two channels at `rhoA = 0.31`, `rhoB = 0.22`. `mpw91` is not on this path
+and does not get a guard: its
+`x^3.72` term makes the sigma-sigma curvature diverge as `sigma^(-0.14)`, so
+the truth there is an infinity and a shifted radicand would report a large
+finite number where the truth is infinite. That leaves the one kernel with a
+corner hole, measured as four non-finite entries: the two divergent diagonals
+and the two `(rho, sigma)` channel entries, whose limits are finite but whose
+only repair here is that same shift; because the mode guards every
+differentiated entry of the kernel, the whole tier stays unguarded. The one
+recipe that contains it, `mpw1pw91`, inherits those four entries through the
+weighted sum, so `tests/second_derivative_test.cpp` pins both names rather
+than the entries.
 
 Two passes in `xc_defs/excgrid_generate.ys` close the ORDER-1 holes this tree
-has measured, and both run on the first-derivative expressions only:
+has measured; both are invoked on the first-derivative expressions, and the
+first is also the function the tier's `TierGuard` mode calls:
 
-- `ExGuardSigmaRadical` shifts a vanishing single-channel radical (`asinh`
-  enhancements: `becke88`, `pw91`, `mpw91`) by a constant below the resolution
-  of every sigma a caller can hand over, so the corner answers the limit while
-  the arithmetic above it is bit-identical;
+- `ExGuardSigmaRadical` shifts the radicand of a vanishing gradient radical by
+  a constant chosen so the shift rounds out of every sigma above about
+  `1e-284`: the arithmetic is bit-identical there, and at the corner the
+  expression answers the limit (the changed region is sigma below that scale).
+  It covers the `asinh` exchanges' channel radicals (`becke88`, `pw91`,
+  `mpw91`) and, since the owner ruling of 2026-10-19, the correlation forms'
+  total gradient (`pbe_c`, `pw91_c`, `p86`); `ExSigmaRadicalScale` states the
+  test that keeps the wider scope safe;
 - `ExCancelDensityPower` cancels the removable `rho * (k rho)^(-2/3)` the chain
   rule leaves in a spin-density derivative (`pbe`, `revpbe`, `rpbe`, `pbesol`,
   `pw91`), by the exponent identity rather than by a guard.
 
 Each carries its own measurements in its comment, including the repairs that
-were built and rejected on measurement. Because neither touches the energy
-expression, every affected tier regenerates byte for byte — and for `becke88`
-and `mpw91` that leaves the tier answering NaN in its sigma rows at an exactly
-zero gradient where the kernel now answers the limit. Those entries are the
-curvature across two sigma components, genuinely infinite there; the (rho,
-sigma) entries beside them are removable and unreached, and
-`tests/second_derivative_test.cpp` names both facts rather than skipping them.
-The correlation route's radical is over the total gradient, so it is outside
-the guard's scope and still returns NaN at its own zero (`pbe_c`, `pw91_c`,
-`p86`) — measured and reported, not guarded.
+were built and rejected on measurement. Neither pass touches the energy
+expression, so the tiers the modes above do not repair regenerate byte for
+byte. The tier's own singularities are closed by its own mode — the guard, the
+sum-level cancellation, or a hand-derived entry. `TierGuard` applies
+`ExGuardSigmaRadical` to the first derivative and then differentiates that, so
+the tier is the derivative of exactly the guarded expression the order-1
+kernel emits. Guarding the finished second derivative instead was measured and
+rejected: the walk recursed over `pbe_correlation`'s `(rhoA,rhoA)` entry —
+6,447 `Sqrt` nodes at depth 74 — and exhausted Yacas' evaluation stack, while
+`d(Sqrt(u + c SigmaGuard))` already carries its shifted `1/Sqrt` before the
+differentiation duplicates the radical.
 
 Declining a tier means the declaration must go with it, and the second fact is
 not in the source: the tier functions are declared by hand — in
@@ -294,7 +350,10 @@ disagree.
 
 A recipe takes a tier only when every one of its terms has one, so a hybrid
 built on a declined correlation refuses as a whole rather than returning the sum
-of the terms it happens to have.
+of the terms it happens to have. Every shipped recipe's terms all carry tiers
+now, and `tests/second_derivative_test.cpp` checks b3lyp's materialised matrix
+against the weighted sum of its four terms rather than trusting the
+composition.
 
 What is not built: the third derivative, which has no contract type to cross in
 — that addition is a schema change before it is a generator change.

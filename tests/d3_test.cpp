@@ -1,6 +1,6 @@
-// The D3 dispersion tests: the analytic gradient vs finite differences
-// (the strong internal check - no external reference needed), the
-// distance-decay shape, and the preset table.
+// The D3 dispersion tests: the analytic gradient vs finite differences,
+// the distance-decay shape, the preset table, and the external reference
+// energy printed by the classic dftd3 program for a water fixture.
 
 #include "excgrid/dispersion.hpp"
 
@@ -20,6 +20,18 @@ excgrid::Geometry WaterGeometry() {
     return geometry;
 }
 
+excgrid::Geometry ScaledWaterGeometry(double scale) {
+    excgrid::Geometry geometry = WaterGeometry();
+
+    for (excgrid::Atom& atom : geometry.atoms)
+    {
+        atom.position = {atom.position[0] * scale, atom.position[1] * scale,
+                         atom.position[2] * scale};
+    }
+
+    return geometry;
+}
+
 TEST(D3Test, EnergyIsNegativeAndDecays) {
     const excgrid::D3Parameters p = excgrid::D3Preset("b3lyp").value();
 
@@ -27,18 +39,15 @@ TEST(D3Test, EnergyIsNegativeAndDecays) {
     ASSERT_TRUE(near.has_value());
     EXPECT_LT(*near, 0.0);
 
-    // Doubling every distance must reduce |E| substantially (the R^-6
-    // dominance).
-    excgrid::Geometry far = WaterGeometry();
-
-    for (excgrid::Atom& atom : far.atoms)
-    {
-        atom.position = {atom.position[0] * 2.0, atom.position[1] * 2.0, atom.position[2] * 2.0};
-    }
-
-    auto farEnergy = excgrid::GrimmeD3Energy(far, p);
-    ASSERT_TRUE(farEnergy.has_value());
-    EXPECT_LT(std::abs(*farEnergy), std::abs(*near) * 0.1);
+    // Zero damping suppresses the short-range term, so |E| is not
+    // monotone when a bonded geometry is expanded. In the asymptotic
+    // regime (coordination numbers ~0) the R^-6 tail dominates, and
+    // doubling every distance cuts |E| by about 64.
+    auto far4 = excgrid::GrimmeD3Energy(ScaledWaterGeometry(4.0), p);
+    auto far8 = excgrid::GrimmeD3Energy(ScaledWaterGeometry(8.0), p);
+    ASSERT_TRUE(far4.has_value());
+    ASSERT_TRUE(far8.has_value());
+    EXPECT_LT(std::abs(*far8), std::abs(*far4) * 0.05);
 }
 
 TEST(D3Test, GradientMatchesFiniteDifference) {
@@ -104,6 +113,17 @@ TEST(D3Test, GradientSumsToZero) {
     EXPECT_NEAR(sum[0], 0.0, 1e-12);
     EXPECT_NEAR(sum[1], 0.0, 1e-12);
     EXPECT_NEAR(sum[2], 0.0, 1e-12);
+}
+
+TEST(D3Test, ReferenceEnergyB3lypWater) {
+    // dftd3 V3.2 Rev 1, `dftd3 water.coord -zero -func b3-lyp`, with the
+    // water fixture in Bohr: "Edisp /kcal,au:    -0.0040 -0.00000634".
+    // The bar is the resolution of the printed 8-decimal au value.
+    const excgrid::D3Parameters p = excgrid::D3Preset("b3lyp").value();
+    auto energy = excgrid::GrimmeD3Energy(WaterGeometry(), p);
+
+    ASSERT_TRUE(energy.has_value());
+    EXPECT_NEAR(*energy, -0.00000634, 5e-8);
 }
 
 TEST(D3Test, PresetsResolve) {

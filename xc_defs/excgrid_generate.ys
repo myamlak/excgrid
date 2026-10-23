@@ -3,10 +3,11 @@
 // An independent implementation's generator is the MECHANISM precedent
 // (differentiate, CSE, substitute the spin-edge limit subexpressions,
 // PatchLoad a C++ skeleton);
-// this engine is deliberately SMALLER: it emits the order-1 tier only - the
-// energy density and the first derivatives (vrho_*, vsigma_*) - because plain
-// Vxc assembly consumes first derivatives only; the second/third
-// derivative tiers are a mechanical extension for the analytic-gradient track.
+// this engine emits the order-1 tier (energy density, vrho_*, vsigma_*)
+// beside the materialised second-derivative tier over the same components
+// (`ExSecondDerivativeEntries`); a skeleton decides per source which tiers it
+// emits, and the tier modes below choose the repair each differentiation
+// needs.  There is no third-derivative tier.
 
 Use("excgrid_cpp_form.ys");
 
@@ -68,6 +69,15 @@ Function("ExHas", {l, x})
     hit;
 ];
 
+// The list `l` without its element `x`, order preserved.
+Function("ExWithout", {l, x})
+[
+    Local(r);
+    r := {};
+    ForEach(i, l) [ If (Not (i = x), r := Concat(r, {i})); ];
+    r;
+];
+
 // The factors of a product node, flattened out of yacas' binary Times nesting.
 Function("ExFlatFactors", {e})
 [
@@ -108,6 +118,8 @@ Function("ExFoldProduct", {l})
 Function("ExCancelSharedFactors", {e})
 [
     Local(l, nf, df, kn, kd);
+    If (IsAtom(e), e,
+    [
     l := Listify(e);
     If (ExOpIs(l, ExU/ExV),
         [
@@ -122,6 +134,7 @@ Function("ExCancelSharedFactors", {e})
         ],
         e
     );
+    ]);
 ];
 
 // The walk itself, written out rather than handed to yacas' Apply().
@@ -179,6 +192,64 @@ Function("ExCancelRadical", {e})
                 ExCancelSharedFactors(e));
         ]
     );
+];
+
+// --- Cancelling a radical buried inside a numerator sum ---------------------
+//
+// The PBEsol exchange carries mu as the rational 10/81 instead of a decimal.
+// In its outer sigma-sigma second derivative the quotient rule leaves a
+// top-level quotient whose numerator is a SUM, and one summand of that sum is
+// itself a quotient carrying Sqrt(4 sigmaAa) in numerator and denominator
+// alike.  The top-level cancellation above reaches only the division at the
+// top of the tree, so it cannot see that summand: at an exactly zero gradient
+// the emitted entry is 0 / 0 (measured: yacas answers Undefined for the
+// symbolic derivative at sigmaAa = 0).  The affected entries are the GGA
+// matrix's (sigmaAa,sigmaAa) and (sigmaBb,sigmaBb).  The same form with mu as
+// a decimal is ONE quotient and cancels at the top, which is why the other
+// three PBE-shaped exchanges never showed this.
+//
+// The repair is the same exact factor cancellation applied one level down:
+// walk the numerator through its additive and multiplicative structure and
+// cancel at every division found there.  It is NOT the general recursive walk
+// rejected above.  It descends only through +, -, unary - and *, and through
+// the NUMERATOR of a division - never into a function argument, a power or a
+// denominator.  That reaches the quotient-rule shape and leaves every other
+// part of the tree, including every correlation derivative, alone.  It runs
+// only when a source opts in with the TierCancelSum mode, so no kernel that is
+// finite today has its emitted arithmetic rebuilt by it.
+//
+// The cancellation is an identity wherever the shared factor is nonzero, so
+// values away from the edge are unchanged; at the edge it defines the
+// removable point.  Measured on the PBEsol outer derivative (rhoA = rhoB = 1,
+// sigmaAb = sigmaBb = 0): the repaired expression answers 9.553099947e-6 at
+// sigmaAa = 0, 9.553099874e-6 at 1e-6, and agrees to every printed digit with
+// the unguarded 9.553027532e-6 at 1e-3 - the finite limit, with the old value
+// away from zero.
+Function("ExCancelSumQuotients", {e})
+[
+    Local(l, args, i, num, out);
+    out := e;
+    If (Not IsAtom(e),
+        [
+            l := Listify(e);
+            If (ExOpIs(l, ExU / ExV),
+                [
+                    num := ExCancelSumQuotients(l[2]);
+                    out := ExCancelSharedFactors(UnList({/, num, l[3]}));
+                ],
+                If (ExOpIs(l, ExU + ExV) Or ExOpIs(l, ExU - ExV) Or ExOpIs(l, ExU * ExV)
+                    Or ((Length(l) = 2) And (UnList({l[1], ExU}) = -ExU)),
+                    [
+                        args := {};
+                        For (i := 2, i <= Length(l), i := i + 1)
+                            [ args := Concat(args, {ExCancelSumQuotients(l[i])}); ];
+                        out := UnList(Concat({l[1]}, args));
+                    ]
+                )
+            );
+        ]
+    );
+    out;
 ];
 
 // --- Cancelling the removable density power in a density derivative --------
@@ -328,7 +399,7 @@ Function("ExCancelDensityPower", {e, rho, others})
 // emitted quotient is 0 / 0 at an exactly zero sigma.
 //
 // The repair is to shift that radicand, in every occurrence, by an amount
-// below the resolution of every sigma a caller can hand over:
+// below the last-bit resolution of every sigma above about 1e-284:
 //
 //   * the quotient is defined at sigma = 0 and answers the LIMIT.  Every
 //     occurrence of the radical is shifted, so the emitted value there is the
@@ -347,30 +418,47 @@ Function("ExCancelDensityPower", {e, rho, others})
 //     radicand would report a large finite number where the truth is
 //     infinite.
 //
-// Scoped to the SPIN CHANNEL's own radical - a radicand that is a constant
-// multiple of the sigma component being differentiated, and of no other.  The
-// correlation forms' radical is over the TOTAL gradient (X'T's gamma); its
-// sigma derivative has the same 0 / 0 shape at its own zero, and that site is
-// measured and reported rather than guarded here, because gamma is a
-// different quantity from the channel gradient this guard is about.
+// The radicand the guard applies to: a quantity that is linear in the
+// differentiated sigma component with a POSITIVE numeric coefficient, and that
+// vanishes when EVERY sigma component is zero.  The original scope was the
+// spin channel's own radical (a constant multiple of the component being
+// differentiated - 4 sigmaAa and the like).  The correlation forms' radical is
+// over the TOTAL gradient (X'T's gamma = sigmaAa + 2 sigmaAb + sigmaBb), whose
+// sigma derivative has the same 0 / 0 shape at its own zero; the owner ruling
+// of 2026-10-19 put that site inside the guard, because the symbolic
+// derivative is finite there.
+//
+// The two tests decide where the guard applies.  A positive numeric derivative
+// means the radicand is c*sigma + v with v free of this component, and
+// vanishing at all sigma components zero means the radicand itself meets the
+// edge the shift exists for.  The shipped radicands that pass are the channel
+// multiples (4 sigmaAa, 4 sigmaBb) and the total gradient (gaa + 2 gab + gbb),
+// nonnegative whenever the sigma inputs are; the shift adds a positive
+// constant, so it cannot turn one negative.  A radicand carrying a density or
+// tau variable fails the numeric-derivative test (rho*sigma, sigma/rho and
+// (1 + rho)*sigma all return 0).
 //
 // The scale is the radicand's own derivative w.r.t. the sigma component, so
-// Sqrt(4 sigma) and Sqrt(sigma) shift by 4 and 1 and stay exact multiples of
-// one another at the edge.  Returns 0 for a radicand the guard does not apply
-// to (never a scale an applicable one could carry: a zero derivative is one of
-// the exclusions).
+// Sqrt(4 sigma) and Sqrt(sigma) shift by 4 and 1, and Sqrt(gamma) by 1 or 2;
+// every occurrence of the same radical carries the same shift and the edge
+// stays exact.  Returns 0 for a radicand the guard does not apply to (never a
+// scale an applicable one could carry: a non-positive derivative is one of the
+// exclusions).
 Function("ExSigmaRadicalScale", {u, sigma, others})
 [
-    Local(c, channelOnly);
-    channelOnly := True;
-    ForEach(o, others) [ If (ExAtomOccurs(o, u), channelOnly := False); ];
+    Local(c, v);
+    // Zero every component, not just the differentiated one: the correlation
+    // radicand is the total gradient, and only all components together make it
+    // vanish.
+    v := WithValue(sigma, 0, u);
+    ForEach(o, others) [ v := WithValue(o, 0, v); ];
     // Deriv and no Simplify: the radicands this applies to are linear in the
     // component by construction, so the derivative IS the scale, and yacas'
     // Simplify() both allocates CSE tags on every call (measured: ~100 per
     // call, which renumbers every emitted kernel) and is documented above as
     // not terminating on the derivative expressions this generator works with.
     c := Deriv(sigma) u;
-    If (channelOnly And IsNumber(c) And (c != 0) And (WithValue(sigma, 0, u) = 0), c, 0);
+    If (IsNumber(c) And (c > 0) And (v = 0), c, 0);
 ];
 
 // The walk itself: inside every radical the guard applies to, replace the
@@ -483,9 +571,19 @@ RuleBaseListed("ExKernelGenerate", {fname, e, args});
 
 // The second-derivative tier costs a full symbolic second differentiation of the
 // expression per entry, which for the correlation forms is minutes to tens of
-// minutes against seconds for the exchange forms.  A source that passes False
-// emits the order-1 kernel alone, so a functional whose tier is not affordable
-// is still a functional.
+// minutes against seconds for the exchange forms.  The last list element is
+// the TIER MODE:
+//   False         - order 1 only; the emitted kernel carries no tier function.
+//   True          - the tier, with the top-level cancellation only.
+//   TierGuard     - the tier, with every applicable radical shifted
+//                   (ExGuardSigmaRadical) so the entry is finite at a zero
+//                   gradient.  The shift is applied to the FIRST derivative,
+//                   before the second differentiation.  The correlation
+//                   forms, and becke88/pw91 for their entries other than the
+//                   two hand-derived ones.
+//   TierCancelSum - the tier, with the numerator sum's nested quotients
+//                   cancelled (ExCancelSumQuotients).  PBEsol only.
+// The default, when the list has no mode element, is True.
 //
 // A one-element list when there is at least one entry to emit and an empty one
 // when there is not, so a skeleton can wrap the whole emission in a single
@@ -496,11 +594,11 @@ Function("ExTierEmissionGuard", {count})
     If (count > 0, {True}, {});
 ];
 
-ExLdaGenerate(fname, e, ra, rb, tier) := [
+ExLdaGenerateLegacy(fname, e, ra, rb, tier) := [
     // The second-derivative tier first, while `e` is still the untagged
     // expression - Deriv() cannot differentiate a CSE tag.
     asecondDerivativeEntries := {};
-    If (tier, asecondDerivativeEntries := ExSecondDerivativeEntries(e, {ra, rb}, {}));
+    If (Not (tier = False), asecondDerivativeEntries := ExSecondDerivativeEntries(e, {ra, rb}, {}, tier));
 
     // The exact spin-zero limits (the Tiny guard inside the formulas keeps
     // them finite; the explicit limits give the EXACT one-spin edge values).
@@ -533,13 +631,14 @@ ExLdaGenerate(fname, e, ra, rb, tier) := [
     PatchLoad("excgrid_lda_skeleton.ey");
 ];
 
-ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
+ExGgaGenerateLegacy(fname, e, ra, rb, gaa, gab, gbb, tier) := [
     // The second-derivative tier first, while `e` is still the untagged
     // expression - Deriv() cannot differentiate a CSE tag.
     asecondDerivativeEntries := {};
-    If (tier,
+    atierNeedsGuard := (tier = TierGuard);
+    If (Not (tier = False),
         asecondDerivativeEntries :=
-            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier));
 
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;
@@ -578,9 +677,10 @@ ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
     // Express the density derivatives through the energy density's common
     // subexpressions (keeps the emitted code compact).  The Tiny guards keep
     // the spin edges finite - KF(rho)*rho + Tiny and (rho + Tiny)^(4/3) cannot
-    // be zero - but they say nothing about the gamma edge: no guard is applied
-    // to gamma, and Sqrt(gamma) is exactly zero at gamma == 0.  The gamma edge
-    // is handled by the cancellation above, not by a guard.
+    // be zero.  The gamma edge is answered above: by the cancellation where
+    // the radical is a factor, and by the radicand shift where it is not;
+    // since the owner ruling of 2026-10-19 the shift also covers the
+    // correlation forms' total gradient.
     deDra := ExSubstituteTagged(ecsl, deDra);
     deDrb := ExSubstituteTagged(ecsl, deDrb);
 
@@ -657,8 +757,9 @@ ExPiecewiseGgaGenerate(fname, cond, eLow, eHigh, ra, rb, gaa, gab, gbb, tier) :=
     // branches' CSE tag namespaces stay separate.
     asecondDerivativeEntries1 := {};
     asecondDerivativeEntries2 := {};
-    If (tier, asecondDerivativeEntries1 := ExSecondDerivativeEntries(eLow, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
-    If (tier, asecondDerivativeEntries2 := ExSecondDerivativeEntries(eHigh, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}));
+    atierNeedsGuard := (tier = TierGuard);
+    If (Not (tier = False), asecondDerivativeEntries1 := ExSecondDerivativeEntries(eLow, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier));
+    If (Not (tier = False), asecondDerivativeEntries2 := ExSecondDerivativeEntries(eHigh, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier));
 
     b1 := ExPiecewiseBranch(eLow, ra, rb, gaa, gab, gbb);
     e1 := b1[1];
@@ -799,13 +900,54 @@ Function("ExIsQuotientZero", {e})
 // differentiated exactly as it was before this argument existed, which is what
 // leaves a functional without reduced gradients, and the tau tier,
 // byte-identical.
+//
+// `tierMode` selects what happens to an entry after the top-level cancellation,
+// and it exists so a repair reaches only the kernels that need it:
+//   * True - no further repair.  The exchange tiers that are finite at an
+//     exactly zero gradient, and every LDA and tau tier, stay byte-identical.
+//   * TierGuard - every applicable radical in the entry is shifted by
+//     SigmaGuard (ExGuardSigmaRadical).  The correlation forms' total-gradient
+//     radical has its own edge, and the owner ruling of 2026-10-19 brought it
+//     inside the guard.  becke88 and pw91 also pass this mode, but their two
+//     sigma-sigma entries are hand-derived (below), so it governs only their
+//     remaining entries.
+//   * TierCancelSum - the numerator sum's nested quotients are cancelled
+//     (ExCancelSumQuotients).  PBEsol's rational mu is the one source that
+//     needs it.
+// mpw91 stays on True on purpose: its tier is analytically divergent at a zero
+// gradient (the x^3.72 term), so a shifted radicand would report a large finite
+// number where the truth is infinite.  It is pinned in the tier test instead.
+//
+// A source may also supply a HAND-DERIVED expression for an individual pair,
+// through the global `ahandDerivedEntries` - a list of
+// {variable, variable, expression}.  A matching pair is taken verbatim: no
+// differentiation, and none of the automatic repairs, because the expression
+// is the derivative already.  This is what the Becke88 and PW91 sigma-sigma
+// entries use: their plain second derivative cancels two terms of order
+// 1/sigma, and no guard value is simultaneously representable in double and
+// invisible in the answer.  The supplied expression reaches CSE and the
+// printer like any other and must carry the kernel's own variable atoms; the
+// list is empty unless a driver sets it.
 // `For` is the C-style four-argument form here (start, predicate, increment,
 // body) - yacas 1.8's controlflow.rep defines it that way, and a three-argument
 // call reads its middle argument as the predicate, so it silently runs zero
 // times rather than complaining.
-Function("ExSecondDerivativeEntries", {e, vars, radicalVars})
+ahandDerivedEntries := {};
+
+Function("ExHandDerivedEntry", {first, second})
 [
-    Local(n, entries, inner, d2, reduced, i, j, swap, first, second);
+    Local(found);
+    found := {};
+    ForEach(h, ahandDerivedEntries)
+        [ If (((h[1] = first) And (h[2] = second))
+              Or ((h[1] = second) And (h[2] = first)),
+              found := h[3]); ];
+    found;
+];
+
+Function("ExSecondDerivativeEntriesLegacy", {e, vars, radicalVars, tierMode})
+[
+    Local(n, entries, inner, d2, reduced, i, j, swap, first, second, sv, hand);
     n := Length(vars);
     entries := {};
     For(i := 1, i <= n, i++)
@@ -818,11 +960,39 @@ Function("ExSecondDerivativeEntries", {e, vars, radicalVars})
             If (swap, first := j);
             If (swap, second := i);
 
-            inner := Deriv(vars[first]) e;
-            If (ExHas(radicalVars, vars[first]), inner := ExCancelRadical(inner));
+            hand := ExHandDerivedEntry(vars[first], vars[second]);
+            If (hand = {},
+                [
+                    inner := Deriv(vars[first]) e;
+                    If (ExHas(radicalVars, vars[first]), inner := ExCancelRadical(inner));
 
-            d2 := Deriv(vars[second]) inner;
-            If (ExHas(radicalVars, vars[second]), d2 := ExCancelRadical(d2));
+                    // The guard belongs on the FIRST derivative, where the
+                    // order-1 path already applies it, not on the raw second
+                    // derivative.  The two are the same function away from the
+                    // edge: d(Sqrt(u + c SigmaGuard)) carries
+                    // 1/Sqrt(u + c SigmaGuard), which is exactly the shift the
+                    // post-hoc walk applied to d2, but reached before the
+                    // differentiation has duplicated the radical.  Guarding
+                    // d2 instead made the walk recurse over pbe_correlation's
+                    // (rhoA,rhoA) entry - 6447 Sqrt nodes at depth 74 - and
+                    // exhausted yacas' evaluation stack.  The tier is now the
+                    // derivative of the guarded first derivative, which is
+                    // also what the emitted order-1 kernel actually is.
+                    If (tierMode = TierGuard,
+                        ForEach(sv, radicalVars)
+                            [ inner := ExGuardSigmaRadical(inner, sv, ExWithout(radicalVars, sv)); ]);
+
+                    d2 := Deriv(vars[second]) inner;
+                    If (ExHas(radicalVars, vars[second]), d2 := ExCancelRadical(d2));
+
+                    // The remaining repair, selected by the source's tier
+                    // mode (the mode table and each one's measurement are
+                    // beside the functions).
+                    If (tierMode = TierCancelSum, d2 := ExCancelSumQuotients(d2));
+                ],
+                d2 := hand
+            );
+
             If (ExIsQuotientZero(d2), d2 := 0);
             reduced := CSE(d2);
             Push(entries, {i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), reduced[1],
@@ -832,11 +1002,11 @@ Function("ExSecondDerivativeEntries", {e, vars, radicalVars})
     entries;
 ];
 
-ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
+ExMetaGgaGenerateLegacy(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
     // The second-derivative tier first, while `e` is still the untagged
     // expression.
     asecondDerivativeEntries :=
-        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {});
+        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {}, True);
 
     deDra := Deriv(ra) e;
     deDrb := Deriv(rb) e;
@@ -883,5 +1053,551 @@ ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
     adeDtacsl := ExAssignments(deDtacsl);
     adeDtbcsl := ExAssignments(deDtbcsl);
 
+    PatchLoad("excgrid_meta_gga_skeleton.ey");
+];
+
+// ---------------------------------------------------------------------------
+// Program-level differentiation
+//
+// A kernel expression is first lowered to a let-program: an ordered list of
+// UniqueConstant tag assignments and one reduced expression (yacas' CSE
+// returns exactly that pair).  Derivatives are then taken over the program
+// rather than the expanded tree.  Each assignment's right-hand side is
+// differentiated once; the chain rule travels through a tag -> derivative-tag
+// map, so a shared subexpression is differentiated once and reused through its
+// tag.  A tag definition is never substituted back into an expression.
+//
+// Cost is one pass over the program per derivative order, and recursion depth
+// is the depth of one right-hand side rather than the depth of a derivative
+// tree.  Differentiating an expanded tree instead copies both factors into
+// both product-rule terms at every order: that is the scaling this
+// representation removes (see docs/maintainer-guide.md).
+
+// The atoms of a small expression, without numbers and without repeats.
+Function("ExAtomWalk", {e, acc})
+[
+    If (IsAtom(e),
+        If (Not (Or (IsNumber(e), Contains(acc, e))), acc := Concat(acc, {e})),
+        ForEach(x, Listify(e)) [ acc := ExAtomWalk(x, acc); ]
+    );
+    acc;
+];
+
+// The total derivative of `e` with respect to `v`.  `dmap` maps each tag
+// already differentiated to its derivative expression (the integer 0 for a
+// tag whose derivative vanished).  Only tags that occur in `e` are looked up,
+// so the cost is proportional to the expression, not to the program size.
+// The chain-rule walk: recurse through the expression's arguments (never a
+// list of atoms - yacas list storage is not stable across the internal calls
+// Deriv makes), and at each distinct tag call Deriv once against the whole
+// expression.  `seen` is only tested and appended, never traversed.
+Function("ExTaggedDerivWalk", {node, whole, dmap, seen, d})
+[
+    Local(n, i, res, c, dd);
+    If (IsAtom(node),
+        If (Not (IsNumber(node)),
+            If (Not Contains(seen, node),
+                [
+                    seen := Concat(seen, {node});
+                    If (Association'Contains(dmap, node),
+                        [
+                            c := Association'Get(dmap, node);
+                            If (Not (c = 0),
+                                [
+                                    dd := Deriv(node) whole;
+                                    d := d + dd * c;
+                                ]);
+                        ]);
+                ])),
+        [
+            n := NrArgs(node);
+            For (i := 1, i <= n, i := i + 1)
+                [
+                    res := ExTaggedDerivWalk(node[i], whole, dmap, seen, d);
+                    seen := res[1];
+                    d := res[2];
+                ];
+        ]
+    );
+    {seen, d};
+];
+
+Function("ExTotalDeriv", {e, v, dmap})
+[
+    Local(res, d);
+    d := Deriv(v) e;
+    res := ExTaggedDerivWalk(e, e, dmap, {}, d);
+    res[2];
+];
+
+// One differentiation pass over a program {reduced, assignments}.  Returns
+// {derivative expression, its new assignments, the extended assignment list}.
+// The extended list is what a second (or third) pass differentiates: it
+// carries the original tags and the derivative tags together, which is
+// exactly the input the chain rule needs.
+Function("ExProgramDeriv", {prog, v})
+[
+    Local(reduced, csl, dmap, out, d, dt, as, dreduced);
+    reduced := prog[1];
+    csl := prog[2];
+    dmap := Association'Create();
+    out := {};
+    ForEach(as, csl)
+    [
+        d := ExTotalDeriv(as[2], v, dmap);
+        If (d = 0,
+            Association'Set(dmap, as[1], 0),
+            [
+                dt := UniqueConstant();
+                out := Concat(out, {{dt, d}});
+                Association'Set(dmap, as[1], dt);
+            ]
+        );
+    ];
+    dreduced := ExTotalDeriv(reduced, v, dmap);
+    {dreduced, out, Concat(csl, out), dmap};
+];
+
+// Node count of an expression, for the scaling record.
+Function("ExNodeCount", {e})
+[
+    Local(n);
+    If (IsAtom(e), 1,
+        [
+            n := 1;
+            ForEach(x, Listify(e)) [ n := n + ExNodeCount(x); ];
+            n;
+        ]
+    );
+];
+
+// Node count of a whole program: every assignment's right-hand side plus the
+// reduced expression.
+Function("ExProgramNodes", {csl, reduced})
+[
+    Local(n);
+    n := ExNodeCount(reduced);
+    ForEach(as, csl) [ n := n + ExNodeCount(as[2]); ];
+    n;
+];
+
+// The assignments a reduced expression actually needs, in dependency order.
+// A derivative program also carries assignments on paths the result does not
+// read; evaluating those could hit an interior singularity that cancels out of
+// the result, so a numeric check must not touch them.
+Function("ExProgramNeeded", {csl, reduced})
+[
+    Local(need, out, as, a);
+    need := ExAtomWalk(reduced, {});
+    out := {};
+    ForEach(as, Reverse(csl))
+    [
+        If (Contains(need, as[1]),
+            [
+                out := Concat(out, {as});
+                ForEach(a, ExAtomWalk(as[2], {}))
+                    [ If (Not Contains(need, a), need := Concat(need, {a})); ];
+            ]
+        );
+    ];
+    Reverse(out);
+];
+
+// Numeric value of a program at a point: each needed assignment is evaluated
+// to a number in dependency order and the number replaces its tag, so the
+// value is reached without ever expanding the symbolic program.  `vs` are the
+// input atoms and `xs` the point.  Used by the generator self-checks.
+Function("ExProgramValue", {csl, reduced, vs, xs})
+[
+    Local(tags, nums, r, v, a, dep, i);
+    csl := ExProgramNeeded(csl, reduced);
+    tags := {};
+    nums := {};
+    ForEach(a, csl)
+    [
+        r := a[2];
+        For (i := 1, i <= Length(tags), i := i + 1)
+            [ r := WithValue(tags[i], nums[i], r); ];
+        r := WithValue(vs, xs, r);
+        v := N(Eval(r));
+        tags := Concat(tags, {a[1]});
+        nums := Concat(nums, {v});
+    ];
+    r := reduced;
+    For (i := 1, i <= Length(tags), i := i + 1)
+        [ r := WithValue(tags[i], nums[i], r); ];
+    r := WithValue(vs, xs, r);
+    N(Eval(r));
+];
+
+// Substitute every tag of a program out, in reverse dependency order, so the
+// result is an expression in the kernel's inputs.  Used by the generator
+// self-checks and by numeric probes; never by kernel emission.
+Function("ExProgramExpand", {csl, reduced})
+[
+    Local(tags, vals, r, as);
+    tags := {};
+    vals := {};
+    ForEach(as, csl)
+        [ tags := Concat(tags, {as[1]}); vals := Concat(vals, {as[2]}); ];
+    r := reduced;
+    // One WithValue call per dependency level, not one per tag: the tags
+    // inserted by a call are themselves substituted by the next round.
+    While (ExHasAnyAtom(r, tags)) [ r := WithValue(tags, vals, r); ];
+    r;
+];
+
+Function("ExHasAnyAtom", {e, tags})
+[
+    Local(hit, x);
+    If (IsAtom(e), Contains(tags, e),
+        [
+            hit := False;
+            ForEach(x, Listify(e)) [ If (ExHasAnyAtom(x, tags), hit := True); ];
+            hit;
+        ]
+    );
+];
+    r;
+];
+
+// --- Program-level generator path -------------------------------------------
+//
+// The order-1 outputs and the second-derivative tier are built by
+// differentiating the lowered program (above), never the expanded tree.
+
+// Is an assignment's right-hand side exactly a square root?
+Function("ExIsSqrtRhs", {e})
+[
+    Local(l);
+    If (IsAtom(e), False,
+        [
+            l := Listify(e);
+            (Length(l) = 2) And (l[1] = Sqrt);
+        ]
+    );
+];
+
+// Remove radical tags from a program by substituting their right-hand sides
+// back in.  A guarded radical has to be reachable by the guard's structural
+// walk, so no radical may hide behind a tag; the expressions stay small
+// because only radicals are inlined.
+Function("ExProgramInlineRadicals", {prog})
+[
+    Local(rads, csl, out, as, rad, r, red);
+    csl := prog[2];
+    rads := {};
+    ForEach(as, csl) [ If (ExIsSqrtRhs(as[2]), rads := Concat(rads, {as})); ];
+    out := {};
+    ForEach(as, csl)
+    [
+        If (Not ExIsSqrtRhs(as[2]),
+            [
+                r := as[2];
+                ForEach(rad, Reverse(rads)) [ r := Subst(rad[1], rad[2]) r; ];
+                out := Concat(out, {{as[1], r}});
+            ]
+        );
+    ];
+    red := prog[1];
+    ForEach(rad, Reverse(rads)) [ red := Subst(rad[1], rad[2]) red; ];
+    {red, out};
+];
+
+// One repair, selected by an atom rather than by a function argument.
+Function("ExProgramRepairExpr", {e, mode, v, rest})
+[
+    If (mode = DensityPower, ExCancelDensityPower(e, v, rest),
+    If (mode = CancelRadical, ExCancelRadical(e),
+    If (mode = GuardSigma, ExGuardSigmaRadical(ExCancelRadical(e), v, rest),
+    If (mode = CancelSum, ExCancelSumQuotients(e), e))));
+];
+
+// Apply a repair to every assignment and the reduced expression.
+Function("ExProgramRepair", {csl, reduced, mode, v, rest})
+[
+    Local(out, as, red);
+    out := {};
+    ForEach(as, csl)
+        [ out := Concat(out, {{as[1], ExProgramRepairExpr(as[2], mode, v, rest)}}); ];
+    red := ExProgramRepairExpr(reduced, mode, v, rest);
+    {out, red};
+];
+
+// Apply the spin-edge limit substitution to every assignment and the reduced
+// expression (the LDA path's leA/leB tags).
+Function("ExProgramSubstituteTagged", {csl, reduced, sl})
+[
+    Local(out, as);
+    out := {};
+    ForEach(as, csl)
+        [ out := Concat(out, {{as[1], ExSubstituteTagged(sl, as[2])}}); ];
+    {out, ExSubstituteTagged(sl, reduced)};
+];
+
+// The assignments of `csl` whose tag is one of the new tags in `newcsl`.
+Function("ExKeepNew", {csl, newcsl})
+[
+    Local(out, as, nn, hit);
+    out := {};
+    ForEach(as, csl)
+    [
+        hit := False;
+        ForEach(nn, newcsl) [ If (nn[1] = as[1], hit := True); ];
+        If (hit, out := Concat(out, {as}));
+    ];
+    out;
+];
+
+// A second differentiation whose chain rule for the ORIGINAL tags is supplied
+// by an existing first-derivative map (`extMap`), so the original tags are not
+// differentiated again.  The assignments in `csl` are the first-derivative
+// tags; a second-derivative tag is created for each one in dependency order.
+Function("ExProgramDerivMapped", {csl, reduced, v, extMap})
+[
+    Local(dmap, out, d, dt, as, dred, p);
+    dmap := Association'Create();
+    ForEach(p, Association'ToList(extMap)) [ Association'Set(dmap, p[1], p[2]); ];
+    out := {};
+    ForEach(as, csl)
+    [
+        d := ExTotalDeriv(as[2], v, dmap);
+        If (d = 0,
+            Association'Set(dmap, as[1], 0),
+            [
+                dt := UniqueConstant();
+                out := Concat(out, {{dt, d}});
+                Association'Set(dmap, as[1], dt);
+            ]
+        );
+    ];
+    dred := ExTotalDeriv(reduced, v, dmap);
+    {dred, out, Concat(csl, out), dmap};
+];
+
+// One order-1 output: differentiate the program, repair the result, prune to
+// the tags the answer reads, and keep only the tags this output introduces
+// (the energy tags are declared once, before every derivative block).
+Function("ExFirstDerivOutput", {Pd, v, mode, gv, rest, sl})
+[
+    Local(r, rep, csl, kept);
+    r := ExProgramDeriv(Pd, v);
+    rep := ExProgramRepair(r[2], r[1], mode, gv, rest);
+    csl := ExProgramNeeded(Concat(Pd[2], rep[1]), rep[2]);
+    kept := ExKeepNew(csl, rep[1]);
+    {rep[2], kept};
+];
+
+// The GGA straight-line kernel on the program representation.
+ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
+    Local(P, Pd, ecsl, eexpr, r);
+
+    asecondDerivativeEntries := {};
+    atierNeedsGuard := (tier = TierGuard);
+    If (Not (tier = False),
+        asecondDerivativeEntries :=
+            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier));
+
+    {eexpr, ecsl} := CSE(e);
+    P := {eexpr, ecsl};
+    Pd := ExProgramInlineRadicals(P);
+
+    r := ExFirstDerivOutput(Pd, ra, DensityPower, ra, {rb}, {});
+    deDra := r[1]; adeDracsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, rb, DensityPower, rb, {ra}, {});
+    deDrb := r[1]; adeDrbcsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gaa, GuardSigma, gaa, {gab, gbb}, {});
+    deGaa := r[1]; adeGaacsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gab, GuardSigma, gab, {gaa, gbb}, {});
+    deGab := r[1]; adeGabcsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gbb, GuardSigma, gbb, {gaa, gab}, {});
+    deGbb := r[1]; adeGbbcsl := ExAssignments(r[2]);
+
+    e := eexpr;
+    aecsl := ExAssignments(ecsl);
+    PatchLoad("excgrid_gga_skeleton.ey");
+];
+
+// The second-derivative tier on the program representation: one first-
+// derivative program per variable (repaired and guarded once), then each
+// entry is the mapped derivative of the row's first derivative.  Assignments
+// are emitted once per C++ scope, in the first entry that needs them.
+Function("ExSecondDerivativeEntries", {e, vars, radicalVars, tierMode})
+[
+    Local(n, entries, declared, cslP, P, Pd, RD, v, r, i, j, swap, first, second,
+          hand, r1, rs, r2, rr, p1out, p1red, p2out, p2red, root, needed, newl,
+          as, sv, d2, reduced);
+    n := Length(vars);
+    {e, cslP} := CSE(e);
+    P := {e, cslP};
+    Pd := ExProgramInlineRadicals(P);
+
+    RD := Association'Create();
+    ForEach(v, vars)
+    [
+        r := ExProgramDeriv(Pd, v);
+        p1out := r[2];
+        p1red := r[1];
+        If (ExHas(radicalVars, v),
+            [
+                rr := ExProgramRepair(p1out, p1red, CancelRadical, v, {});
+                p1out := rr[1]; p1red := rr[2];
+            ]);
+        If (tierMode = TierGuard,
+            ForEach(sv, radicalVars)
+            [
+                rr := ExProgramRepair(p1out, p1red, GuardSigma, sv, ExWithout(radicalVars, sv));
+                p1out := rr[1]; p1red := rr[2];
+            ]);
+        Association'Set(RD, v, {p1red, p1out, r[4]});
+    ];
+
+    entries := {};
+    declared := {};
+    For (i := 1, i <= n, i := i + 1)
+    [
+        For (j := i, j <= n, j := j + 1)
+        [
+            swap := ExHas(radicalVars, vars[j]) And Not ExHas(radicalVars, vars[i]);
+            first := i;
+            second := j;
+            If (swap, first := j);
+            If (swap, second := i);
+
+            hand := ExHandDerivedEntry(vars[first], vars[second]);
+            If (hand = {},
+                [
+                    r1 := Association'Get(RD, vars[first]);
+                    rs := Association'Get(RD, vars[second]);
+                    r2 := ExProgramDerivMapped(r1[2], r1[1], vars[second], rs[3]);
+                    p2out := r2[2];
+                    p2red := r2[1];
+                    If (ExHas(radicalVars, vars[second]),
+                        [
+                            rr := ExProgramRepair(p2out, p2red, CancelRadical, vars[second], {});
+                            p2out := rr[1]; p2red := rr[2];
+                        ]);
+                    If (tierMode = TierCancelSum,
+                        [
+                            rr := ExProgramRepair(p2out, p2red, CancelSum, 0, {});
+                            p2out := rr[1]; p2red := rr[2];
+                        ]);
+                    root := Concat(cslP, r1[2]);
+                    If (Not (vars[first] = vars[second]), root := Concat(root, rs[2]));
+                    root := Concat(root, p2out);
+                    needed := ExProgramNeeded(root, p2red);
+                    newl := {};
+                    ForEach(as, needed)
+                        [ If (Not Contains(declared, as[1]),
+                              [ newl := Concat(newl, {as});
+                                declared := Concat(declared, {as[1]}); ]); ];
+                    If (ExIsQuotientZero(p2red), p2red := 0);
+                    entries := Concat(entries,
+                        {{i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), p2red,
+                          ExAssignments(newl)}});
+                ],
+                [
+                    d2 := hand;
+                    If (ExIsQuotientZero(d2), d2 := 0);
+                    reduced := CSE(d2);
+                    entries := Concat(entries,
+                        {{i - 1, j - 1, ExUpperTriangleIndex(i - 1, j - 1, n), reduced[1],
+                          ExAssignments(reduced[2])}});
+                ]
+            );
+        ];
+    ];
+    entries;
+];
+
+// A program's assignments without the tags of another program (the LDA
+// skeleton declares its limit tags in the block itself).
+Function("ExWithoutTags", {csl, excl})
+[
+    Local(out, as, ex, hit);
+    out := {};
+    ForEach(as, csl)
+    [
+        hit := False;
+        ForEach(ex, excl) [ If (ex[1] = as[1], hit := True); ];
+        If (Not hit, out := Concat(out, {as}));
+    ];
+    out;
+];
+
+// The LDA straight-line kernel: the two density derivatives, each expressed
+// through the opposite spin's exact zero-limit program.  The skeleton's
+// derivative blocks are their own C++ scopes, so the block carries the energy
+// tags it reads; the limit tags are emitted by the skeleton itself.
+ExLdaGenerate(fname, e, ra, rb, tier) := [
+    Local(P, Pd, ecsl, eexpr, leA, leB, leAcsl, leBcsl, r, rep, sub, all, kept);
+
+    asecondDerivativeEntries := {};
+    atierNeedsGuard := False;
+    If (Not (tier = False),
+        asecondDerivativeEntries := ExSecondDerivativeEntries(e, {ra, rb}, {}, tier));
+
+    {eexpr, ecsl} := CSE(e);
+    P := {eexpr, ecsl};
+    Pd := ExProgramInlineRadicals(P);
+
+    leA := WithValue(ra, 0, e);
+    If (leA = Undefined, leA := Limit(ra, 0, Right) e);
+    leB := WithValue(rb, 0, e);
+    If (leB = Undefined, leB := Limit(rb, 0, Right) e);
+    {leA, leAcsl} := CSE(leA);
+    {leB, leBcsl} := CSE(leB);
+
+    r := ExProgramDeriv(Pd, ra);
+    rep := ExProgramRepair(r[2], r[1], DensityPower, ra, {rb});
+    sub := ExProgramSubstituteTagged(rep[1], rep[2], leBcsl);
+    all := ExProgramNeeded(Concat(Pd[2], leBcsl, sub[1]), sub[2]);
+    kept := ExWithoutTags(all, leBcsl);
+    deDra := sub[2];
+    adeDracsl := ExAssignments(kept);
+
+    r := ExProgramDeriv(Pd, rb);
+    rep := ExProgramRepair(r[2], r[1], DensityPower, rb, {ra});
+    sub := ExProgramSubstituteTagged(rep[1], rep[2], leAcsl);
+    all := ExProgramNeeded(Concat(Pd[2], leAcsl, sub[1]), sub[2]);
+    kept := ExWithoutTags(all, leAcsl);
+    deDrb := sub[2];
+    adeDrbcsl := ExAssignments(kept);
+
+    e := eexpr;
+    aecsl := ExAssignments(ecsl);
+    aleAcsl := ExAssignments(leAcsl);
+    aleBcsl := ExAssignments(leBcsl);
+    PatchLoad("excgrid_lda_skeleton.ey");
+];
+
+// The meta-GGA straight-line kernel on the program representation.
+ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
+    Local(P, Pd, ecsl, eexpr, r);
+
+    asecondDerivativeEntries :=
+        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {}, True);
+
+    {eexpr, ecsl} := CSE(e);
+    P := {eexpr, ecsl};
+    Pd := ExProgramInlineRadicals(P);
+
+    r := ExFirstDerivOutput(Pd, ra, DensityPower, ra, {rb}, {});
+    deDra := r[1]; adeDracsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, rb, DensityPower, rb, {ra}, {});
+    deDrb := r[1]; adeDrbcsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gaa, CancelRadical, gaa, {}, {});
+    deGaa := r[1]; adeGaacsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gab, CancelRadical, gab, {}, {});
+    deGab := r[1]; adeGabcsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, gbb, CancelRadical, gbb, {}, {});
+    deGbb := r[1]; adeGbbcsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, ta, None, ta, {}, {});
+    deDta := r[1]; adeDtacsl := ExAssignments(r[2]);
+    r := ExFirstDerivOutput(Pd, tb, None, tb, {}, {});
+    deDtb := r[1]; adeDtbcsl := ExAssignments(r[2]);
+
+    e := eexpr;
+    aecsl := ExAssignments(ecsl);
     PatchLoad("excgrid_meta_gga_skeleton.ey");
 ];

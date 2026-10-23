@@ -15,6 +15,10 @@ Usage:
     python tools/regenerate.py --check     # regenerate to a temp dir, diff
                                            # against the committed files (the
                                            # deliberate freshness gate)
+    python tools/regenerate.py --check --kernel-timeout 0
+                                           # the same gate for a tree whose
+                                           # committed tiers cost more than the
+                                           # default 1800 s per kernel
 
 The manifest rewritten on the first path is what tools/check_freshness.py
 reads at commit time: it hashes the xc_defs sources and fails when one has
@@ -35,6 +39,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 from pathlib import Path
 
 import check_freshness
@@ -86,13 +91,14 @@ TIER_DECLARATION_SITES = (
 )
 TIER_SUFFIX = "SecondDerivatives"
 
-# The per-kernel bound.  Deliberately far above the slowest HEALTHY kernel -
-# pbe_correlation at about 12.5 minutes, timed from the child process itself,
-# against about 3 minutes for the next slowest, vwn5_correlation, read off
-# the per-kernel output timestamps of a full regeneration.  The bound exists
-# to stop a NON-TERMINATING expansion, not to police the pace, so do not
-# lower it to make a run feel faster - the guide's "Two guards make an
-# interrupted run safe and a hanging one loud" carries the same numbers.
+# The per-kernel bound.  Deliberately far above the slowest HEALTHY order-1
+# kernel that was known when it was set - pbe_correlation at about 12.5
+# minutes, against about 3 minutes for the next slowest - because the bound
+# exists to stop a NON-TERMINATING expansion, not to police the pace.  The
+# second-derivative tier is a second full symbolic differentiation, and the
+# owner ruling of 2026-10-19 funded the tiers whose measured cost exceeds this
+# default, so `--kernel-timeout` is how a deliberate long run opts in; 0 means
+# no bound at all.  A run that needs the option says so in its own record.
 KERNEL_TIMEOUT_SECONDS = 1800
 
 
@@ -179,6 +185,22 @@ def inspect_expansion(stdout_text, stderr_text):
     return problems
 
 
+def error_digest(stdout_text, stderr_text, limit=400):
+    """The error lines of a failed child, or the tail of its output.
+
+    Yacas prints its own error banners on stdout (see inspect_expansion());
+    a child killed before printing one leaves only the tail to quote.  Both
+    are bounded: a half-expanded kernel can be megabytes of text.
+    """
+    lines = [line.strip()
+             for line in (stdout_text + "\n" + stderr_text).splitlines()
+             if any(marker in line for marker in YACAS_ERROR_MARKERS)]
+    if lines:
+        return "yacas wrote: " + " | ".join(lines[:3])[:limit]
+    tail = (stderr_text.strip() or stdout_text.strip())
+    return f"stdout/stderr tail: {tail[-limit:]!r}"
+
+
 def generate_one(yacas, scripts_root, ey_path, out_path, clang_format=None,
                  timeout=KERNEL_TIMEOUT_SECONDS):
     """One yacas invocation: the `-pc --patchload` console-expansion pattern.
@@ -212,10 +234,14 @@ def generate_one(yacas, scripts_root, ey_path, out_path, clang_format=None,
             timeout=timeout,
         )
         if completed.returncode != 0:
+            # A nonzero exit carries no promise about WHICH stream holds the
+            # reason - yacas reports expansion errors on stdout and exits 0 -
+            # so the message names the error lines it did write, and falls back
+            # to the tail of both streams when neither carries a marker.
             raise SystemExit(
                 f"{ey_path.name}: yacas exited {completed.returncode}, so {out_path.name} "
                 f"was NOT rewritten and the freshness manifest has NOT been blessed. "
-                f"stderr: {completed.stderr.strip()[:400]}")
+                f"{error_digest(completed.stdout, completed.stderr)}")
         problems = inspect_expansion(completed.stdout, completed.stderr)
         if problems:
             raise SystemExit(
@@ -233,9 +259,9 @@ def generate_one(yacas, scripts_root, ey_path, out_path, clang_format=None,
         temporary.unlink(missing_ok=True)
         raise SystemExit(
             f"{ey_path.name}: yacas did not finish within {timeout}s and was killed. "
-            f"The committed {out_path.name} is untouched. The slowest HEALTHY kernel "
-            f"timed on this tree is pbe_correlation at about 12.5 minutes, so a larger "
-            f"bound needs a measurement, not a guess.")
+            f"The committed {out_path.name} is untouched. A slower kernel may be "
+            f"healthy, but a larger bound needs a measurement, not a guess; pass "
+            f"--kernel-timeout SECONDS (0 = no bound) only for a deliberate long run.")
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
@@ -250,7 +276,7 @@ def normalize_and_format(path, clang_format):
     on the --check path this file lives in a temporary directory: an
     in-tree .clang-format is not an ancestor of it, so the search would
     miss it and fall back to the LLVM defaults, which reproduce none of the
-    committed bytes.  The gate would then report all fifteen kernels as
+    committed bytes.  The gate would then report all sixteen kernels as
     drift on a clean tree.  Naming the config makes the formatter the same
     one on both paths, and a missing config is a hard error rather than a
     silent restyle.
@@ -262,9 +288,13 @@ def normalize_and_format(path, clang_format):
         subprocess.run([clang_format, "--style", style, "-i", str(path)], check=True)
 
 
-# One emitted CSE temporary: `const double C17 = <expr>;`, always one line
-# (checked over the committed corpus: 4772 of 4772).
-DECLARATION = re.compile(r"^(?P<indent>[ \t]*)const double (?P<tag>C\d+) = (?P<rhs>.*);\s*$")
+# One emitted CSE temporary: `const double C17 = <expr>;`.  The formatter
+# wraps a long right-hand side onto continuation lines, so a declaration is
+# read from its first line through the first `;`, exactly as the output
+# assignments below are.  (The earlier one-line rule silently lost the
+# dependencies of every wrapped declaration, and the prune then deleted a
+# temporary that a wrapped expression used.)
+DECLARATION = re.compile(r"^(?P<indent>[ \t]*)const double (?P<tag>C\d+) =(?P<rest>.*)$")
 # The assignment whose expression the group's declarations feed: a member of one
 # of the kernel's output objects - `result.<field> = ...` for the order-1 tier,
 # `matrix.upper[<k>] = ...` for the second-derivative tier.  Written as the
@@ -299,12 +329,21 @@ def prune_unreachable_temporaries(text):
     # so a file with no braces at all (none today) still prunes.
     scopes = [{"declarations": [], "roots": []}]
     pending_root = None
+    pending_decl = None
 
     index = 0
     while index < len(lines):
         line = lines[index]
 
-        if pending_root is not None:
+        if pending_decl is not None:
+            pending_decl[3].append(line)
+            if ";" in line:
+                scopes[-1]["declarations"].append(
+                    (pending_decl[0], index, pending_decl[1],
+                     "\n".join(pending_decl[3]))
+                )
+                pending_decl = None
+        elif pending_root is not None:
             pending_root[1].append(index)
             if ";" in line:
                 scopes[-1]["roots"].append("\n".join(lines[i] for i in pending_root[1]))
@@ -312,9 +351,13 @@ def prune_unreachable_temporaries(text):
         else:
             declaration = DECLARATION.match(line)
             if declaration is not None:
-                scopes[-1]["declarations"].append(
-                    (index, declaration.group("tag"), declaration.group("rhs"))
-                )
+                if ";" in declaration.group("rest"):
+                    scopes[-1]["declarations"].append(
+                        (index, index, declaration.group("tag"), declaration.group("rest"))
+                    )
+                else:
+                    # The declaration wraps; it ends at the first line with ';'.
+                    pending_decl = (index, declaration.group("tag"), None, [line])
             elif ASSIGNMENT_START.match(line):
                 # The assignment may wrap; it ends at the first line with ';'.
                 pending_root = (index, [index])
@@ -350,7 +393,7 @@ def _prune_scope(scope, kept, lines):
     # expression needs makes the values its own right-hand side uses needed in
     # turn.  (The opposite rule - an entry is live because it *uses* something
     # live - keeps consumers of live values and drops the values themselves.)
-    entries = {tag: rhs for _, tag, rhs in scope["declarations"]}
+    entries = {tag: rhs for _, _, tag, rhs in scope["declarations"]}
     changed = True
     while changed:
         changed = False
@@ -362,9 +405,10 @@ def _prune_scope(scope, kept, lines):
                     live.add(used)
                     changed = True
 
-    for line_index, tag, _ in scope["declarations"]:
+    for start, end, tag, _ in scope["declarations"]:
         if tag not in live:
-            kept[line_index] = False
+            for line_index in range(start, end + 1):
+                kept[line_index] = False
 
 
 def prune_in_place(path):
@@ -408,7 +452,8 @@ def check_tier_declarations(generated_dir):
     return complaints
 
 
-def regenerate(output_dir, yacas_arg=None, clang_format_arg=None):
+def regenerate(output_dir, yacas_arg=None, clang_format_arg=None,
+               kernel_timeout=KERNEL_TIMEOUT_SECONDS):
     yacas = find_tool(yacas_arg, os.environ.get("EXCGRID_YACAS"),
                       [str(p) for p in YACAS_CANDIDATES], "yacas")
     clang_format = find_tool(clang_format_arg, os.environ.get("EXCGRID_CLANG_FORMAT"),
@@ -420,8 +465,17 @@ def regenerate(output_dir, yacas_arg=None, clang_format_arg=None):
     for ey_name, cpp_name in FUNCTIONALS:
         ey_path = DEFS_DIR / ey_name
         out_path = output_dir / cpp_name
-        print(f"generating {cpp_name}")
-        generate_one(yacas, scripts_root, ey_path, out_path, clang_format)
+        print(f"generating {cpp_name}", flush=True)
+        started = time.monotonic()
+        try:
+            generate_one(yacas, scripts_root, ey_path, out_path, clang_format,
+                         kernel_timeout)
+        finally:
+            # Printed on the failure path too: a timed-out kernel's actual cost
+            # is the number the next bound has to be based on.  Flushed as it
+            # is written: a long run is watched, and a killed one keeps the
+            # lines already reached.
+            print(f"  {cpp_name}: {time.monotonic() - started:.1f}s", flush=True)
 
 
 def main():
@@ -430,12 +484,18 @@ def main():
                         help="regenerate to a temp dir and diff against the committed outputs")
     parser.add_argument("--yacas", help="path to the yacas binary")
     parser.add_argument("--clang-format", help="path to clang-format")
+    parser.add_argument("--kernel-timeout", type=float, default=KERNEL_TIMEOUT_SECONDS,
+                        metavar="SECONDS",
+                        help="per-kernel yacas bound; 0 means no bound (default: %(default)s)")
     args = parser.parse_args()
+
+    # subprocess treats timeout=0 as "kill immediately", not "no bound".
+    kernel_timeout = None if args.kernel_timeout == 0 else args.kernel_timeout
 
     if args.check:
         with tempfile.TemporaryDirectory(prefix="excgrid-codegen-") as tmp:
             tmp_dir = Path(tmp)
-            regenerate(tmp_dir, args.yacas, args.clang_format)
+            regenerate(tmp_dir, args.yacas, args.clang_format, kernel_timeout)
             mismatches = []
             for _, cpp_name in FUNCTIONALS:
                 committed = (GENERATED_DIR / cpp_name).read_text(encoding="utf-8")
@@ -458,7 +518,7 @@ def main():
                   "declared tier has a definition")
             return 0
 
-    regenerate(GENERATED_DIR, args.yacas, args.clang_format)
+    regenerate(GENERATED_DIR, args.yacas, args.clang_format, kernel_timeout)
 
     # Before the manifest, not after: the manifest is what blesses these sources
     # as regenerated, and a tree whose tiers do not link has not earned that.

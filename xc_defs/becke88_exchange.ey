@@ -13,5 +13,46 @@
 
     e := X'Becke88Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    ExKernelGenerate("Becke88Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
+    // The two sigma-sigma entries are supplied in their stable closed form.
+    // The plain second derivative cancels a term of order 1/sigma against
+    // another of the same order, so in double the value depends on the guard
+    // and is wrong by up to ~2e-8 relative at the best guard; no guard is both
+    // representable and invisible.  The identity below moves the cancellation
+    // into the algebra:
+    //   E = rho^(4/3) h(x),  x = sqrt(sigma)/(rho+Tiny)^(4/3),
+    //   h = -beta x^2/D,     D = 1 + 6 beta x asinh(x),
+    //   E_ss = rho^(4/3) / (4 (rho+Tiny)^(16/3)) * K(x),
+    //   K = 6 beta^2 [ D (2+x^2) r^3 + 3 D (w+r)
+    //                  - 12 beta x^2 (w+r)^2 ] / D^3,
+    //   r = 1/sqrt(1+x^2),   w = asinh(x)/x (the helper answers 1 at x=0).
+    // Verified against the symbolic second derivative to 1e-56 at five points
+    // and at the corner it reduces to 12 beta^2/rho^4; the generator
+    // takes a supplied entry verbatim (ExHandDerivedEntry).
+    hBeta := 0.0042;
+    hxA := X'X(rhoA, sigmaAa);
+    hxB := X'X(rhoB, sigmaBb);
+    hwA := X'AsinhOverX(hxA);
+    hwB := X'AsinhOverX(hxB);
+    hrA := 1 / Sqrt(1 + hxA^2);
+    hrB := 1 / Sqrt(1 + hxB^2);
+    hDA := 1 + 6 * hBeta * hxA * X'Asinh(hxA);
+    hDB := 1 + 6 * hBeta * hxB * X'Asinh(hxB);
+    hKA := 6 * hBeta^2 *
+        (hDA * (2 + hxA^2) * hrA^3 + 3 * hDA * (hwA + hrA)
+         - 12 * hBeta * hxA^2 * (hwA + hrA)^2) / hDA^3;
+    hKB := 6 * hBeta^2 *
+        (hDB * (2 + hxB^2) * hrB^3 + 3 * hDB * (hwB + hrB)
+         - 12 * hBeta * hxB^2 * (hwB + hrB)^2) / hDB^3;
+    // The exponents are written as floats on purpose: yacas would keep the
+    // exact rational 4/3 and the printer would emit the C++ integer division
+    // `4/3`, i.e. 1.
+    hEAA := rhoA^(4. / 3.) / (4 * (rhoA + X'Tiny)^(16. / 3.)) * hKA;
+    hEBB := rhoB^(4. / 3.) / (4 * (rhoB + X'Tiny)^(16. / 3.)) * hKB;
+    ahandDerivedEntries := {{sigmaAa, sigmaAa, hEAA}, {sigmaBb, sigmaBb, hEBB}};
+
+    // TierGuard for the remaining entries: the cross derivatives still carry
+    // asinh(x)/sqrt(sigma), whose singular factor is a ratio of two quantities
+    // that vanish together; the shifted radicand evaluates that ratio
+    // accurately because nothing of order 1/sigma cancels there.
+    ExKernelGenerate("Becke88Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
 ?>

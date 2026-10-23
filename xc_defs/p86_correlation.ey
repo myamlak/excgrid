@@ -24,9 +24,10 @@
     eLow := X'P86CorrelationLow(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
     eHigh := X'P86CorrelationHigh(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
+    // TierGuard: both branches carry the TOTAL-gradient radical, guarded in
+    // order 1 and in the tier so the kernel and its tier answer the finite
+    // limit at exactly zero gradient (owner ruling 2026-10-19).  The tier is
+    // generated per branch, each inside its own scope.
     ExPiecewiseKernelGenerate("P86Correlation", cond, eLow, eHigh,
-                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False});
+                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard});
 ?>
