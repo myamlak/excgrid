@@ -1,15 +1,11 @@
-// excgrid codegen source: the PW92 LDA correlation functional
-// (Perdew-Wang 1992).  Fresh authorship; formula from the PW92 paper
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the PW92 LDA correlation functional (Perdew-Wang 1992).
+// Formula from the PW92 paper.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
 
-// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits one excgrid::XcKernelValue function per LDA functional: the energy
-// density and its spin-density derivatives, with the exact one-spin-zero
-// limit branches (the generator's limit substitution supplies the limit
-// expressions).
+// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits one
+// XcKernelValue function per LDA functional, with its spin-zero limit branches.
 // It also emits the functional's SECOND-DERIVATIVE tier: one function filling
 // the contract's materialised matrix, from the same expression as the kernel.
 // The matrix is the contract's upper triangle, row-major over the two

@@ -1,6 +1,5 @@
 // excgrid codegen source: the Perdew-Burke-Ernzerhof 1996 GGA exchange
-// functional.  Fresh authorship; formula from the PBE paper
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// functional.  Formula from the PBE paper.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"

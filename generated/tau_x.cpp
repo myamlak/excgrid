@@ -1,34 +1,13 @@
 // excgrid codegen source: the tau tier's exchange functional - the second-order
-// gradient expansion of exchange in the iso-orbital (Pauli) variables, the
-// library's first functional to read the kinetic-energy densities.  Fresh
-// authorship; the formula is the published expansion in its iso-orbital form
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py
-// (Yacas is a maintainer-only tool; the committed generated/ output is the
-// build input).  This is also the tier's worked example of the generator's
-// second-derivative emission: the kernel below is emitted together with the
-// functional's materialised second-derivative matrix.
+// gradient expansion of exchange in the iso-orbital (Pauli) variables.
+// Formula from the published expansion in its iso-orbital form.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
 
-// The excgrid meta-GGA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits, per meta-GGA functional, the order-1 kernel - the energy density, the
-// two spin-density derivatives, the three sigma derivatives and the two
-// kinetic-energy-density derivatives, the contract's reserved slots 5 and 6 -
-// and, beside it, the functional's SECOND-DERIVATIVE tier: one function filling
-// the contract's materialised matrix.
-//
-// The second-derivative function's argument list is the kernel's, and the matrix
-// it fills is the contract's upper triangle, row-major over the ACTIVE components
-// in identifier order.  Which components those are is the caller's mask, so the
-// order is pinned by the caller and not here: this skeleton emits the entries in
-// the identifier order of the seven collinear inputs it is generated over.
-//
-// No spin-edge branches: as in the GGA skeleton, the definitions' Tiny guards
-// keep every expression finite at the spin and gamma edges, and the density
-// prefactor carries the zero-density corner.
-// The banner and the kernel.hpp include are emitted by the calling .ey, which
-// always precedes this skeleton, so they are not repeated here.
+// The excgrid meta-GGA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits the
+// order-1 kernel and the second-derivative tier, the contract's upper triangle over the
+// caller's mask; the Tiny guards keep every expression finite, so no edge branches.
 
 #include <cmath>
 #include <limits>
@@ -83,7 +62,7 @@ XcKernelValue TauXExchange(double rhoA,
              ((1. - 10. * (tauA - sigmaAa / (8. * C59)) / (std::pow(C59, C63) * C67)) / 12. + 1.) +
          0.));
 
-    const double C70 = 1;
+    const double C76 = 1;
 
     result.vrhoB = -(
         (-0.9305257363491 * std::pow(rhoB, C62) *
@@ -91,7 +70,7 @@ XcKernelValue TauXExchange(double rhoA,
               10. * (tauB - sigmaBb / (8. * C60)) * C63 * std::pow(C60, C63 - 1) * C67) /
              (12. * std::pow(std::pow(C60, C63) * C67, 2)) +
          0.) *
-            C70 +
+            C76 +
         (0.9305257363491 * C62 * std::pow(rhoB, C62 - 1) *
              ((1. - 10. * (tauB - sigmaBb / (8. * C60)) / (std::pow(C60, C63) * C67)) / 12. + 1.) +
          0.));

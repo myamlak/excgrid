@@ -1,6 +1,5 @@
-// excgrid codegen source: the Lee-Yang-Parr 1988 GGA correlation
-// functional.  Fresh authorship; formula from the LYP paper
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the Lee-Yang-Parr 1988 GGA correlation functional.
+// Formula from the LYP paper.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -13,7 +12,6 @@
 
     e := X'LypCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // The form is linear in the sigmas and carries no radical anywhere, so its
-    // tier needs no guard and no cancellation: True.
+    // Linear in the sigmas and radical-free, so the tier needs no guard: True.
     ExKernelGenerate("LypCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, True);
 ?>

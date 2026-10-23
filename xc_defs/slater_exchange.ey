@@ -1,8 +1,5 @@
 // excgrid codegen source: the Slater (Dirac) LDA exchange functional.
-// Fresh authorship; the formula is the published spin-scaled Dirac exchange
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py
-// (Yacas is a maintainer-only tool; the committed generated/ output is the
-// build input).
+// Formula from the published spin-scaled Dirac exchange.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"

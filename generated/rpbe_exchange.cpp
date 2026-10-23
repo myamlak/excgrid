@@ -1,15 +1,6 @@
-// excgrid codegen source: the Hammer-Hansen-Norskov 1999 revised PBE GGA
-// exchange functional (RPBE).  Fresh authorship.
-//
-// The enhancement factor Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)) has
-// kappa = 0.804 and mu = beta pi^2 / 3, the PBE relation, evaluated with
-// this tree's own full-precision PBE beta (X'PbeCorrBeta).  That product is
-// 0.2195149727645171 - the standard PBE mu, and the same value the tree's
-// pbe and revpbe rules carry - and it is what RPBE uses: RPBE keeps PBE's
-// kappa and mu and changes only the enhancement's FORM, from PBE's rational
-// expression to this exponential one.
-// Verified against the oracle by excgrid/tools/verify_pyscf.py.
-// Regenerate with tools/regenerate.py.
+// excgrid codegen source: the Hammer-Hansen-Norskov 1999 RPBE GGA exchange functional.
+// RPBE keeps PBE's kappa and mu and changes only the enhancement's form, to
+//   Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)).
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
@@ -42,14 +33,8 @@ XcKernelValue RpbeExchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    // The sigma-edge guard the generator adds to a vanishing gradient radical
-    // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
-    // Its value has to be written HERE rather than injected from the
-    // definitions: the printer renders a number below 1e-16 as "0.", so a
-    // constant small enough to be absorbed by every normal sigma cannot reach
-    // the expression through yacas at all.  1e-300 is absorbed by every sigma
-    // above ~1e-284 and leaves the sum at exactly sigma, which is what keeps
-    // the guarded arithmetic bit-identical to the unguarded one.
+    // The generator's sigma-edge guard.  Written here, not injected: the printer renders
+    // a number below 1e-16 as "0.", and 1e-300 leaves sigma + guard == sigma.
     [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;

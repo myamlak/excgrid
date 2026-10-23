@@ -1,6 +1,5 @@
 // excgrid codegen source: the Perdew-Wang 1991 GGA exchange functional.
-// Fresh authorship; formula from the PW91 paper (docs/mainpage.md
-// references).  Regenerate with tools/regenerate.py.
+// Formula from the PW91 paper.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -13,19 +12,8 @@
 
     e := X'Pw91Exchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // The two sigma-sigma entries are supplied in their stable closed form.
-    // The plain second derivative of Fx(s) cancels two terms of order
-    // 1/sigma, so in double the value depends on the guard and no guard is
-    // both representable and invisible; with s = sqrt(sigma)/B (B = kF(2 rho)
-    // 2 rho + Tiny), z = s^2 and Fx = EN(z)/ED(z), the second derivative is
-    //   E_ss = rho EpsX(2 rho) * Phizz(z) / B^4,
-    // and Phizz through the z-derivatives below:
-    //   EN  = 1 + a b z w + (c - d q) z,   ED  = 1 + a b z w + e z^2,
-    //   x = b s,  q = exp(-100 z),  w = asinh(x)/x,
-    //   u'  = (w + r)/2,   u'' = b^2 (wp - r^3/2)/2,
-    //   r = 1/sqrt(1+x^2),  wp = d/d(x^2)[asinh(x)/x]  (both helpers).
-    // Verified against the symbolic second derivative to 1e-57 at five points;
-    // at the corner it reduces to the same finite limit as the tiny-sigma form.
+    // The two sigma-sigma entries are hand-derived: the plain second derivative
+    // cancels terms of order 1/sigma and is unstable in double at a zero gradient.
     hA := 0.19645;
     hB := 7.7956;
     hC := 0.2743;
@@ -71,9 +59,7 @@
     hEbb := rhoB * X'EpsX(2 * rhoB) * hPhizzB / hDenB^4;
     ahandDerivedEntries := {{sigmaAa, sigmaAa, hEaa}, {sigmaBb, sigmaBb, hEbb}};
 
-    // TierGuard for the remaining entries: they still carry asinh(x)/sqrt(sigma)
-    // and share the becke88 exchange's removable corner, where the radicand
-    // shift evaluates the ratio accurately because nothing of order 1/sigma
-    // cancels in the cross derivatives.
+    // TierGuard: the remaining entries carry asinh(x)/sqrt(sigma) and share the
+    // becke88 corner, which the shifted radicand evaluates accurately.
     ExKernelGenerate("Pw91Exchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
 ?>

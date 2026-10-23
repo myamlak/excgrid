@@ -1,17 +1,12 @@
 // excgrid codegen source: the VWN3 LDA correlation functional (the VWN
-// RPA-parameter interpolation).  Distinct from VWN5 - the two are
-// separately named, never conflated (docs/kernel-api.md section 4).
-// Fresh authorship; formula from VWN 1980 Table I.  Regenerate with
-// tools/regenerate.py.
+// RPA-parameter interpolation).  VWN3 and VWN5 are distinct functionals, never
+// conflated.  Formula from VWN 1980 Table I.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
 
-// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits one excgrid::XcKernelValue function per LDA functional: the energy
-// density and its spin-density derivatives, with the exact one-spin-zero
-// limit branches (the generator's limit substitution supplies the limit
-// expressions).
+// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits one
+// XcKernelValue function per LDA functional, with its spin-zero limit branches.
 // It also emits the functional's SECOND-DERIVATIVE tier: one function filling
 // the contract's materialised matrix, from the same expression as the kernel.
 // The matrix is the contract's upper triangle, row-major over the two

@@ -1,7 +1,6 @@
-// excgrid codegen source: the VWN5 LDA correlation functional (the VWN
-// interpolation-V parametrization - the "full" VWN; most codes' bare
-// "VWN").  Fresh authorship; formula from VWN 1980 Table V
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the VWN5 LDA correlation functional (the
+// interpolation-V parametrization, most codes' bare "VWN").
+// Formula from VWN 1980 Table V.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -14,9 +13,6 @@
 
     e := X'Vwn5Correlation(rhoA, rhoB);
 
-    // The LDA class has no reduced-gradient radical, so the tier needs no
-    // guard: True.  This is the costliest LDA tier on record (~55 min before
-    // the owner ruling of 2026-10-19 lifted the 1800 s per-kernel bound for
-    // this one-time tier completion).
+    // The LDA class has no reduced-gradient radical, so the tier needs no guard: True.
     ExKernelGenerate("Vwn5Correlation", e, rhoA, rhoB, True);
 ?>

@@ -1,43 +1,12 @@
-// excgrid codegen source: the Perdew 1986 GGA correlation functional (the
-// gradient correction on the Perdew-Zunger LDA piece).  Transcribed from the
-// printed paper - J. P. Perdew, Phys. Rev. B 33, 8822 (1986) (docs/mainpage.md
-// references) - not from another tree.
-// Regenerate with tools/regenerate.py.
+// excgrid codegen source: the Perdew 1986 GGA correlation functional, the gradient
+// correction on the Perdew-Zunger LDA piece: J. P. Perdew, Phys. Rev. B 33, 8822 (1986).
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
 
-// The excgrid GGA PIECEWISE-kernel skeleton (fresh authorship; BSD-3-Clause).
-//
-// WHY THIS SKELETON EXISTS.  Every other kernel in this tree is one
-// straight-line expression, and the GGA skeleton's own note says so: the
-// formulas' Tiny guards keep every expression finite at the spin and gamma
-// edges, so no branches are needed.  That is true of every functional here
-// EXCEPT the Perdew-Zunger 1981 LDA piece (`lda_c_pz`, Perdew & Zunger,
-// Phys. Rev. B 23, 5048 (1981)), which the P86 correlation is defined on:
-// PZ81 is genuinely piecewise at rs = 1 -
-//
-//   rs >= 1 :  ec = gamma / (1 + beta1 sqrt(rs) + beta2 rs)
-//   rs <  1 :  ec = a ln rs + b + c rs ln rs + d rs
-//
-// - two different analytic forms, not one expression with a removable
-// singularity, so NO choice of guard makes it straight-line.  The two
-// branches meet at rs = 1 to about 3e-5 (they are continuous but not
-// smooth there), which is why the split is a real branch and not a
-// cosmetic one.
-//
-// THE CONTRACT.  A piecewise kernel is emitted as two complete branch bodies
-// inside `if (cond) { ... } else { ... }`, each branch carrying its own CSE
-// declarations in its OWN braces, exactly as the LDA skeleton already scopes
-// its spin-edge branches.  `tools/regenerate.py`'s temporary pruner computes
-// reachability per C++ scope, so the two branches' tag namespaces may collide
-// (both branches declare `C1`) and each branch prunes independently.
-// `cond` is evaluated once, from the kernel arguments, and must select the
-// branch that the definition's first expression binds - the generator's
-// `ExPiecewiseGgaGenerate` takes them in that order and does not reorder.
-// A kernel author adding a piecewise form must therefore state the boundary
-// and its source in the `.ey` beside the condition, as `p86_correlation.ey`
-// does; nothing here infers it.
+// The excgrid GGA PIECEWISE-kernel skeleton (fresh authorship; BSD-3-Clause).  A piecewise
+// kernel is two branch bodies inside if/else, each with its own braces and CSE namespace;
+// `cond` must select the branch the definition's first expression binds.
 // The functional's SECOND-DERIVATIVE tier is emitted beside the kernel from the
 // same two expressions, and carries the same branch: the matrix is one
 // functional's, so a request must be answered by the branch the point is in and
@@ -55,12 +24,7 @@ XcKernelValue P86Correlation(
     double rhoA, double rhoB, double sigmaAa, double sigmaAb, double sigmaBb) {
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    // Declared where the straight-line skeleton declares it, and for the same
-    // reason: the generator's sigma-edge guard needs a constant too small for
-    // the printer to write into an expression.  Both branches of the tree's
-    // one piecewise functional now carry the guarded total-gradient radical
-    // (the owner ruling of 2026-10-19), and every future branch that does will
-    // find it here.
+    // The same sigma-edge guard constant the straight-line skeleton declares.
     [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;

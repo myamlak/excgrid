@@ -1,6 +1,5 @@
 // excgrid codegen source: the Becke 1988 GGA exchange functional.
-// Fresh authorship; formula from the B88 paper (docs/mainpage.md
-// references).  Regenerate with tools/regenerate.py.
+// Formula from the B88 paper.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
@@ -35,14 +34,8 @@ XcKernelValue Becke88Exchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    // The sigma-edge guard the generator adds to a vanishing gradient radical
-    // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
-    // Its value has to be written HERE rather than injected from the
-    // definitions: the printer renders a number below 1e-16 as "0.", so a
-    // constant small enough to be absorbed by every normal sigma cannot reach
-    // the expression through yacas at all.  1e-300 is absorbed by every sigma
-    // above ~1e-284 and leaves the sum at exactly sigma, which is what keeps
-    // the guarded arithmetic bit-identical to the unguarded one.
+    // The generator's sigma-edge guard.  Written here, not injected: the printer renders
+    // a number below 1e-16 as "0.", and 1e-300 leaves sigma + guard == sigma.
     [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;

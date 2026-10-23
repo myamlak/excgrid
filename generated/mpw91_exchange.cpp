@@ -1,15 +1,7 @@
-// excgrid codegen source: the mPW91 (modified PW91) GGA exchange
-// functional (Adamo-Barone).  Fresh authorship; the form is the published
-// PW91 exchange with this functional's modified constants.
-//
-// The damping exponent, re-derived here rather than quoted at one digit
-// count: PW91 damps with Exp(-alpha s^2), alpha = 100, where
-// s = |grad rho| / (2 kF rho) and kF = (6 pi^2 rho)^(1/3) is the
-// spin-density Fermi wavevector.  This kernel works in the variable
-// x = |grad rho| / rho^(4/3), so s = x / (2 (6 pi^2)^(1/3)) and the damping
-// is Exp(-100 / (4 (6 pi^2)^(2/3)) * x^2).  The exponent below is that
-// constant - 1.6455307846020557... - carried at double precision, so no
-// digit of it is a free parameter.  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the mPW91 (modified PW91) GGA exchange functional (Adamo-Barone).
+// The published PW91 exchange with this functional's modified constants.
+// Damping exponent 1.6455307846... = 100 / (4 (6 pi^2)^(2/3)), i.e. PW91's
+// Exp(-100 s^2) rewritten in x = |grad rho| / rho^(4/3).
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
@@ -42,14 +34,8 @@ XcKernelValue MPw91Exchange(
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    // The sigma-edge guard the generator adds to a vanishing gradient radical
-    // (ExGuardSigmaRadical in excgrid_generate.ys carries the measurement).
-    // Its value has to be written HERE rather than injected from the
-    // definitions: the printer renders a number below 1e-16 as "0.", so a
-    // constant small enough to be absorbed by every normal sigma cannot reach
-    // the expression through yacas at all.  1e-300 is absorbed by every sigma
-    // above ~1e-284 and leaves the sum at exactly sigma, which is what keeps
-    // the guarded arithmetic bit-identical to the unguarded one.
+    // The generator's sigma-edge guard.  Written here, not injected: the printer renders
+    // a number below 1e-16 as "0.", and 1e-300 leaves sigma + guard == sigma.
     [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;

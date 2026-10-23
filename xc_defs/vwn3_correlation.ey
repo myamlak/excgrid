@@ -1,8 +1,6 @@
 // excgrid codegen source: the VWN3 LDA correlation functional (the VWN
-// RPA-parameter interpolation).  Distinct from VWN5 - the two are
-// separately named, never conflated (docs/kernel-api.md section 4).
-// Fresh authorship; formula from VWN 1980 Table I.  Regenerate with
-// tools/regenerate.py.
+// RPA-parameter interpolation).  VWN3 and VWN5 are distinct functionals, never
+// conflated.  Formula from VWN 1980 Table I.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -15,8 +13,6 @@
 
     e := X'Vwn3Correlation(rhoA, rhoB);
 
-    // The LDA class has no reduced-gradient radical, so the tier needs no
-    // guard: True.  The owner ruling of 2026-10-19 lifted the 1800 s per-kernel
-    // bound for this one-time tier completion.
+    // The LDA class has no reduced-gradient radical, so the tier needs no guard: True.
     ExKernelGenerate("Vwn3Correlation", e, rhoA, rhoB, True);
 ?>

@@ -1,8 +1,5 @@
-// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits one excgrid::XcKernelValue function per LDA functional: the energy
-// density and its spin-density derivatives, with the exact one-spin-zero
-// limit branches (the generator's limit substitution supplies the limit
-// expressions).
+// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits one
+// XcKernelValue function per LDA functional, with its spin-zero limit branches.
 <?  // Appended to the banner only when the source asks for a tier, so a
     // functional shipping order 1 alone carries no claim that it has one.
     ForEach(emit, ExTierEmissionGuard(Length(asecondDerivativeEntries))) [
