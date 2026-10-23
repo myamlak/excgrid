@@ -1,63 +1,21 @@
 #!/usr/bin/env python3
-"""Recover Lebedev-Laikov spherical quadratures from their defining
-conditions and emit excgrid's lebedev_tables.hpp.
+"""Recover Lebedev-Laikov spherical quadratures from their defining conditions
+and emit excgrid's lebedev_tables.hpp.
 
-A Lebedev grid is a set of nodes on the unit sphere closed under the
-octahedral group O_h, with weights such that the quadrature
+A Lebedev grid is O_h-invariant nodes on the unit sphere whose weights make
 
     int_{S^2} f dOmega  ~  sum_i w_i f(p_i)
 
-is exact for every polynomial of total degree <= d.  Rather than copying a
-published table (they are hard to verify by eye and carry no exactness
-certificate with them), this script SOLVES for the parameters from the
-moment conditions:
+exact for every polynomial of total degree <= d.  The solve enforces
 
-    sum_i w_i * m(p_i) = int_{S^2} m dOmega
-        for every monomial m = x^A y^B, A, B even, A + B <= d.
+    sum_i w_i * m(p_i) = int_{S^2} m dOmega,   m = x^A y^B, A, B even, A + B <= d,
 
-On the unit sphere this is a complete condition set: the O_h-invariant
-polynomials are spanned by x^A y^B with A, B even (z^2 = 1 - x^2 - y^2
-reduces any invariant monomial), the grid sums match the integrals on the
-sphere relation, and odd-power/permutation variants integrate to zero on
-both sides.  The algebraic degree per size is the published one (6:3,
-14:5, 26:7, 38:9, 50:11, 74:13, 86:15, 110:17, 146:19, 170:21, 194:23,
-230:25, 266:27, 302:29, 350:31, 434:35 - the degree-33 grid was never
-published); the certificate below re-checks the solved grid against every
-condition, so a wrong claimed degree cannot pass.
+per size, seeded from the published orbit data and certified by the residual.
+The published tables are in the average-over-sphere convention (weights sum to
+1); the emitted weights are the integral convention, sum w_i = 4 pi.
 
-The orbit structure per size (which O_h orbits appear, and how many of
-each) and the values that seed the solve are the PUBLISHED data of this
-quadrature, carried in this file as data (PUBLISHED_ORBITS below: 16
-sizes, 115 orbits).  They are the tables of
-
-    V.I. Lebedev, D.N. Laikov, "A quadrature formula for the sphere of the
-    131st algebraic order of accuracy", Doklady Mathematics 59 (3) (1999)
-    477-481, and the earlier papers of the series for the smaller grids
-    (Russian Acad. Sci. Dokl. Math. 50 (1995) 283; ibid. 45 (1992) 587;
-    Siberian Math. J. 18 (1977) 99; Comput. Math. Math. Phys. 16 (1976) 10;
-    ibid. 15 (1975) 44),
-
-as distributed, with Laikov's own grid generator, through the CCL:
-http://ccl.net/cca/software/SOURCES/FORTRAN/Lebedev-Laikov-Grids/
-(Lebedev-Laikov.F - D.N. Laikov's C code translated to FORTRAN by
-Ch. van Wuellen).  No external file and no implementation's source is read
-at run time: the script runs from the repository alone.
-
-Those tables give the weights of the average-over-sphere convention (over
-a grid they sum to 1); this repository emits the integral convention, in
-which they sum to 4 pi, so a solved weight is the published one times
-4 pi.  The parameters are seeded from the carried values (read-only, never
-modified) and refined by Gauss-Newton in high precision (mpmath, 80
-digits).  The solve therefore both reproduces the published values and
-certifies the result - the certificate (max |moment residual|) is printed
-per size.
-
-Orbit sums are evaluated in closed form: an orbit with generating vector
-(v1, v2, v3) contributes 2^k * sum over distinct coordinate permutations
-of v1^A v2^B, where k = number of nonzero components (all sign variants
-carry the same even-monomial value).  The enumerated point sets (the
-published gen_oh orbit construction) are cross-checked against the closed
-forms once per orbit family.
+Published data: V.I. Lebedev, D.N. Laikov, Doklady Mathematics 59 (3) (1999)
+477-481, and the earlier papers of the series, as distributed through the CCL.
 
 Usage:  python tools/gen_lebedev.py                 # regenerate
         python tools/gen_lebedev.py --check         # verify the header matches
@@ -74,17 +32,12 @@ from pathlib import Path
 import mpmath
 
 MP_DPS = 80
-# Highest size certified and emitted (degree 35).  Larger published sizes
-# (590..5810) extend the table the same way; they are out of scope for the
-# grids this library builds, whose angular quadratures need <= 434 points.
+# Highest size certified and emitted (degree 35); DEGREES also carries the larger published sizes.
 MAX_SIZE = 434
 
 kFourPi = mpmath.mpf(4) * mpmath.pi
 
-# Probe mode: skip Gauss-Newton entirely and report the weight-only
-# certificate at the published positions for every size.  The weight solve
-# is a linear least squares, so this is instant - it is the first-pass gate
-# that decides which sizes need position refinement.
+# Probe mode: skip Gauss-Newton and certify weights at the published positions.
 WEIGHTS_ONLY = "--weights-only" in sys.argv
 
 # Published algebraic degree of exactness per point count.
@@ -123,14 +76,11 @@ DEGREES = {
     5810: 131,
 }
 
-# Orbit parameter counts: codes 1/2/3 carry only a weight; 4/5 a position
-# parameter plus a weight; 6 two positions plus a weight.
+# Parameters per orbit code: a weight only, a position plus a weight, or two positions plus a weight.
 PARAMETER_COUNT = {1: 1, 2: 1, 3: 1, 4: 2, 5: 2, 6: 3}
 ORBIT_SIZE = {1: 6, 2: 12, 3: 8, 4: 24, 5: 24, 6: 48}
 
-# Published position parameters of the well-known small grids, used as an
-# independent spot-check of the solve (the certificate is the authority;
-# these catch systematically wrong seed values).
+# Published position parameters of three small grids, an independent spot-check of the solve.
 KNOWN_PARAMETERS = {
     38: 0.4597008433809831,  # code 5: a of the degree-9 grid
     50: 0.3015113445777636,  # code 4: a = 1/sqrt(11)
@@ -138,15 +88,7 @@ KNOWN_PARAMETERS = {
 }
 
 
-# The published orbit structure and seed values: which O_h orbits appear
-# per point count, in which order, and their generating parameters.  The
-# arguments are the published decimals, in the (a[, b], weight) order
-# published_seed reads; a weight is the per-point weight of the
-# average-over-sphere convention, which the solve raises to the integral
-# convention by a factor of 4 pi.  This is DATA, carried here so the script
-# runs from the repository alone: the solve below refines every value from
-# the moment conditions and certifies the result, so a wrong entry cannot
-# pass - it would either fail to converge or fail the certificate.
+# (code, (a[, b], weight)) per point count, weights in the average-over-sphere convention.
 PUBLISHED_ORBITS: dict[int, list[tuple[int, tuple[str, ...]]]] = {
     6: [
         (1, ('0.1666666666666667',)),
@@ -299,9 +241,7 @@ PUBLISHED_ORBITS: dict[int, list[tuple[int, tuple[str, ...]]]] = {
 
 
 def orbit_points(code: int, a: mpmath.mpf, b: mpmath.mpf) -> list[tuple]:
-    """All points of an O_h orbit: signs and coordinate permutations of a
-    generating vector, exactly the gen_oh families of the CCL
-    Lebedev-Laikov distribution."""
+    """All points of an O_h orbit: signs and coordinate permutations of a generating vector."""
     one = mpmath.mpf(1)
 
     if code == 1:  # 6 points: the coordinate axes.
@@ -341,10 +281,8 @@ def _pow0(x: mpmath.mpf, exponent: int) -> mpmath.mpf:
 
 def orbit_sum_closed(code: int, a: mpmath.mpf, b: mpmath.mpf,
                      exponents: tuple[int, int]) -> mpmath.mpf:
-    """Closed form of sum over the orbit of x^A y^B (z-exponent 0): the
-    orbit is the sign-flipped and permuted generating vector, all sign
-    variants carry the same even-monomial value, so the sum is 2^k times
-    the sum over distinct coordinate assignments, k = #nonzero coords."""
+    """Closed form of sum over an orbit of x^A y^B: 2^k times the distinct coordinate
+    assignments, k = number of nonzero coordinates (all sign variants carry the same value)."""
     A, B = exponents
     if code == 1:
         vals = (mpmath.mpf(1), mpmath.mpf(0), mpmath.mpf(0))
@@ -367,9 +305,8 @@ def orbit_sum_closed(code: int, a: mpmath.mpf, b: mpmath.mpf,
 
 
 def monomial_integral(A: int, B: int) -> mpmath.mpf:
-    """int_{S^2} x^A y^B dOmega for even A, B.  From the general form
-    int x^a y^b z^c dOmega = 2 G((a+1)/2) G((b+1)/2) G((c+1)/2) /
-    G((a+b+c+3)/2), with c = 0, i.e. denominator G(ha + hb + 1/2)."""
+    """int_{S^2} x^A y^B dOmega for even A, B: 2 G((A+1)/2) G((B+1)/2) G(1/2) /
+    G((A+B+3)/2)."""
     ha, hb = (A + 1) / 2, (B + 1) / 2
     return (
         2
@@ -381,8 +318,7 @@ def monomial_integral(A: int, B: int) -> mpmath.mpf:
 
 
 def check_integral_self_tests() -> None:
-    """Known sphere moments: int x^(2k) = 4 pi / (2k+1), int x^2 y^2 =
-    4 pi / 15, int x^2 y^2 z^2 = 4 pi / 105, int 1 = 4 pi."""
+    """Known sphere moments, the self-test values of monomial_integral."""
     expected = {
         (0, 0): 4 * mpmath.pi,
         (2, 0): 4 * mpmath.pi / 3,
@@ -399,10 +335,8 @@ def check_integral_self_tests() -> None:
 
 
 def reduced_basis(degree: int) -> list[tuple[int, int]]:
-    """Condition set: monomials x^A y^B with A, B even, A >= B >= 0,
-    A + B <= degree.  The A < B conditions are identical to the A > B
-    ones (the grid is O_h-closed, so sum w x^A y^B = sum w y^A x^B, and
-    the integrals agree)."""
+    """Condition set: x^A y^B with A, B even, A >= B >= 0, A + B <= degree; the
+    A < B rows would be identical (the grid is O_h-closed)."""
     basis = []
     for A in range(0, degree + 1, 2):
         for B in range(0, min(A, degree - A) + 1, 2):
@@ -420,15 +354,12 @@ def published_seed(code: int, args: list[str]) -> list[mpmath.mpf]:
 
 
 def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
-    """Solves the moment conditions for every size <= MAX_SIZE, seeded by
-    the carried PUBLISHED_ORBITS values.  Returns size -> [(code, [a, b, v]
-    mpmath)] only for sizes that certify (max |moment residual| near the
-    solve precision)."""
+    """Solves the moment conditions for every size <= MAX_SIZE, seeded by the carried
+    PUBLISHED_ORBITS values; returns size -> [(code, [a, b, v])] for the sizes that certify."""
     mpmath.mp.dps = MP_DPS
     check_integral_self_tests()
     all_sizes = PUBLISHED_ORBITS
 
-    # Cross-check the closed-form orbit sums against the enumeration.
     for code in range(1, 7):
         a = mpmath.mpf("0.37")
         b = mpmath.mpf("0.23")
@@ -462,9 +393,7 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
                 count = PARAMETER_COUNT[code]
                 local.append(xs[index : index + count])
                 index += count
-            # One residual per monomial: the orbit contributions SUM into
-            # the moment (a per-orbit row would be a different, wrong
-            # problem - every moment must include all orbits).
+            # One residual per monomial: every orbit contributes to every moment.
             res = []
             for exponents in basis:
                 total = mpmath.mpf(0)
@@ -491,10 +420,7 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
                 converged = True
                 final_norm = norm
                 break
-            # Damped Gauss-Newton via QR least squares on the full
-            # Jacobian: the normal equations J^T J square the
-            # conditioning, and the high-degree moment systems turn it
-            # singular.
+            # Damped Gauss-Newton with QR on the full Jacobian: the normal equations J^T J square the conditioning.
             jac = mpmath.matrix(len(f), len(xs))
             for j in range(len(xs)):
                 perturbed = list(xs)
@@ -529,13 +455,7 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
                 break
 
         if not converged or final_norm is None:
-            # Fallback: solve ONLY the weights by linear least squares at
-            # the published positions, and certify at double-precision
-            # exactness.  This is the right gate: the tables are emitted
-            # as doubles, so the meaningful certificate is how exactly the
-            # emitted grid integrates - a grid whose moment residual is
-            # < 1e-12 over ~90 conditions and 21 unknowns IS the Lebedev
-            # grid, whatever the parameter provenance.
+            # Fallback: solve only the weights at the published positions, certified at double precision.
             print("  Gauss-Newton did not converge; solving the weights at "
                   "the published positions", file=sys.stderr)
             weight_matrix = mpmath.matrix(len(basis), len(orbits))
@@ -578,10 +498,7 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
 
         print(f"  certified: max |moment residual| = {mpmath.nstr(certificate, 5)}")
 
-        # Validate against the published values in the convention this
-        # header emits: the published tables sum to 1 over the grid (the
-        # average over the sphere), so the solved weights must equal
-        # published_weight * 4 pi.
+        # The published weights sum to 1 over the grid; the emitted ones are those times 4 pi.
         worst_w = mpmath.mpf(0)
         worst_p = mpmath.mpf(0)
         index = 0
@@ -601,7 +518,6 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
         print(f"  vs published x4pi: weight rel.dev. {mpmath.nstr(worst_w, 5)}, "
               f"position rel.dev. {mpmath.nstr(worst_p, 5)}")
 
-        # Spot-check the solved position parameters against published ones.
         if size in KNOWN_PARAMETERS:
             index = 0
             found = False
@@ -615,7 +531,6 @@ def certify_sizes() -> dict[int, list[tuple[int, list[mpmath.mpf]]]]:
                               f"{expected!r} for size {size}", file=sys.stderr)
                 index += PARAMETER_COUNT[code]
 
-        # Re-solve the per-orbit parameters in (code, [a, b, v]) form.
         local: list[list[mpmath.mpf]] = []
         index = 0
         for code, _ in orbits:
@@ -685,8 +600,7 @@ def emit_header(certified: dict[int, list[tuple[int, list[mpmath.mpf]]]]) -> str
         for code, values in certified[size]:
             a = values[0]
             b = values[1] if code == 6 else mpmath.mpf(0)
-            # One value per line: the repo's .clang-format forbids
-            # bin-packing, so packed triples would not be format-clean.
+            # One value per line: .clang-format forbids bin-packing, so packed triples would not be clean.
             for x, y, z in orbit_points(code, a, b):
                 add(f"    {float(x)!r},")
                 add(f"    {float(y)!r},")
@@ -714,11 +628,7 @@ def emit_header(certified: dict[int, list[tuple[int, list[mpmath.mpf]]]]) -> str
 
 def main() -> int:
     check_only = "--check" in sys.argv
-    # Locate the excgrid tree by its own marker rather than by counting
-    # parents: this file sits at <tree>/tools/gen_lebedev.py in the standalone
-    # layout but at a deeper path when the tree is nested inside a larger
-    # checkout, so any fixed depth is right in one layout and wrong in the
-    # other.
+    # Locate the tree by its own marker: the script's depth depends on the checkout layout.
     repo = next(
         (parent for parent in Path(__file__).resolve().parents if (parent / "include" / "excgrid").is_dir()),
         None,
@@ -726,8 +636,7 @@ def main() -> int:
     if repo is None:
         print("cannot locate the excgrid tree root from this script's location", file=sys.stderr)
         return 1
-    # No input file: the published orbit structure and seeds are carried in
-    # this script, so a checkout of the repository is the only input.
+    # No input file: the orbit structure and seeds are carried in this script.
     output_path = repo / "include" / "excgrid" / "internal" / "lebedev_tables.hpp"
 
     certified = certify_sizes()

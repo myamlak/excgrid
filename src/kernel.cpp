@@ -52,10 +52,6 @@ void FoldIntoResult(const XcKernelValue& value, const ComponentMask& mask,
 
 ComponentMask XcFunctional::SecondDerivativeMask() const noexcept { return {}; }
 
-// The two defaults refuse outright rather than reporting what
-// SecondDerivativeStatus would say about this class's own mask: a derived class
-// that publishes a mask without overriding these writes no numbers, and kOk
-// over an untouched matrix is the one answer a caller cannot detect.
 KernelStatus XcFunctional::EvaluatePointWithSecondDerivatives(const PointInputs&,
                                                               std::span<const double>,
                                                               PointResult&,

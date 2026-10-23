@@ -1,15 +1,3 @@
-// The Becke partition's value contract, checked through the public grid
-// rather than against stored numbers: every block weight the build hands out
-// is the quadrature weight of the point it was generated from times the
-// Becke/SSF partition weight of that point's OWNING atom.  Both halves of
-// that product are reconstructible from the public API - the radial point,
-// the angular node, and the owned atom all come back out of the block - so
-// the partition weight can be extracted and compared against the pairwise
-// reference the library's candidate-restricted pass has to agree with.
-//
-// This is the gate the candidate restriction is answerable to: the pass skips
-// every pair whose SSF factor is exactly 1 and every cell whose weight is
-// exactly 0, and this test is what says those skips cost nothing.
 
 #include "excgrid/grid.hpp"
 
@@ -35,8 +23,7 @@ excgrid::Geometry Chain(std::size_t atomCount) {
     return geometry;
 }
 
-// A heteroatom set: four species with four different Slater radii, so the
-// radius table, the heteroatom adjustment and the fallback all get walked.
+// Four species with different Slater radii: the radius table, the heteroatom adjustment and the fallback.
 excgrid::Geometry MixedSpecies() {
     excgrid::Geometry geometry;
     geometry.atoms.push_back({6, {0.0, 0.0, 0.0}});
@@ -47,8 +34,7 @@ excgrid::Geometry MixedSpecies() {
     return geometry;
 }
 
-// The same radius table the library resolves (Bragg-Slater, Slater 1964),
-// in Bohr, with the untabulated-element fallback.
+// The library's Bragg-Slater radii (Slater 1964), in Bohr; untabulated elements take the fallback.
 struct SlaterEntry {
     int atomicNumber;
     double radiusAngstrom;
@@ -93,8 +79,7 @@ double Switch(double mu) {
     return 0.5 * (1.0 - z);
 }
 
-// The pairwise reference: the owning atom's normalized Becke weight, with no
-// candidate restriction and no early cell rejection - the full N^2 walk.
+// The unrestricted reference: the owner's normalized Becke weight over the full N^2 walk.
 double ReferenceOwnerWeight(const std::array<double, 3>& point,
                             const excgrid::Geometry& geometry,
                             std::size_t owner) {
@@ -179,9 +164,6 @@ double ReferenceOwnerWeight(const std::array<double, 3>& point,
     return total > 0.0 ? raw[owner] / total : raw[owner];
 }
 
-// The quadrature weight the point was generated with, rebuilt from the
-// public tables: the radial point and the angular node are matched to the
-// block point's own geometry.
 double QuadratureWeight(const excgrid::Block& block,
                         std::size_t index,
                         const excgrid::Geometry& geometry,
@@ -235,8 +217,6 @@ struct Fixture {
 std::vector<Fixture> MakeFixtures() {
     std::vector<Fixture> fixtures;
 
-    // The resolution the engine runs at, on a small system: the candidate
-    // set is exactly what a real DFT grid build exercises.
     excgrid::GridParams engine;
     engine.radialPoints = 30;
     engine.angularPoints = 50;
@@ -256,10 +236,7 @@ std::vector<Fixture> MakeFixtures() {
     untabulated.atoms.push_back({94, {0.0, 0.0, 0.0}});
     untabulated.atoms.push_back({1, {0.0, 0.0, 3.0}});
 
-    // Sparse geometries.  The per-shell neighbour window leaves most of the
-    // molecule out here, so these are the fixtures that exercise the second
-    // nearest and second smallest hi fallbacks the restricted pass needs to
-    // stay exact - dense sets never reach them.
+    // Sparse pairs reach the neighbour-window fallbacks a dense set never exercises.
     excgrid::Geometry sparsePair;
     sparsePair.atoms.push_back({6, {0.0, 0.0, 0.0}});
     sparsePair.atoms.push_back({6, {0.0, 0.0, 20.0}});
@@ -326,9 +303,6 @@ TEST(BlockGridPartitionTest, OwnerWeightMatchesThePairwiseReference) {
         }
     }
 
-    // The coverage claim: the fixtures above are only a gate if they carry a
-    // real point count and real non-zero cells (a pass built entirely of
-    // trimmed cells would be vacuously green).
     EXPECT_GT(checked, 20000u);
     EXPECT_GT(nonzero, 20000u);
 }

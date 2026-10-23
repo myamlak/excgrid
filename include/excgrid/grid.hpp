@@ -13,30 +13,21 @@ namespace excgrid {
 
 /// \defgroup excgrid-grid Molecular block-grid construction
 ///
-/// The radial and angular quadratures, the Becke fuzzy-cell partition,
-/// and the trimmed, spatially re-batched molecular blocks the kernel
-/// consumers walk (docs/kernel-api.md section 5).
+/// The radial and angular quadratures, the Becke fuzzy-cell partition and the
+/// re-batched molecular blocks the kernel consumers walk.
 /// \{
 
-/// A radial quadrature for the atomic radial coordinate, using the
-/// Murray-Handy-Laming substitution (Mol. Phys. 78 (1993) 997) with
-/// Euler-Maclaurin trapezoidal points:
-///     r(q) = alpha * (q / (1 - q))^m
-/// mapping q in [0, 1) onto r in [0, inf).  Points sit at q_i = i / N
-/// with N = pointCount + 1, so the outermost finite point is
-/// r_max = alpha * pointCount^m.  Weights carry the substitution
-/// Jacobian dr/dq * (1/N) but NOT the r^2 of the volume element - the
-/// atomic product grid folds r^2 in when it combines radial and angular
-/// quadratures.
+/// A radial quadrature for the atomic radial coordinate: the Murray-Handy-Laming
+/// substitution (Mol. Phys. 78 (1993) 997) with Euler-Maclaurin trapezoidal
+/// points, r(q) = alpha * (q / (1 - q))^m at q_i = i / N, N = pointCount + 1.
 /// \ingroup excgrid-grid
 class RadialGrid {
 public:
     /// Creates the quadrature.
-    /// \param pointCount Radial points; the outermost lies at r_max.
+    /// \param pointCount Radial points; the outermost lies at alpha * pointCount^m.
     /// \param alpha Length scale of the mapping (Bohr).
     /// \param exponent The mapping exponent m; 2 is the standard choice.
-    /// \returns The grid, or kInvalidArgument for a zero point count or a
-    /// zero exponent.
+    /// \returns The grid, or kInvalidArgument for a zero point count or exponent.
     static Result<RadialGrid> Create(std::size_t pointCount,
                                      double alpha,
                                      std::size_t exponent = 2);
@@ -66,14 +57,8 @@ private:
     std::vector<double> _weights;
 };
 
-/// A Lebedev-Laikov angular quadrature on the unit sphere.
-///
-/// The point set is closed under the octahedral group and the weights
-/// integrate every polynomial of total degree <= Degree() exactly.  The
-/// tables are SOLVED for from these two defining conditions by
-/// tools/gen_lebedev.py (no copied tables) and certified per size to
-/// max |moment residual| < 1e-60.  Weights are normalized so that they
-/// sum to 4 pi, the area of the unit sphere.
+/// A Lebedev-Laikov angular quadrature on the unit sphere: octahedrally closed,
+/// exact for every polynomial of total degree <= Degree().
 /// \ingroup excgrid-grid
 class AngularGrid {
 public:
@@ -127,10 +112,9 @@ struct GridParams {
     std::size_t blockTarget = 1024; ///< Spatial re-batching target (points per block).
 };
 
-/// One spatial block of the molecular grid: the parallel and cache unit
-/// every consumer walks.  Points are Bohr coordinates; weights include
-/// the radial and angular quadrature weights, the r^2 volume element,
-/// and the normalized Becke partition weight.
+/// One spatial block: the parallel and cache unit every consumer walks.  Points
+/// are Bohr coordinates; weights include the r^2 volume element and the
+/// normalized Becke partition weight.
 /// \ingroup excgrid-grid
 struct Block {
     std::size_t pointCount = 0; ///< Points in the block.
@@ -139,13 +123,10 @@ struct Block {
     std::vector<std::size_t> atomIndex; ///< pointCount owning atoms.
 };
 
-/// The molecular integration grid: per-atom radial x angular product
-/// grids combined into one point set, each point weighted by its Becke
-/// partition weight, trimmed (near-zero weights dropped) and re-batched
-/// into spatially compact blocks (~GridParams::blockTarget points each).
+/// The molecular integration grid: per-atom product grids combined, each point
+/// Becke-weighted, trimmed and re-batched into compact blocks.
 ///
-/// The integral of a function f over R^3 is approximated by
-///     sum over blocks, points: weight_i f(point_i).
+/// The integral of f over R^3:  sum over blocks, points: weight_i f(point_i).
 /// \ingroup excgrid-grid
 class BlockGrid {
 public:

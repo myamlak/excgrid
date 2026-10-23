@@ -9,17 +9,11 @@ namespace excgrid {
 
 /// \defgroup excgrid-components The contract's component table
 ///
-/// The numbered schema through which a per-point quantity crosses the boundary
-/// between this library and its consumers.  Every value carries the schema
-/// version and an active mask, and every slot is named here rather than by
-/// position.
+/// The numbered schema through which a per-point quantity crosses the boundary.
 
 /// The schema version.
 ///
-/// A major change alters an identifier's meaning, reorders the table, exhausts
-/// the capacity, or changes the composition semantics.  A minor change
-/// activates a reserved identifier, adds an optional capability, or adds a
-/// functional using only reserved identifiers.
+/// A major change alters an identifier's meaning or the composition semantics.
 /// \ingroup excgrid-components
 struct SchemaVersion {
     std::uint16_t major = 0; ///< Changed only by a semantic break.
@@ -42,18 +36,12 @@ inline constexpr SchemaVersion kSchemaVersion{1, 0};
 /// \ingroup excgrid-components
 inline constexpr std::size_t kComponentCapacity = 32;
 
-/// The number of components a second-derivative request may activate.
-///
-/// Smaller than the input capacity, whose cost is linear in the active count
-/// where this one is quadratic.  Exceeding it is a refusal.
+/// The most components a second-derivative request may activate; exceeding it
+/// is a refusal.
 /// \ingroup excgrid-components
 inline constexpr std::size_t kSecondDerivativeCapacity = 16;
 
 /// A stable input identifier.
-///
-/// Identifiers 0 to 6 are active and keep the positions they arrived in;
-/// 7 to 31 are reserved with fixed meanings.  Adding an identifier past 31 is a
-/// major change.
 /// \ingroup excgrid-components
 enum class Component : std::uint8_t {
     RhoA = 0, ///< Alpha-spin density.
@@ -102,8 +90,6 @@ enum ComponentFlag : std::uint32_t {
 };
 
 /// One identifier's table entry.
-///
-/// The unit is a property of the table rather than data carried in each value.
 /// \ingroup excgrid-components
 struct ComponentInfo {
     Component id = Component::RhoA; ///< The stable identifier.

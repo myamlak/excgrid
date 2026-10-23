@@ -1,6 +1,4 @@
-// The grid's derivatives with respect to nuclear position.  The mathematics,
-// the naming of every intermediate and the reason the pass is structured this
-// way are in grid_derivs.hpp; this file is the implementation.
+// The grid's derivatives with respect to nuclear position.
 
 #include "grid_derivs.hpp"
 
@@ -17,30 +15,18 @@ namespace excgrid::derivs {
 
 namespace {
 
-// The switch window: |mu| <= a is the only region where the SSF step is off its
-// plateau.  Mirrors the build's own kSwitchWindow (src/block_grid.cpp).
+// The SSF switch window a; must match the build's own kSwitchWindow in block_grid.cpp.
 constexpr double kSwitchWindow = 0.64;
 
-// Two of the nine entries of a second-derivative block are the accumulator
-// slots the walk over the cells fills: the block's (0, 0) holds the sum of the
-// raw cells' second derivatives over every live cell, and its (1, 1) holds the
-// same sum over the owner's own cell alone.  Both are overwritten when the
-// block is assembled into the nuclear-coordinate Hessian.  They are named as
-// entries of the block's own 3 x 3 frame, not as raw offsets into the buffer:
-// the buffer IS the (3N)^2 matrix, whose blocks are `width` entries apart, so a
-// raw offset of four would land inside a neighbouring block's row whenever the
-// geometry has more than one atom.
+// The block-frame accumulator slots the cell walk fills: (0, 0) sums every live
+// cell, (1, 1) the owner's own; block entries, never raw buffer offsets.
 constexpr std::size_t kSecondSumRow = 0;
 constexpr std::size_t kSecondSumColumn = 0;
 constexpr std::size_t kSecondOwnRow = 1;
 constexpr std::size_t kSecondOwnColumn = 1;
 
-// The two smallest of a cell's upper bounds, and the atom carrying the
-// smallest.  A cell's switch sits on the zero plateau exactly when its lower
-// bound reaches the smallest upper bound over the OTHER atoms, and the two
-// smallest answer that for every cell at once, in O(1) per cell.  The second
-// smallest of a one-atom geometry is infinite, which is the whole of why a lone
-// atom's cell is always live.
+// The two smallest upper bounds: the smallest over the other atoms answers every
+// cell at once, and a lone atom's cell is always live.
 struct CellBounds {
     double smallest = 0.0; ///< The smallest upper bound.
     double secondSmallest = 0.0; ///< The next one up, infinite for one atom.
@@ -81,10 +67,8 @@ SwitchValue SsfSwitch(double mu) noexcept {
         return {1.0, 0.0, 0.0};
     }
 
-    // z(t) = t (35 - t^2 (35 - t^2 (21 - 5 t^2))) / 16, and its derivatives
-    // collapsed to z'(t) = 35 (1 - t^2)^3 / 16 and
-    // z''(t) = -105 t (1 - t^2)^2 / 8.  Both vanish at |t| = 1, so the switch
-    // and its first two derivatives are continuous at the joins.
+    // z(t) = t (35 - t^2 (35 - t^2 (21 - 5 t^2))) / 16, z'(t) = 35 (1 - t^2)^3 / 16,
+    // z''(t) = -105 t (1 - t^2)^2 / 8; both vanish at |t| = 1, so the joins are C^2.
     const double t = mu / kSwitchWindow;
     const double t2 = t * t;
     const double z = t * (35.0 - t2 * (35.0 - t2 * (21.0 - 5.0 * t2))) / 16.0;
@@ -105,9 +89,7 @@ double BraggSlaterRadius(int atomicNumber) noexcept {
 }
 
 std::size_t DerivativeScratch::DoubleCount() const noexcept {
-    // capacity(), not size(): the question this answers is how much memory the
-    // pass holds, and `active` and `member` are the arrays whose size moves per
-    // point.
+    // capacity(), not size(): this answers how much memory the pass holds.
     return radius.capacity() + distance.capacity() + lo.capacity() + hi.capacity() + u.capacity() +
            sumFirst.capacity() + ownFirst.capacity() + gradient.capacity() + chain.capacity() +
            member.capacity() + active.capacity() + mark.capacity() + switchValue.capacity() +
@@ -115,15 +97,7 @@ std::size_t DerivativeScratch::DoubleCount() const noexcept {
 }
 
 std::size_t DerivativeScratch::PerPointDoubles(std::size_t atomCount) noexcept {
-    // Thirteen N-sized slots (radius, distance, lo, hi, sumFirst, ownFirst,
-    // gradient, member, active, mark, switchValue, switchFirst and
-    // switchSecond), the 3N unit vector and the 3N chain, the two N + 1 running
-    // products, and the reserved capacity of the per-cell lists.  The
-    // footprint test asserts that DoubleCount() equals this expression for a
-    // scratch built for the same atom count, so the formula and the arrays
-    // cannot drift apart.  The output buffer's own `dirty` list is part of the
-    // output, not of the pass's work arrays, and the (3N)^2 matrix beside it is
-    // the caller's.
+    // Thirteen N-sized slots, the 3N unit vector and 3N chain, two N + 1 products: 21 N + 2.
     return 21 * atomCount + 2;
 }
 
@@ -224,11 +198,7 @@ void EvaluatePointWeight(const Geometry& geometry,
                          PointWeightDerivatives& out) {
     EvaluatePartitionWeight(geometry, PointPosition(geometry, basis, id), id.atom, scratch, out);
 
-    // The quadrature factor is constant in the geometry, so it scales the value
-    // and every derivative alike.  The partition leaves its second derivatives
-    // sparse - only the active atoms' blocks are anything but zero - and the
-    // buffer's own `dirty` is exactly which those were, so the scaling is as
-    // sparse as the assembly was and never a (3N)^2 sweep per point.
+    // q is constant in the geometry: it scales the value and every derivative alike.
     const double quadrature = PointQuadrature(basis, id);
     out.value *= quadrature;
 
@@ -281,13 +251,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
 
     if (secondOrder)
     {
-        // The (3N)^2 output is dense in the contract and sparse in the work:
-        // only the active atoms have a non-zero block, so clearing the blocks
-        // the previous point left set is the whole of what a point pays, and
-        // never a (3N)^2 sweep.  A buffer this pass has not seen before is the
-        // one exception, and it is cleared once.  Which blocks the buffer holds
-        // is recorded beside them, so a buffer whose footprint is right but
-        // whose contents came from somewhere else cannot be mis-cleared.
+        // Clear only the blocks `dirty` records; a fresh buffer is cleared once here.
         if (out.second.size() != width * width)
         {
             out.second.assign(width * width, 0.0);
@@ -313,10 +277,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
         out.second.clear();
     }
 
-    // One pass over the atoms: the distances, the unit vectors the chain rule
-    // needs, and the two smallest upper bounds.  Every cell test below asks for
-    // the smallest hi over the OTHER atoms, which the two smallest values
-    // answer in O(1) for every cell at once.
+    // Distances, unit vectors and the two smallest upper bounds, in one pass.
     for (std::size_t a = 0; a < atomCount; ++a)
     {
         const std::array<double, 3>& center = geometry.atoms[a].position;
@@ -336,12 +297,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
 
     const CellBounds bounds = TwoSmallest(hi);
 
-    // The live cells: every cell whose switch is not on the zero plateau.  A
-    // cell that is not live has raw_c = 0 and every derivative zero, because
-    // the vanishing factor's derivative vanishes with it at the plateau edge.
-    // `active` collects the atoms that end up with a non-zero row; the mark
-    // array is stamped by a generation counter, so the collection clears
-    // without an O(N) sweep per point.
+    // The live cells; `active` collects the atoms that end up with a non-zero row.
     if (++scratch.generation == 0u)
     {
         std::fill(scratch.mark.begin(), scratch.mark.end(), 0u);
@@ -371,16 +327,8 @@ void EvaluatePartitionWeight(const Geometry& geometry,
         }
     };
 
-    // The second-order accumulator: while the cells are walked, the (x, y)
-    // block of out.second carries two scalars in two of its nine entries - the
-    // sum of the raw cells' second derivatives d2(raw_c)/dr_x dr_y over every
-    // live cell, and the same sum over the owner's own cell alone.  The
-    // quotient rule weights the two differently, and holding both here is what
-    // keeps the walk over the cells a single one: the assembly below reads the
-    // two slots and overwrites the whole block with the nuclear-coordinate
-    // Hessian.  Both slots are entries of the (x, y) block itself, so a write to
-    // any other block leaves them alone and the block's own assembly reads them
-    // before it overwrites them.
+    // Two of the (x, y) block's nine entries accumulate while the cells are
+    // walked; the assembly below reads both and overwrites the whole block.
     const auto slotAt = [&](std::size_t x,
                             std::size_t y,
                             std::size_t row,
@@ -438,8 +386,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
             ++memberCount;
         }
 
-        // The running products, so a member's cofactor costs one multiply:
-        // prefix[i] * suffix[i + 1] is the product over every other member.
+        // Running products: prefix[i] * suffix[i + 1] is the product over every other member.
         prefix[0] = 1.0;
 
         for (std::size_t i = 0; i < memberCount; ++i)
@@ -457,9 +404,8 @@ void EvaluatePartitionWeight(const Geometry& geometry,
         const double cellValue = prefix[memberCount];
         double cellFirst = 0.0;
 
-        // d(raw_c)/dr_c = sum_i cofactor_i * S'(mu) / pairRadius, and the
-        // derivative with respect to a member's distance is the negative of
-        // that member's own term - mu is linear in the distances.
+        // d(raw_c)/dr_c = sum_i cof_i S'(mu_i) / pairRadius; a member's own distance
+        // takes the negative of its term, mu being linear in the distances.
         for (std::size_t i = 0; i < memberCount; ++i)
         {
             const double term = prefix[i] * suffix[i + 1] * switchFirst[i];
@@ -489,14 +435,12 @@ void EvaluatePartitionWeight(const Geometry& geometry,
 
         if (secondOrder)
         {
-            // The cell's own block of the distance Hessian, in the two
-            // accumulator slots.  With s_i = S(mu_i), a_i = ds_i/dr_c and
-            // b_i = d2s_i/dr_c2, the cell's raw product obeys
-            //     d2(raw_c)/dr_c2       = sum_i [ cof_i b_i + sum_{j != i} cof_ij a_i a_j ]
-            //     d2(raw_c)/dr_c dr_m_i = -cof_i b_i - sum_{j != i} cof_ij a_i a_j
-            //     d2(raw_c)/dr_m_i2     =  cof_i b_i
-            //     d2(raw_c)/dr_m_i dr_m_j = cof_ij a_i a_j,
-            // where cof_i = prod_{j != i} s_j and cof_ij = prod_{l != i, j} s_l.
+            // The cell's distance Hessian, with s_i = S(mu_i), a_i = ds_i/dr_c,
+            // b_i = d2s_i/dr_c2, cof_i = prod_{j != i} s_j, cof_ij = prod_{l != i,j} s_l:
+            //     d2(raw_c)/dr_c2         = sum_i [ cof_i b_i + sum_{j != i} cof_ij a_i a_j ]
+            //     d2(raw_c)/dr_c dr_m_i   = -cof_i b_i - sum_{j != i} cof_ij a_i a_j
+            //     d2(raw_c)/dr_m_i2       =  cof_i b_i
+            //     d2(raw_c)/dr_m_i dr_m_j =  cof_ij a_i a_j.
             const bool ownCell = c == owner;
 
             for (std::size_t i = 0; i < memberCount; ++i)
@@ -513,8 +457,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
 
                 for (std::size_t j = i + 1; j < memberCount; ++j)
                 {
-                    // middle is the product over the members strictly between
-                    // i and j, so middle * suffix[j + 1] is cof_ij.
+                    // middle * suffix[j + 1] is cof_ij: the product over the members between.
                     const double pair = middle * suffix[j + 1] * switchFirst[i] * switchFirst[j];
                     addSecond(c, c, 2.0 * pair, ownCell);
                     addSecond(member[i], member[j], pair, ownCell);
@@ -526,19 +469,14 @@ void EvaluatePartitionWeight(const Geometry& geometry,
         }
     }
 
-    // The quotient rule, then the chain rule that takes the distance
-    // derivatives to nuclear-coordinate ones (3).  Every atom outside `active`
-    // has g_c = 0, so its row is exactly zero and the assembly leaves it alone.
+    // Quotient rule, then the chain rule to nuclear coordinates; atoms outside `active`
+    // have g_c = 0, so their rows are exactly zero.
     const double weight = sumValue > 0.0 ? ownValue / sumValue : ownValue;
     out.value = weight;
     out.activeAtoms = active.size();
     out.first.assign(3 * atomCount, 0.0);
 
-    // Every live cell's product is strictly positive - each of its members sits
-    // strictly inside the switch window - so a vanishing sum means there was no
-    // live cell at all: an empty active set, a weight of zero, and every
-    // derivative of that weight zero.  The loops below are then empty, and the
-    // output stays as the clear above left it.
+    // A vanishing sum means no live cell: weight zero and every derivative zero.
     std::vector<double>& gradient = scratch.gradient;
     std::array<double, 3> pointGradient = {0.0, 0.0, 0.0};
 
@@ -570,10 +508,9 @@ void EvaluatePartitionWeight(const Geometry& geometry,
     {
         const double inverseSquare = 1.0 / (sumValue * sumValue);
 
-        // The distance Hessian at one pair, out of the two accumulator slots:
+        // The distance Hessian at one pair:
         //     H_xy = [ N (D_xy - W N_xy) - D_x N_y - D_y N_x + 2 W N_x N_y ] / N^2,
-        // with D_xy the owner's own cell's second derivative and N_xy the sum
-        // over every live cell.
+        // D_xy the owner's own cell's second derivative, N_xy the sum over every live cell.
         const auto pairHessian = [&](std::size_t x, std::size_t y) {
             const double sumSecond = slotAt(x, y, kSecondSumRow, kSecondSumColumn);
             const double ownSecond = slotAt(x, y, kSecondOwnRow, kSecondOwnColumn);
@@ -584,20 +521,12 @@ void EvaluatePartitionWeight(const Geometry& geometry,
             return numerator * inverseSquare;
         };
 
-        // v_c = sum_d H_cd u_d for every active atom, read out of the accumulator
-        // blocks while they are all still the accumulator's.  The assembly below
-        // then reads the chains and never a slot: both the row's curvature and
-        // the column's come from here, and a block an earlier row has already
-        // overwritten could no longer be asked for either.
+        // v_c = sum_d H_cd u_d, read out of the accumulator blocks before the assembly
+        // overwrites any of them.
         std::vector<double>& chain = scratch.chain;
 
-        // P_c[p,q] = g_c T_c[p,q] + u_c[p] v_c[q] with T_c = (I - u_c u_c^T)/r_c:
-        // the curvature of the weight in the point's own coordinates at atom c.
-        // (4) mixes it into the nuclear blocks three ways - the (b, owner) block
-        // takes the ROW's, the (owner, c) block takes the COLUMN's, and the
-        // (owner, owner) block takes the sum over every active atom, which is the
-        // point-space Hessian d2W/dx2.  Only an active atom has a gradient, so an
-        // owner outside `active` contributes nothing to any of the three.
+        // P_c[p,q] = g_c T_c[p,q] + u_c[p] v_c[q], T_c = (I - u_c u_c^T)/r_c: the
+        // curvature in the point's coordinates; only an active atom contributes.
         const auto curvatureAt = [&](std::size_t c, std::size_t p, std::size_t q) {
             const double t = ((p == q ? 1.0 : 0.0) - u[3 * c + p] * u[3 * c + q]) / distance[c];
 
@@ -635,11 +564,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
             }
         }
 
-        // The blocks themselves, upper triangle first: H_bc is read before the
-        // block that holds it is overwritten, and a lower-triangle block is never
-        // written here, so every H is still the accumulator's while the rows are
-        // walked - and the chains above have already taken everything else out of
-        // the slots.
+        // Upper triangle first: every H_bc is still the accumulator's when it is read.
         for (std::size_t bi = 0; bi < active.size(); ++bi)
         {
             const std::size_t b = active[bi];
@@ -683,13 +608,7 @@ void EvaluatePartitionWeight(const Geometry& geometry,
             }
         }
 
-        // The lower triangle is the upper one transposed, and inside a diagonal
-        // block the lower half is the upper half's.  Mirroring rather than
-        // recomputing is what makes the Hessian symmetric bit for bit: an entry
-        // is a sum of terms that is symmetric in (l, m) only as a whole - the
-        // row's curvature and the column's are different pieces - so the two
-        // halves of a diagonal block disagree in the last bit when each is
-        // assembled on its own.
+        // Mirror, never recompute: the two halves must agree bit for bit.
         for (std::size_t bi = 0; bi < active.size(); ++bi)
         {
             const std::size_t b = active[bi];

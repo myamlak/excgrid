@@ -8,17 +8,13 @@ namespace excgrid {
 
 namespace {
 
-// The scheme constants (the published DFT-D3 choices).
 constexpr double k1 = 16.0; // The counting-function steepness.
 constexpr double k3 = -4.0; // The C6-interpolation exponent (k3 = 4, with
                             // the paper's negative sign folded in).
 constexpr double kDistanceThreshold = 2000.0; // Pair R^2 cutoff, Bohr^2.
 
-// The pair cut-off radius r0(ab) in Bohr. kR0Angstrom is stored in the
-// order setr0ab fills it - larger element outer, smaller inner, no
-// padding entry - so the flat index is j(j-1)/2 + i-1. setr0ab converts
-// with r0ab/autoang (autoang = 0.52917726 Angstrom per Bohr); the table
-// carries the 2018 CODATA Bohr radius, so divide, never multiply.
+// The pair cut-off radius r0(ab), Bohr: kR0Angstrom is flat-indexed
+// j(j-1)/2 + i-1 with i <= j and no padding entry; it is Angstrom, so divide.
 double R0Pair(std::size_t a, std::size_t b) {
     const std::size_t i = a <= b ? a : b;
     const std::size_t j = a <= b ? b : a;
@@ -27,10 +23,8 @@ double R0Pair(std::size_t a, std::size_t b) {
     return d3tables::kR0Angstrom[index] / d3tables::kAngstromPerBohr;
 }
 
-// The CN-interpolated C6 of one element pair and its CN derivatives:
-// L_ij = exp(k3 [(cn_i - CN_a)^2 + (cn_j - CN_b)^2]) over the element
-// pair's reference states (the classic getc6 scheme, with the
-// nearest-reference fallback).
+// The CN-interpolated C6 of one element pair: L_ij = exp(k3 [(cn_i - CN_a)^2 +
+// (cn_j - CN_b)^2]) over the pair's reference states, nearest-reference fallback.
 struct C6Pair {
     double c6 = 0.0;
     double dC6dCnA = 0.0;
@@ -65,8 +59,6 @@ C6Pair C6Of(std::size_t a, std::size_t b, double cnA, double cnB) {
         {
             const double c6 = d3tables::kC6[base + i * countB + j];
 
-            // getc6 skips absent reference combinations with exactly this
-            // test (dftd3.f line 2578: if(c6.gt.0)); the table stores 0.
             if (c6 <= 0.0)
             {
                 continue;
@@ -110,8 +102,7 @@ C6Pair C6Of(std::size_t a, std::size_t b, double cnA, double cnB) {
     return result;
 }
 
-// The counting-function coordination numbers and their pair derivatives:
-// CN_a = sum_b 1 / (1 + exp(-k1 (R_cov(ab) / r_ab - 1))).
+// CN_a = sum_b 1 / (1 + exp(-k1 (R_cov(ab) / r_ab - 1))), with its pair derivatives.
 struct Coordination {
     std::vector<double> cn; // Per atom.
     std::vector<std::vector<double>> dCnDr; // [a][b] = dCN_a / d r_ab.
@@ -144,9 +135,8 @@ Coordination CoordinationNumbers(const Geometry& geometry) {
             }
 
             const double r = std::sqrt(r2);
-            // ncoord's covalent distance is the sum rcov(i) + rcov(j),
-            // not half of it; both radii are k2-scaled and already in
-            // Bohr.
+            // The covalent distance is rcov(i) + rcov(j), not half of it; both radii
+            // are k2-scaled and already in Bohr.
             const double cov = d3tables::kRcov[geometry.atoms[a].atomicNumber] +
                                d3tables::kRcov[geometry.atoms[b].atomicNumber];
             const double h = std::exp(-k1 * (cov / r - 1.0));
@@ -161,7 +151,6 @@ Coordination CoordinationNumbers(const Geometry& geometry) {
     return result;
 }
 
-// The two-body D3 evaluation over the whole geometry.
 Result<D3Result> Evaluate(const Geometry& geometry, const D3Parameters& p) {
     const std::size_t n = geometry.atoms.size();
 
@@ -179,9 +168,6 @@ Result<D3Result> Evaluate(const Geometry& geometry, const D3Parameters& p) {
     D3Result result;
     result.gradient.assign(n, {0.0, 0.0, 0.0});
 
-    // The energy accumulates the CN-chain derivatives per atom for the
-    // second pass (dE/dCN_a), because the CNs couple every pair to every
-    // other pair through the counting functions.
     std::vector<double> dEdCn(n, 0.0);
 
     double energy = 0.0;
@@ -233,8 +219,7 @@ Result<D3Result> Evaluate(const Geometry& geometry, const D3Parameters& p) {
             const double dE6dr = p.s6 * c6.c6 * (dDamp6dr / r6 - 6.0 * damp6 / (r6 * r));
             const double dE8dr = p.s8 * c8 * (dDamp8dr / r8 - 8.0 * damp8 / (r8 * r));
 
-            // The pair's gradient contribution: dE/dr along the a-b axis.
-            // dE/dR_a -= dE/dr * u_ab (energy decreases with r, dE/dr > 0).
+            // dE/dR_a -= dE/dr * u_ab along the a-b axis; dE/dr > 0 here.
             const double gScalar = dE6dr + dE8dr;
 
             for (int k = 0; k < 3; ++k)
@@ -258,9 +243,7 @@ Result<D3Result> Evaluate(const Geometry& geometry, const D3Parameters& p) {
         }
     }
 
-    // The CN-chain gradient pass: dCN_a / d r_ab couples atom a to every
-    // other atom b, so each atom's gradient picks up dE/dCN_a * dCN_a/dr
-    // along every a-b direction.
+    // dE/dR picks up dE/dCN_a * dCN_a/dr_ab along every a-b direction.
     for (std::size_t a = 0; a < n; ++a)
     {
         if (dEdCn[a] == 0.0)
@@ -323,8 +306,7 @@ Result<D3Parameters> D3Preset(std::string_view name) {
         D3Parameters parameters;
     };
 
-    // The published DFT-D3 zero-damping parameter sets (s6 = 1, sr8 = 1,
-    // alpha6 = 14, alpha8 = 16 throughout).
+    // The published zero-damping sets (s6 = 1, sr8 = 1, alpha6 = 14, alpha8 = 16).
     constexpr Preset presets[] = {
         {"b3lyp", {1.0, 1.703, 1.261, 14.0, 1.0, 16.0}},
         {"pbe", {1.0, 0.722, 1.217, 14.0, 1.0, 16.0}},

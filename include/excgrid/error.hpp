@@ -6,9 +6,7 @@ namespace excgrid {
 
 /// \defgroup excgrid-error Error reporting
 ///
-/// The library's own minimal error convention (standalone discipline):
-/// fallible construction returns `Result<T>`; consumers translate the
-/// codes at their own boundary.
+/// Fallible construction returns `Result<T>`; consumers translate the codes.
 /// \{
 
 /// The error codes the library reports.

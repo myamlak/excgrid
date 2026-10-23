@@ -1,23 +1,9 @@
 #!/usr/bin/env python3
 """Generate src/d4_tables.inc from the published D4 reference-state data.
 
-The reference states of the DFT-D4 model - Caldeweyher, Ehlert, Hansen,
-Neugebauer, Spicher, Bannwarth, Grimme, J. Chem. Phys. 150 (2019) 154122 -
-are the atom-in-molecule states that the model's C6 step interpolates over.  The
-paper defines them (its equations 5, 7 and 8) but does not tabulate them; the
-numeric values are carried by the reference implementation's generated data.
-
-The 23-point frequency grid its equation 9 integrates over is taken from the
-same distribution's own model data, again values only.
-
-This script transcribes NUMBERS ONLY, as the project's D3 parameter data was
-transcribed: the reference charge, the reference coordination number in both the
-D4 and the D3 definition, the scale the published data carries per state, the
-23 isotropically averaged dynamic polarizabilities alpha(iw) of each state, and
-the frequencies those polarizabilities stand on.  No statement, comment,
-structure or expression of the source is reproduced; the output is this
-project's own table in this project's own format, and it names each number for
-where it sits rather than for the role it is believed to play.
+Numeric values only, from the DFT-D4 model of Caldeweyher et al., J. Chem.
+Phys. 150 (2019) 154122 (its equations 5, 7, 8 and 9), as the reference
+implementation's data carries them.
 
 Usage:  python tools/gen_d4_tables.py            # writes src/d4_tables.inc
         python tools/gen_d4_tables.py --check    # verifies the committed file
@@ -33,11 +19,7 @@ SOURCE = "https://raw.githubusercontent.com/dftd4/dftd4/main/src/dftd4/reference
 MODEL_SOURCE = "https://raw.githubusercontent.com/dftd4/dftd4/main/src/dftd4/model/utils.f90"
 OUTPUT = pathlib.Path(__file__).resolve().parent.parent / "src" / "d4_tables.inc"
 
-# The secondary reference systems, in the order the source carries them, with the
-# formula each one is named by and the state index of its reference state in the
-# source's own global numbering.  Which element a state is a reference for is NOT
-# recorded here: a system can serve more than one element (CO carries a carbon and
-# an oxygen reference), so that assignment belongs to the model code, not the table.
+# (formula, source state index) in source order; a system can serve two elements, so none is named here.
 SYSTEMS = [
     ("null", 1),
     ("H2", 2),
@@ -190,8 +172,7 @@ def main():
         print("d4_tables.inc is current")
         return
 
-    # newline="" style: always LF, so the committed file is byte-identical
-    # on a fresh checkout and --check means what it says.
+    # Always LF, so a fresh checkout is byte-identical to what --check reproduces.
     with open(OUTPUT, "w", encoding="utf-8", newline="\n") as handle:
         handle.write(rendered)
     print("wrote %s" % OUTPUT)

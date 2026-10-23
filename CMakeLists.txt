@@ -1,19 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
-# excgrid - the grid + XC-kernel + dispersion library (the standalone DFT
-# foundation repo; its frozen public seam is docs/kernel-api.md).  Layout:
-# public headers under include/excgrid/, hand-written sources under
-# src/, the committed Yacas-generated kernels under generated/, the
-# codegen sources under xc_defs/ (maintainer tooling, never built),
-# the vendored Yacas and the regeneration driver under tools/.
-#
-# NO PCH in this tree: a precompiled header is a build-time optimization
-# for a large consumer, and this library is small enough that one would
-# only obscure which header pulls what.  No foreign targets, paths, or
-# types - the standalone boundary (docs/kernel-api.md section 5).  Tests
-# are gtest (FetchContent, pinned) and are ON only when this tree is the
-# top-level project.  The verification jobs (pylibxc/pyscf point
-# checks) are CI Python steps, not CMake targets.
+# Standalone boundary: no PCH, and no foreign targets, paths or types.
 
 project(excgrid VERSION 0.4.0 LANGUAGES CXX)
 
@@ -26,11 +13,7 @@ endif()
 option(EXCGRID_BUILD_TESTS "Build the excgrid test suite (gtest, FetchContent)"
     ${EXCGRID_TOP_LEVEL})
 
-# Warnings in this library's own code are build failures.  ON by default:
-# a gate that is off until someone opts in is not a gate, and a consumer
-# embedding this tree inherits the same standard.  Set OFF only to build
-# with a compiler whose warning noise this tree has not been made clean
-# for - never to land a warning.
+# ON by default: a gate that is off until someone opts in is not a gate.
 option(EXCGRID_WERROR "Treat warnings in excgrid's own code as errors" ON)
 
 add_library(excgrid
@@ -70,14 +53,7 @@ target_include_directories(excgrid PUBLIC
 
 target_compile_features(excgrid PUBLIC cxx_std_23)
 
-# The warning flags, and they are TARGET-SCOPED on purpose.  A
-# directory-scoped add_compile_options() or a CMAKE_COMPILE_WARNING_AS_ERROR
-# variable would also reach the vendored third-party targets that are
-# configured below (GoogleTest, via FetchContent), turning someone else's
-# warning noise into a build failure in this tree - the exact inversion
-# this gate exists to avoid.  Third-party code is not this project's to
-# gate, and it is not gated: gtest/gtest_main keep the flags GoogleTest's
-# own build gives them.
+# TARGET-SCOPED on purpose: directory scope would also gate the fetched GoogleTest targets.
 if (MSVC)
     target_compile_options(excgrid PRIVATE /W4)
     if (EXCGRID_WERROR)
@@ -90,8 +66,7 @@ else()
     endif()
 endif()
 
-# The kernel probe CLI the verification scripts drive (top-level builds
-# only - a consumer embedding this tree never needs the probe).
+# The kernel probe CLI the verification scripts drive (top-level builds only).
 if (EXCGRID_TOP_LEVEL)
     add_executable(excgrid-kernel-probe tools/kernel_probe.cpp)
     target_link_libraries(excgrid-kernel-probe PRIVATE excgrid)

@@ -12,14 +12,8 @@ namespace excgrid {
 
 /// \defgroup excgrid-d3 Grimme D3 dispersion
 ///
-/// The DFT-D3 two-body dispersion correction (Grimme, Antony, Ehrlich,
-/// Krieg, J. Chem. Phys. 132 (2010) 154104), zero-damping scheme:
-/// geometry-only closed forms - energy plus analytic coordinate
-/// gradients, hand-written (no codegen), over the library's own
-/// Geometry type.  Coordination-number-dependent C6 interpolation,
-/// the C8 estimate, and the counting-function coordination numbers
-/// follow the published scheme; the parameter data is committed under
-/// tools/data/ (see tools/gen_d3_tables.py).
+/// The DFT-D3 two-body dispersion correction, zero damping (Grimme, Antony,
+/// Ehrlich, Krieg, J. Chem. Phys. 132 (2010) 154104).
 /// \{
 
 /// The D3 zero-damping parameters of one functional.
@@ -33,11 +27,9 @@ struct D3Parameters {
     double alpha8 = 16.0; ///< The a2 exponent of the R^8 term (alpha6 + 2).
 };
 
-/// The standard D3 zero-damping parameter set of one method family
-/// (transcribed from the published D3 parameter data).
-/// \param name One of "b3lyp", "pbe", "pbe0", "bp86" (the b-p set),
-/// "blyp", "revpbe", "pbesol", "b97d", "tpss", "bpbe", "bhandhlyp",
-/// "b3pw91", "hf".
+/// The standard D3 zero-damping parameter set of one method family.
+/// \param name "b3lyp", "pbe", "pbe0", "bp86", "blyp", "revpbe", "pbesol",
+/// "b97d", "tpss", "bpbe", "bhandhlyp", "b3pw91" or "hf".
 /// \returns The parameter set, or kInvalidArgument for an unknown name.
 /// \ingroup excgrid-d3
 Result<D3Parameters> D3Preset(std::string_view name);
@@ -45,17 +37,11 @@ Result<D3Parameters> D3Preset(std::string_view name);
 /// The D3 dispersion energy of the geometry, in Hartree.
 /// \param geometry The molecule.
 /// \param parameters The functional's parameter set.
-/// \returns The energy (negative, attractive), or kUnsupported for an
-/// element above the table's range.
+/// \returns The energy, or kUnsupported for an element above the table's range.
 /// \ingroup excgrid-d3
 Result<double> GrimmeD3Energy(const Geometry& geometry, const D3Parameters& parameters);
 
 /// The D3 energy and its analytic coordinate gradient.
-/// \param geometry The molecule.
-/// \param parameters The functional's parameter set.
-/// \returns The energy (Hartree) and the gradient (one 3-vector per atom,
-/// Hartree/Bohr), or kUnsupported for an out-of-table element.
-/// The energy plus the analytic coordinate gradient, together.
 /// \ingroup excgrid-d3
 struct D3Result {
     double energy = 0.0; ///< The dispersion energy (Hartree).

@@ -1,6 +1,3 @@
-// The D3 dispersion tests: the analytic gradient vs finite differences,
-// the distance-decay shape, the preset table, and the external reference
-// energy printed by the classic dftd3 program for a water fixture.
 
 #include "excgrid/dispersion.hpp"
 
@@ -10,8 +7,7 @@
 namespace {
 
 excgrid::Geometry WaterGeometry() {
-    // A water-like three-atom geometry (O + 2 H), arbitrary but
-    // physical coordinates in Bohr.
+    // Water-like O + 2 H fixture, in Bohr.
     excgrid::Geometry geometry;
     geometry.atoms.push_back({8, {0.0, 0.0, 0.0}});
     geometry.atoms.push_back({1, {1.4, 0.0, 0.9}});
@@ -39,10 +35,7 @@ TEST(D3Test, EnergyIsNegativeAndDecays) {
     ASSERT_TRUE(near.has_value());
     EXPECT_LT(*near, 0.0);
 
-    // Zero damping suppresses the short-range term, so |E| is not
-    // monotone when a bonded geometry is expanded. In the asymptotic
-    // regime (coordination numbers ~0) the R^-6 tail dominates, and
-    // doubling every distance cuts |E| by about 64.
+    // Asymptotic R^-6 tail: doubling every distance cuts |E| by about 2^6 = 64.
     auto far4 = excgrid::GrimmeD3Energy(ScaledWaterGeometry(4.0), p);
     auto far8 = excgrid::GrimmeD3Energy(ScaledWaterGeometry(8.0), p);
     ASSERT_TRUE(far4.has_value());
@@ -116,9 +109,7 @@ TEST(D3Test, GradientSumsToZero) {
 }
 
 TEST(D3Test, ReferenceEnergyB3lypWater) {
-    // dftd3 V3.2 Rev 1, `dftd3 water.coord -zero -func b3-lyp`, with the
-    // water fixture in Bohr: "Edisp /kcal,au:    -0.0040 -0.00000634".
-    // The bar is the resolution of the printed 8-decimal au value.
+    // dftd3 V3.2 Rev 1, `dftd3 water.coord -zero -func b3-lyp`: Edisp = -0.00000634 au.
     const excgrid::D3Parameters p = excgrid::D3Preset("b3lyp").value();
     auto energy = excgrid::GrimmeD3Energy(WaterGeometry(), p);
 

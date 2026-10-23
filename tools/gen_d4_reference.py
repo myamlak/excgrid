@@ -1,29 +1,9 @@
 #!/usr/bin/env python3
 """Generate src/d4_reference.inc from the published D4 reference-state data.
 
-The C6 step of the DFT-D4 model - Caldeweyher, Ehlert, Hansen, Neugebauer,
-Spicher, Bannwarth, Grimme, J. Chem. Phys. 150 (2019) 154122 - interpolates
-over the element-specific reference systems of each atom (its equations 7
-and 8).  Those systems are the paper's own but are not tabulated there; the
-numeric values are carried by the reference implementation's generated data,
-as the model's other D4 data already is.
-
-What each reference system carries is the polarizability of a whole MOLECULE
-A_m X_n of m equivalent atoms A and n atoms X, not of the atom A.  The
-paper's equation 5 turns the one into the other, dividing by m and
-subtracting the n atoms X, so a usable table needs m, n, the charge of X,
-and which reference system of element X to take that atom's polarizability
-from.  The data carries all four; this script transcribes them beside the
-polarizabilities, and checks m and n against the formula the data names the
-reference system by.
-
-This script transcribes NUMBERS ONLY: per element and per reference state,
-the reference system the state is taken from, its reference coordination
-number, its reference charge, the atom counts and charges equation 5 needs,
-and the 23 isotropically averaged dynamic polarizabilities alpha(iw) of the
-molecule.  No statement, comment, structure or expression of the source is
-reproduced; the output is this project's own table in this project's own
-format.
+Each entry carries one reference molecule A_m X_n and the terms equation 5 of
+Caldeweyher et al., J. Chem. Phys. 150 (2019) 154122 needs to reduce its
+polarizability to a single atom's.  Numbers only: no source code is reproduced.
 
 Usage:  python tools/gen_d4_reference.py            # writes src/d4_reference.inc
         python tools/gen_d4_reference.py --check    # verifies the committed file
@@ -55,8 +35,7 @@ def fetch(url):
 
 
 def scalars(text, name):
-    # The source leaves the kind suffix off two of its entries, so the
-    # number is read with or without it.
+    # The source omits the `_wp` suffix on two entries, so it is optional here.
     pattern = r"data\s+%s\s*\(\s*(\d+)\s*,\s*(\d+)\s*\)\s*/\s*([-\d.eE+]+)(?:_wp)?" % name
     return {(int(m.group(1)), int(m.group(2))): float(m.group(3))
             for m in re.finditer(pattern, text)}
@@ -115,9 +94,7 @@ def only_other(atoms, symbol):
 def secondary(text):
     """The secondary reference systems, by their own index.
 
-    Each is where the subtraction of equation 5 takes one atom's
-    polarizability from: the molecule's own charge, that atom's share of the
-    molecule's polarizability, and its polarizabilities over the grid.
+    Each is where the subtraction of equation 5 takes one atom's polarizability from.
     """
     charge = {int(m.group(1)): float(m.group(2))
               for m in re.finditer(r"data\s+secq\s*\(\s*(\d+)\s*\)\s*/\s*([-\d.eE+]+)(?:_wp)?", text)}
@@ -144,15 +121,7 @@ def secondary(text):
 
 
 def parse(text):
-    # The source carries six charge sets per state.  The model applies the
-    # classical one: its own reference-charge and reference-alpha routines of
-    # the EEQ scheme both read the `cls` columns, and the paper names the
-    # descriptor it uses "classical EEQ type partial charges".  The other
-    # sets - the GFN-FF, DFT, PBC and EEQ-BC charges, and the `ref` pair -
-    # are carried by the source for schemes this library does not ship, and
-    # the published per-atom polarizabilities of the model's own test set
-    # select the classical pair against every other one: 0.1 per cent root
-    # mean square against 2.8 for the `ref` pair.
+    # The model applies the classical (`cls`) charge set; the source's other five sets are unused here.
     charge = scalars(text, "clsq")
     cn = scalars(text, "refcovcn")
     system = systems(text)
@@ -176,10 +145,7 @@ def parse(text):
         if states != list(range(1, len(states) + 1)):
             raise SystemExit("element %d reference indices are not 1..n" % z)
 
-        # The published data is not complete over its own element range: its
-        # last element carries reference coordination numbers but no reference
-        # polarizabilities, so it has nothing for the C6 step to interpolate.
-        # The table stops where the data does.
+        # The data's last element has no reference polarizabilities, so the table stops there.
         if any((i, z) not in alpha for i in states):
             if z != MAX_ELEMENT:
                 raise SystemExit("element %d is incomplete but is not the last" % z)
@@ -196,20 +162,14 @@ def parse(text):
             own = atoms[symbol]
             others = sum(count for other, count in atoms.items() if other != symbol)
 
-            # The share the data gives is the reciprocal of the atom count of
-            # the element in the named molecule, and the count it gives is the
-            # number of the molecule's other atoms; anything else would mean
-            # the name and the numbers disagree.
+            # The published share is 1/m of the named molecule; anything else means name and numbers disagree.
             if abs(share[(i, z)] * own - 1.0) > 1e-6:
                 raise SystemExit("state (%d,%d) is named %s with %d %s but its share is %.8f"
                                  % (i, z, name[(i, z)], own, symbol, share[(i, z)]))
 
             other = only_other(atoms, symbol)
 
-            # The count of atoms to subtract is the molecule's other atom
-            # count wherever one element makes up the rest of it.  It is
-            # carried as published rather than enforced, and a row where the
-            # name and the count disagree says so in the generated file.
+            # The atom count is carried as published, not enforced; a mismatch goes into the row's note.
             note = ""
 
             if others == 0:

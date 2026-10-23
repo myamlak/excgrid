@@ -11,14 +11,9 @@ namespace excgrid {
 
 /// \defgroup excgrid-gridderivs The grid's geometric derivative interface
 ///
-/// How the grid points and their weights move when the nuclei move.  This is a
-/// different kind of object from a per-point functional value: it is indexed by
-/// nuclear coordinate rather than by density component, and a gradient or a
-/// Hessian cannot be assembled without it.
-///
-/// The unit is the block, not the point.  Blocks are already spatially compact
-/// and already carry their owning atom, so a caller walks the same sequence it
-/// walks for the functional evaluation.
+/// How the grid points and their weights move when the nuclei move; indexed by
+/// nuclear coordinate rather than by density component, and walked block by block.
+/// \{
 
 /// How deep a derivative request goes.
 /// \ingroup excgrid-gridderivs
@@ -34,11 +29,8 @@ enum class DerivativePart : std::uint8_t {
     kWeights = 1U << 1U, ///< The derivatives of the quadrature weights.
 };
 
-/// The derivatives of one block, in the caller's own arrays.
-///
-/// Every array is indexed the same way: the block's points in order, then the
-/// nuclear coordinates in the caller's own ordering, which is the same 3N
-/// ordering the gradient and the Hessian use.
+/// The derivatives of one block, in the caller's own arrays: points in block
+/// order, then the caller's 3N nuclear coordinates.
 /// \ingroup excgrid-gridderivs
 struct BlockDerivatives {
     /// d(position)/dR, shape {pointCount, 3, 3N}: the derivative of point p's
@@ -60,16 +52,11 @@ struct BlockDerivatives {
 /// \ingroup excgrid-gridderivs
 enum class DerivativeStatus : std::uint8_t {
     kOk = 0, ///< The values were produced.
-    /// Second-order derivatives were asked for and this build does not supply
-    /// them.  A refusal, never zeros.
+    /// Second-order derivatives were asked for and this build does not supply them.
     kRefusedSecondOrderUnavailable = 1,
     /// The caller's buffers are too small for the block.
     kRefusedBufferTooSmall = 2,
-    /// The block carries a point this geometry's grid does not produce: a point
-    /// that is not on the product grid, or one whose weight the build's trim
-    /// threshold would have dropped.  A surviving block never carries a trimmed
-    /// point - the condition is that the grid's point set moved, which is what
-    /// a finite-difference step over nuclear position does.
+    /// The block carries a point this geometry's grid does not produce.
     kRefusedUndifferentiableGrid = 3,
 };
 
@@ -91,8 +78,6 @@ struct BlockDerivativeSizes {
 };
 
 /// The size of each buffer a block's derivatives need.
-///
-/// A caller sizes its buffers from this rather than from its own arithmetic.
 /// \param request The request.
 /// \param pointCount The block's point count.
 /// \returns The element counts, in the order of BlockDerivatives.
@@ -100,11 +85,7 @@ struct BlockDerivativeSizes {
 [[nodiscard]] BlockDerivativeSizes SizeOf(const DerivativeRequest& request,
                                           std::size_t pointCount) noexcept;
 
-/// Produces a block's geometric derivatives.
-///
-/// One implementation exists per grid construction.  A caller obtains one from
-/// the grid it built, so that the derivatives and the grid cannot disagree
-/// about which points exist.
+/// Produces a block's geometric derivatives, tied to the grid it was made for.
 /// \ingroup excgrid-gridderivs
 class GridDerivativeProvider {
 public:
@@ -125,15 +106,10 @@ public:
 };
 
 /// Builds the provider for a geometry and a set of grid parameters.
-///
-/// This is the door a consumer comes in by.  The provider must be built for the
-/// same geometry and the same parameters the caller built its grid with, and
-/// this factory is the only way to obtain one, so the two cannot be paired up
-/// wrongly by accident.
 /// \param geometry The molecule the caller's grid was built for.
 /// \param params The parameters the caller's grid was built with.
-/// \param order The deepest order wanted.  A request past it is refused by name
-/// rather than answered with zeros.
+/// \param order The deepest order wanted; a request past it is refused by name,
+/// never answered with zeros.
 /// \returns The provider, or a named error when the grid cannot be built for
 /// \p params.
 /// \ingroup excgrid-gridderivs

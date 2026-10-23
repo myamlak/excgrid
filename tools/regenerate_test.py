@@ -1,41 +1,13 @@
 #!/usr/bin/env python3
 """Self-test for tools/regenerate.py: the guard that refuses a failed expansion.
 
-WHY THIS FILE EXISTS.  The defect this covers was found on 2026-09-13 by
-walking the add-a-functional guide, and the GUIDE was fixed - it now says a
-zero exit from `regenerate.py` is not evidence that the step worked.  The CODE
-was not: `generate_one()` piped yacas' stdout into `generated/<name>.cpp` and
-trusted only the exit status, so an expansion error REPLACED a committed kernel
-(errors go to stdout, and yacas exits 0 on them) and the run then rewrote
-`xc_defs/freshness.json`, blessing the tree it had just broken.  A warning in a
-document is a warning nobody's code enforces, which is exactly how it survived
-one fix; this file is the enforcement.
-
-The checks, and the direction each one protects:
-
-1. HEALTHY CONTROL (the vendored yacas, a real expansion): `generate_one()`
-   writes a file carrying the kernel shape and does NOT refuse.  A guard that
-   refused everything would satisfy 2 and 3, so this is the check that keeps
-   the guard from being a wall.
-2. THE ORIGINAL SILENT REWRITE, LIVE - a `scripts_root` missing the defs
-   directory (yacas: `Error in file ... File not found`, 472 bytes on stdout,
-   exit 0): `generate_one()` raises SystemExit, the target file is byte-identical
-   to what it was, no `.partial` is left behind, and the message names the
-   kernel and quotes the error.
-3. THE SAME, for the other reproduced exit-0 failure - a `.ey` calling a rule
-   that does not exist (yacas: `Error in file ... bad argument number 1`, 1087
-   bytes, exit 0).  Distinct from 2 because the output is a PLAUSIBLE kernel
-   with the error text spliced into one assignment: no shape check can see it,
-   only the marker scan can.
-4. THE PREDICATE, without yacas: `inspect_expansion()` on the two payloads
-   captured above returns a finding naming the marker, and on a captured
-   healthy payload returns none.  This is the half that runs on a machine with
-   no vendored binary, and the half that catches a marker list edited into a
-   typo.
+Checks: a healthy expansion is accepted; the two reproduced exit-0 failures (a
+missing defs directory, a .ey calling an undefined rule) are refused with the
+target byte-identical and no .partial left; and inspect_expansion() decides both
+without yacas.
 
 Exit status: 0 every check passed, 1 a check failed, 2 the vendored yacas is
-absent so checks 1-3 CANNOT RUN - which is a third answer, not a pass, and it
-is what keeps this file from reporting a green it did not measure.
+absent so checks 1-3 could not run - which is not a pass.
 
 Run: python excgrid/tools/regenerate_test.py
 """
@@ -50,9 +22,7 @@ import regenerate  # noqa: E402  (the tool under test, beside this file)
 
 SENTINEL = b"// a committed kernel that must survive a failed regeneration\n"
 
-#: The two exit-0 failure payloads, captured from the pinned yacas on
-#: 2026-09-15 by running `generate_one`'s own command line by hand (the byte
-#: counts are the ones on stdout, and the exit status was 0 both times).
+#: The two exit-0 failure payloads, captured from the pinned yacas: (label, marker, bytes, payload).
 FAILED_PAYLOADS = (
     ("missing defs directory", "Error in file", 472, """// excgrid codegen source, a comment header
 // Auto-generated file, do not modify
@@ -83,7 +53,7 @@ The offending argument ExCppForm(e) evaluated to ExCppForm(X'NoSuch(rhoA,rhoB))
 """),
 )
 
-#: A captured HEALTHY payload (the slater expansion, same day, 1805 bytes).
+#: A captured healthy payload (the slater expansion).
 HEALTHY_PAYLOAD = """// excgrid codegen source: the Slater (Dirac) LDA exchange functional.
 
 // Auto-generated file, do not modify
@@ -174,7 +144,7 @@ def _run():
             failures.append(f"1. HEALTHY: the kernel is {healthy_target.stat().st_size} "
                             "bytes, which is not a kernel")
 
-        # 2. and 3. THE ORIGINAL SILENT REWRITE, both reproduced exit-0 failures.
+        # 2. and 3. the two reproduced exit-0 failures.
         broken_ey = tmp_dir / "undefined_rule.ey"
         broken_ey.write_text(
             '// probe\n<?\n    Builtin\'Precision\'Set(16);\n    Use("excgrid_defs.ys");\n'

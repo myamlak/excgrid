@@ -1,5 +1,3 @@
-// The block-grid tests: the partition of unity, the trimming and
-// re-batching properties, and the end-to-end integral accuracy.
 
 #include "excgrid/grid.hpp"
 
@@ -47,10 +45,7 @@ TEST(BlockGridTest, BlocksWithinTarget) {
 }
 
 TEST(BlockGridTest, IntegratesGaussian) {
-    // The full molecular grid integrates a unit-normalized Gaussian:
-    // int exp(-a r^2) d^3r = (pi / a)^(3/2).  The point set is the
-    // one-atom product grid (no partition complication), built through
-    // the same public BlockGrid path.
+    // int exp(-a r^2) d^3r = (pi / a)^(3/2), on the one-atom product grid.
     excgrid::Geometry geometry;
     geometry.atoms.push_back({1, {0.0, 0.0, 0.0}});
     excgrid::GridParams params;
@@ -99,10 +94,7 @@ TEST(BlockGridTest, TrimmingDropsOnlyTinyWeights) {
 }
 
 TEST(BlockGridTest, SpatialCompactness) {
-    // Every block's diameter is a small fraction of the point cloud's
-    // extent (the re-batching contract): the cloud extent is the
-    // bounding-box diagonal (one pass over all points - an exact
-    // all-pairs diameter is O(n^2) on a ~10^4-point grid).
+    // Re-batching contract: block diameter is a small fraction of the bounding-box diagonal.
     excgrid::GridParams params;
     params.radialPoints = 40;
     params.angularPoints = 194;

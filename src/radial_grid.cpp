@@ -6,10 +6,7 @@
 namespace excgrid {
 
 // The Murray-Handy-Laming substitution (Mol. Phys. 78 (1993) 997):
-//     r(q) = alpha (q / (1 - q))^m,  q in [0, 1)
-// with Euler-Maclaurin trapezoidal points q_i = i / N, N = pointCount + 1.
-// The weight carries dr/dq * dq; the r^2 of the volume element belongs to
-// the atomic product grid, not here.
+//     r(q) = alpha (q / (1 - q))^m,   q_i = i / N,   N = pointCount + 1.
 Result<RadialGrid> RadialGrid::Create(std::size_t pointCount, double alpha, std::size_t exponent) {
     if (pointCount == 0 || exponent == 0)
     {
@@ -29,8 +26,7 @@ Result<RadialGrid> RadialGrid::Create(std::size_t pointCount, double alpha, std:
         const double q = static_cast<double>(i) * step;
         const double ratio = q / (1.0 - q);
         const double r = alpha * std::pow(ratio, m);
-        // dr/dq = alpha m q^(m-1) / (1 - q)^(m+1); the trapezoidal weight
-        // is dr/dq * step.
+        // dr/dq = alpha m q^(m-1) / (1 - q)^(m+1); the trapezoidal weight is dr/dq * step.
         const double jacobian = alpha * m * std::pow(q, m - 1.0) * std::pow(1.0 - q, -(m + 1.0));
 
         points.push_back(r);
