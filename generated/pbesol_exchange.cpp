@@ -63,80 +63,103 @@ XcKernelValue PbeSolExchange(
     const double C78 = std::pow(C76, C72);
     const double C79 = std::pow(C77, C72);
 
-    result.exc =
-        -((1.804 -
-           0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
-                        0.65124e2 +
-                    1.)) *
-              rhoB * 3. * C79 +
-          (1.804 -
-           0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
-                        0.65124e2 +
-                    1.)) *
-              rhoA * 3. * C78) /
-        (4. * Pi);
+    result.exc = -((1.804 - 0.804 / (10. *
+                                         std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                                      (2. * (C79 * C71 + 1e-16)),
+                                                  2) /
+                                         0.65124e2 +
+                                     1.)) *
+                       rhoB * 3. * C79 +
+                   (1.804 - 0.804 / (10. *
+                                         std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                                      (2. * (C78 * C70 + 1e-16)),
+                                                  2) /
+                                         0.65124e2 +
+                                     1.)) *
+                       rhoA * 3. * C78) /
+                 (4. * Pi);
 
     const double C81 = 2.;
     const double C82 = C73 * C81;
     const double C83 = 3. * C82;
-    const double C84 = C72 * std::pow(C76, C72 - 1) * C83;
+    const double C84 = C72 * std::pow(C76 + 6. * std::pow(Pi, 2) * SigmaGuard, C72 - 1) * C83;
 
-    result.vrhoA = -(
-        C81 * rhoA * 3. * C78 * -0.3216e2 * C78 * 4. * sigmaAa /
-            (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
-             std::pow(10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
-                              0.65124e2 +
-                          1.,
-                      2) *
-             4. * Pi) +
-        (C84 * ((1.804 -
-                 0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
-                              0.65124e2 +
-                          1.)) *
-                    3. * rhoA +
-                rhoA * 3. * C78 * -0.3216e2 * C70 * 4. * sigmaAa /
-                    (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
-                     std::pow(
-                         10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
+    result.vrhoA =
+        -(C81 * rhoA * 3. * C78 * -0.3216e2 * C78 * (4. * sigmaAa + 4. * SigmaGuard) /
+              (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
+               std::pow(10. *
+                                std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                             (2. * (C78 * C70 + 1e-16)),
+                                         2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+               4. * Pi) +
+          (C84 * ((1.804 - 0.804 / (10. *
+                                        std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                                     (2. * (C78 * C70 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.)) *
+                      3. * rhoA +
+                  rhoA * 3. * C78 * -0.3216e2 * C70 * (4. * sigmaAa + 4. * SigmaGuard) /
+                      (0.130248e3 * (C78 * C70 + 1e-16) * std::pow(2. * (C78 * C70 + 1e-16), 2) *
+                       std::pow(10. *
+                                        std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                                     (2. * (C78 * C70 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.,
+                                2))) +
+           (1.804 - 0.804 / (10. *
+                                 std::pow(std::sqrt(4. * sigmaAa + 4. * SigmaGuard) /
+                                              (2. * (C78 * C70 + 1e-16)),
+                                          2) /
                                  0.65124e2 +
-                             1.,
-                         2))) +
-         (1.804 - 0.804 / (10. * std::pow(std::sqrt(4. * sigmaAa) / (2. * (C78 * C70 + 1e-16)), 2) /
-                               0.65124e2 +
-                           1.)) *
-             3. * C78) /
-            (4. * Pi));
+                             1.)) *
+               3. * C78) /
+              (4. * Pi));
 
-    const double C85 = 2.;
-    const double C86 = C73 * C85;
-    const double C87 = 3. * C86;
-    const double C88 = C72 * std::pow(C77, C72 - 1) * C87;
+    const double C87 = 2.;
+    const double C88 = C73 * C87;
+    const double C89 = 3. * C88;
+    const double C90 = C72 * std::pow(C77 + 6. * std::pow(Pi, 2) * SigmaGuard, C72 - 1) * C89;
 
-    result.vrhoB = -(
-        C85 * rhoB * 3. * C79 * -0.3216e2 * C79 * 4. * sigmaBb /
-            (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
-             std::pow(10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
-                              0.65124e2 +
-                          1.,
-                      2) *
-             4. * Pi) +
-        (C88 * ((1.804 -
-                 0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
-                              0.65124e2 +
-                          1.)) *
-                    3. * rhoB +
-                rhoB * 3. * C79 * -0.3216e2 * C71 * 4. * sigmaBb /
-                    (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
-                     std::pow(
-                         10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
+    result.vrhoB =
+        -(C87 * rhoB * 3. * C79 * -0.3216e2 * C79 * (4. * sigmaBb + 4. * SigmaGuard) /
+              (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
+               std::pow(10. *
+                                std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                             (2. * (C79 * C71 + 1e-16)),
+                                         2) /
+                                0.65124e2 +
+                            1.,
+                        2) *
+               4. * Pi) +
+          (C90 * ((1.804 - 0.804 / (10. *
+                                        std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                                     (2. * (C79 * C71 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.)) *
+                      3. * rhoB +
+                  rhoB * 3. * C79 * -0.3216e2 * C71 * (4. * sigmaBb + 4. * SigmaGuard) /
+                      (0.130248e3 * (C79 * C71 + 1e-16) * std::pow(2. * (C79 * C71 + 1e-16), 2) *
+                       std::pow(10. *
+                                        std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                                     (2. * (C79 * C71 + 1e-16)),
+                                                 2) /
+                                        0.65124e2 +
+                                    1.,
+                                2))) +
+           (1.804 - 0.804 / (10. *
+                                 std::pow(std::sqrt(4. * sigmaBb + 4. * SigmaGuard) /
+                                              (2. * (C79 * C71 + 1e-16)),
+                                          2) /
                                  0.65124e2 +
-                             1.,
-                         2))) +
-         (1.804 - 0.804 / (10. * std::pow(std::sqrt(4. * sigmaBb) / (2. * (C79 * C71 + 1e-16)), 2) /
-                               0.65124e2 +
-                           1.)) *
-             3. * C79) /
-            (4. * Pi));
+                             1.)) *
+               3. * C79) /
+              (4. * Pi));
 
     result.vsigmaAa = -0.6432e2 * C78 * 3. * rhoA /
                       (Pi * 4. *

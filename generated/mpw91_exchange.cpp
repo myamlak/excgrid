@@ -66,8 +66,8 @@ XcKernelValue MPw91Exchange(
     const double C118 = -5. / 3.;
     const double C119 = 1. / 3.;
     const double C120 = 4. / 3.;
-    const double C121 = std::sqrt(sigmaAa);
-    const double C122 = std::sqrt(sigmaBb);
+    const double C121 = std::sqrt(sigmaAa + SigmaGuard);
+    const double C122 = std::sqrt(sigmaBb + SigmaGuard);
     const double C123 = std::pow(3., C120);
     const double C124 = std::pow(C114, C119);
     const double C125 = std::pow(C115, C118);
@@ -96,22 +96,24 @@ XcKernelValue MPw91Exchange(
               0.000002 * C137 * C124 / C123) +
              1.));
 
-    const double C139 = 1;
-    const double C140 = C120 * std::pow(C116, C120 - 1) * C139;
-    const double C141 = C120 * std::pow(rhoA, C120 - 1);
-    const double C142 = (-C140 * std::sqrt(sigmaAa)) / std::pow(C126, 2);
-    const double C143 = 2 * C131 * C142;
-    const double C144 = 3.72 * std::pow(C131, 2.72) * C142;
+    const double C141 = 1;
+    const double C142 = C120 * std::pow(C116, C120 - 1) * C141;
+    const double C143 = C120 * std::pow(rhoA, C120 - 1);
+    const double C144 = (-C142 * std::sqrt(sigmaAa + SigmaGuard)) / std::pow(C126, 2);
+    const double C145 = 2 * C131 * C144;
+    const double C146 = 3.72 * std::pow(C131, 2.72) * C144;
 
     result.vrhoA =
         ((((0. -
             (((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) - 0.000001 * C135) /
-                 ((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
+                 ((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 *
+                       std::sqrt(sigmaAa + SigmaGuard) / C126 +
                    0.000002 * C135 * C124 / C123) +
                   1.) +
              0.9305257363491) *
-                C141) -
-           ((((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
+                C143) -
+           ((((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
+                   C126 +
                0.000002 * C135 * C124 / C123) +
               1.) *
                  C128 *
@@ -120,16 +122,17 @@ XcKernelValue MPw91Exchange(
              C128 *
                  ((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) -
                   0.000001 * C135) *
-                 0.02556 * std::sqrt(sigmaAa) /
+                 0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
                  (2 * std::sqrt(C134 + 1.) * (C131 + std::sqrt(C134 + 1.)) * C126)) /
-                std::pow(
-                    (std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
-                     0.000002 * C135 * C124 / C123) +
-                        1.,
-                    2) +
+                std::pow((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 *
+                              std::sqrt(sigmaAa + SigmaGuard) / C126 +
+                          0.000002 * C135 * C124 / C123) +
+                             1.,
+                         2) +
             0.) *
-               C143) -
-          ((((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
+               C145) -
+          ((((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
+                  C126 +
               0.000002 * C135 * C124 / C123) +
              1.) *
                 -0.000001 * C128 -
@@ -137,51 +140,53 @@ XcKernelValue MPw91Exchange(
                 ((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) -
                  0.000001 * C135) *
                 0.000002 * C124 / C123) /
-               std::pow(
-                   (std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
-                    0.000002 * C135 * C124 / C123) +
-                       1.,
-                   2) +
+               std::pow((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 *
+                             std::sqrt(sigmaAa + SigmaGuard) / C126 +
+                         0.000002 * C135 * C124 / C123) +
+                            1.,
+                        2) +
            0.) *
-              C144) +
+              C146) +
          (C128 *
               ((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) - 0.000001 * C135) *
-              0.02556 * std::sqrt(sigmaAa) /
+              0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
               ((C131 + std::sqrt(C134 + 1.)) * C126 *
-               std::pow(
-                   (std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) / C126 +
-                    0.000002 * C135 * C124 / C123) +
-                       1.,
-                   2)) -
+               std::pow((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 *
+                             std::sqrt(sigmaAa + SigmaGuard) / C126 +
+                         0.000002 * C135 * C124 / C123) +
+                            1.,
+                        2)) -
           0.) *
-             C142) -
+             C144) -
         (C128 *
              ((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) - 0.000001 * C135) *
-             std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa) /
+             std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
              (std::pow(C126, 2) * std::pow((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 *
-                                                std::sqrt(sigmaAa) / C126 +
+                                                std::sqrt(sigmaAa + SigmaGuard) / C126 +
                                             0.000002 * C135 * C124 / C123) +
                                                1.,
                                            2)) +
          0.) *
-            C140;
+            C142;
 
-    const double C145 = 1;
-    const double C146 = C120 * std::pow(C117, C120 - 1) * C145;
-    const double C147 = C120 * std::pow(rhoB, C120 - 1);
-    const double C148 = (-C146 * std::sqrt(sigmaBb)) / std::pow(C127, 2);
-    const double C149 = 2 * C132 * C148;
-    const double C150 = 3.72 * std::pow(C132, 2.72) * C148;
+    const double C149 = 1;
+    const double C150 = C120 * std::pow(C117, C120 - 1) * C149;
+    const double C151 = C120 * std::pow(rhoB, C120 - 1);
+    const double C152 = (-C150 * std::sqrt(sigmaBb + SigmaGuard)) / std::pow(C127, 2);
+    const double C153 = 2 * C132 * C152;
+    const double C154 = 3.72 * std::pow(C132, 2.72) * C152;
 
     result.vrhoB =
         ((((0. -
             (((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) - 0.000001 * C137) /
-                 ((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
+                 ((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 *
+                       std::sqrt(sigmaBb + SigmaGuard) / C127 +
                    0.000002 * C137 * C124 / C123) +
                   1.) +
              0.9305257363491) *
-                C147) -
-           ((((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
+                C151) -
+           ((((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
+                   C127 +
                0.000002 * C137 * C124 / C123) +
               1.) *
                  C129 *
@@ -190,16 +195,17 @@ XcKernelValue MPw91Exchange(
              C129 *
                  ((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) -
                   0.000001 * C137) *
-                 0.02556 * std::sqrt(sigmaBb) /
+                 0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
                  (2 * std::sqrt(C136 + 1.) * (C132 + std::sqrt(C136 + 1.)) * C127)) /
-                std::pow(
-                    (std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
-                     0.000002 * C137 * C124 / C123) +
-                        1.,
-                    2) +
+                std::pow((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 *
+                              std::sqrt(sigmaBb + SigmaGuard) / C127 +
+                          0.000002 * C137 * C124 / C123) +
+                             1.,
+                         2) +
             0.) *
-               C149) -
-          ((((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
+               C153) -
+          ((((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
+                  C127 +
               0.000002 * C137 * C124 / C123) +
              1.) *
                 -0.000001 * C129 -
@@ -207,38 +213,38 @@ XcKernelValue MPw91Exchange(
                 ((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) -
                  0.000001 * C137) *
                 0.000002 * C124 / C123) /
-               std::pow(
-                   (std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
-                    0.000002 * C137 * C124 / C123) +
-                       1.,
-                   2) +
+               std::pow((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 *
+                             std::sqrt(sigmaBb + SigmaGuard) / C127 +
+                         0.000002 * C137 * C124 / C123) +
+                            1.,
+                        2) +
            0.) *
-              C150) +
+              C154) +
          (C129 *
               ((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) - 0.000001 * C137) *
-              0.02556 * std::sqrt(sigmaBb) /
+              0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
               ((C132 + std::sqrt(C136 + 1.)) * C127 *
-               std::pow(
-                   (std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) / C127 +
-                    0.000002 * C137 * C124 / C123) +
-                       1.,
-                   2)) -
+               std::pow((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 *
+                             std::sqrt(sigmaBb + SigmaGuard) / C127 +
+                         0.000002 * C137 * C124 / C123) +
+                            1.,
+                        2)) -
           0.) *
-             C148) -
+             C152) -
         (C129 *
              ((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) - 0.000001 * C137) *
-             std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb) /
+             std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
              (std::pow(C127, 2) * std::pow((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 *
-                                                std::sqrt(sigmaBb) / C127 +
+                                                std::sqrt(sigmaBb + SigmaGuard) / C127 +
                                             0.000002 * C137 * C124 / C123) +
                                                1.,
                                            2)) +
          0.) *
-            C146;
+            C150;
 
-    const double C151 = 1 / (2 * std::sqrt(sigmaAa + SigmaGuard) * C126);
-    const double C152 = 2 * C131 * C151;
-    const double C153 = 3.72 * std::pow(C131, 2.72) * C151;
+    const double C157 = 1 / (2 * std::sqrt(sigmaAa + SigmaGuard) * C126);
+    const double C158 = 2 * C131 * C157;
+    const double C159 = 3.72 * std::pow(C131, 2.72) * C157;
 
     result.vsigmaAa =
         (((C128 *
@@ -269,7 +275,7 @@ XcKernelValue MPw91Exchange(
                             1.,
                         2) +
            0.) *
-              C152) -
+              C158) -
          ((((std::log(C131 + std::sqrt(C134 + 1.)) * 0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
                  C126 +
              0.000002 * C135 * C124 / C123) +
@@ -284,7 +290,7 @@ XcKernelValue MPw91Exchange(
                            1.,
                        2) +
           0.) *
-             C153) +
+             C159) +
         (C128 *
              ((0.00426 * C134 - C133 * C134 * std::exp(-1.6455307846 * C134)) - 0.000001 * C135) *
              0.02556 * std::sqrt(sigmaAa + SigmaGuard) /
@@ -295,13 +301,13 @@ XcKernelValue MPw91Exchange(
                            1.,
                        2)) -
          0.) *
-            C151;
+            C157;
 
     result.vsigmaAb = 0.;
 
-    const double C154 = 1 / (2 * std::sqrt(sigmaBb + SigmaGuard) * C127);
-    const double C155 = 2 * C132 * C154;
-    const double C156 = 3.72 * std::pow(C132, 2.72) * C154;
+    const double C160 = 1 / (2 * std::sqrt(sigmaBb + SigmaGuard) * C127);
+    const double C161 = 2 * C132 * C160;
+    const double C162 = 3.72 * std::pow(C132, 2.72) * C160;
 
     result.vsigmaBb =
         (((C129 *
@@ -332,7 +338,7 @@ XcKernelValue MPw91Exchange(
                             1.,
                         2) +
            0.) *
-              C155) -
+              C161) -
          ((((std::log(C132 + std::sqrt(C136 + 1.)) * 0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
                  C127 +
              0.000002 * C137 * C124 / C123) +
@@ -347,7 +353,7 @@ XcKernelValue MPw91Exchange(
                            1.,
                        2) +
           0.) *
-             C156) +
+             C162) +
         (C129 *
              ((0.00426 * C136 - C133 * C136 * std::exp(-1.6455307846 * C136)) - 0.000001 * C137) *
              0.02556 * std::sqrt(sigmaBb + SigmaGuard) /
@@ -358,7 +364,7 @@ XcKernelValue MPw91Exchange(
                            1.,
                        2)) -
          0.) *
-            C154;
+            C160;
 
     return result;
 }

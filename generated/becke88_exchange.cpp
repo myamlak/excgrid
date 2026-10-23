@@ -52,149 +52,153 @@ XcKernelValue Becke88Exchange(
         return result;
     }
 
-    const double C123 = 4. * Pi;
-    const double C124 = rhoA + 1e-16;
-    const double C125 = rhoB + 1e-16;
-    const double C126 = 1. / 3.;
-    const double C127 = 4. / 3.;
-    const double C128 = std::sqrt(sigmaAa);
-    const double C129 = std::sqrt(sigmaBb);
-    const double C130 = 3. / C123;
-    const double C131 = std::pow(C124, C127);
-    const double C132 = std::pow(C125, C127);
-    const double C133 = C128 / C131;
-    const double C134 = C129 / C132;
-    const double C135 = std::pow(C130, C126);
-    const double C136 = 3. * C135;
-    const double C137 = std::pow(C133, 2);
-    const double C138 = std::pow(C134, 2);
-    const double C139 = C136 / 2.;
+    const double C127 = 4. * Pi;
+    const double C128 = rhoA + 1e-16;
+    const double C129 = rhoB + 1e-16;
+    const double C130 = 1. / 3.;
+    const double C131 = 4. / 3.;
+    const double C132 = std::sqrt(sigmaAa + SigmaGuard);
+    const double C133 = std::sqrt(sigmaBb + SigmaGuard);
+    const double C134 = 3. / C127;
+    const double C135 = std::pow(C128, C131);
+    const double C136 = std::pow(C129, C131);
+    const double C137 = C132 / C135;
+    const double C138 = C133 / C136;
+    const double C139 = std::pow(C134, C130);
+    const double C140 = 3. * C139;
+    const double C141 = std::pow(C137, 2);
+    const double C142 = std::pow(C138, 2);
+    const double C143 = C140 / 2.;
 
     result.exc =
-        -(std::pow(rhoB, C127) *
-              (C139 + 0.0042 * C138 /
-                          (std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * C129 / C132 + 1.)) +
-          std::pow(rhoA, C127) *
-              (C139 + 0.0042 * C137 /
-                          (std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * C128 / C131 + 1.)));
+        -(std::pow(rhoB, C131) *
+              (C143 + 0.0042 * C142 /
+                          (std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 * C133 / C136 + 1.)) +
+          std::pow(rhoA, C131) *
+              (C143 + 0.0042 * C141 /
+                          (std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 * C132 / C135 + 1.)));
 
-    const double C141 = 1;
-    const double C142 = C127 * std::pow(C124, C127 - 1) * C141;
-    const double C143 = (-C142 * std::sqrt(sigmaAa)) / std::pow(C131, 2);
-    const double C144 = 2 * C133 * C143;
+    const double C147 = 1;
+    const double C148 = C131 * std::pow(C128, C131 - 1) * C147;
+    const double C149 = (-C148 * std::sqrt(sigmaAa + SigmaGuard)) / std::pow(C135, 2);
+    const double C150 = 2 * C137 * C149;
 
     result.vrhoA =
-        (C143 * std::pow(rhoA, C127) * 0.0042 * C137 * 0.0252 * std::sqrt(sigmaAa) /
-             ((C133 + std::sqrt(C137 + 1.)) * C131 *
-              std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * std::sqrt(sigmaAa) / C131 +
+        (C149 * std::pow(rhoA, C131) * 0.0042 * C141 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
+             ((C137 + std::sqrt(C141 + 1.)) * C135 *
+              std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaAa + SigmaGuard) / C135 +
                            1.,
                        2)) -
-         (C144 * std::pow(rhoA, C127) *
-              (0.0042 *
-                   (std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * std::sqrt(sigmaAa) / C131 +
-                    1.) -
-               0.0042 * C137 * 0.0252 * std::sqrt(sigmaAa) /
-                   (2 * std::sqrt(C137 + 1.) * (C133 + std::sqrt(C137 + 1.)) * C131)) /
-              std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * std::sqrt(sigmaAa) / C131 +
+         (C150 * std::pow(rhoA, C131) *
+              (0.0042 * (std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                             std::sqrt(sigmaAa + SigmaGuard) / C135 +
+                         1.) -
+               0.0042 * C141 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
+                   (2 * std::sqrt(C141 + 1.) * (C137 + std::sqrt(C141 + 1.)) * C135)) /
+              std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaAa + SigmaGuard) / C135 +
                            1.,
                        2) +
-          C127 * std::pow(rhoA, C127 - 1) *
-              (C139 +
-               0.0042 * C137 /
-                   (std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * std::sqrt(sigmaAa) / C131 +
-                    1.)))) +
-        C142 * std::pow(rhoA, C127) * -0.0042 * C137 * std::log(C133 + std::sqrt(C137 + 1.)) *
-            0.0252 * std::sqrt(sigmaAa) /
-            (std::pow(C131, 2) *
-             std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 * std::sqrt(sigmaAa) / C131 +
-                          1.,
-                      2));
+          C131 * std::pow(rhoA, C131 - 1) *
+              (C143 + 0.0042 * C141 /
+                          (std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaAa + SigmaGuard) / C135 +
+                           1.)))) +
+        C148 * std::pow(rhoA, C131) * -0.0042 * C141 * std::log(C137 + std::sqrt(C141 + 1.)) *
+            0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
+            (std::pow(C135, 2) * std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                                                  std::sqrt(sigmaAa + SigmaGuard) / C135 +
+                                              1.,
+                                          2));
 
-    const double C145 = 1;
-    const double C146 = C127 * std::pow(C125, C127 - 1) * C145;
-    const double C147 = (-C146 * std::sqrt(sigmaBb)) / std::pow(C132, 2);
-    const double C148 = 2 * C134 * C147;
+    const double C156 = 1;
+    const double C157 = C131 * std::pow(C129, C131 - 1) * C156;
+    const double C158 = (-C157 * std::sqrt(sigmaBb + SigmaGuard)) / std::pow(C136, 2);
+    const double C159 = 2 * C138 * C158;
 
     result.vrhoB =
-        (C147 * std::pow(rhoB, C127) * 0.0042 * C138 * 0.0252 * std::sqrt(sigmaBb) /
-             ((C134 + std::sqrt(C138 + 1.)) * C132 *
-              std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * std::sqrt(sigmaBb) / C132 +
+        (C158 * std::pow(rhoB, C131) * 0.0042 * C142 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
+             ((C138 + std::sqrt(C142 + 1.)) * C136 *
+              std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaBb + SigmaGuard) / C136 +
                            1.,
                        2)) -
-         (C148 * std::pow(rhoB, C127) *
-              (0.0042 *
-                   (std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * std::sqrt(sigmaBb) / C132 +
-                    1.) -
-               0.0042 * C138 * 0.0252 * std::sqrt(sigmaBb) /
-                   (2 * std::sqrt(C138 + 1.) * (C134 + std::sqrt(C138 + 1.)) * C132)) /
-              std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * std::sqrt(sigmaBb) / C132 +
+         (C159 * std::pow(rhoB, C131) *
+              (0.0042 * (std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                             std::sqrt(sigmaBb + SigmaGuard) / C136 +
+                         1.) -
+               0.0042 * C142 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
+                   (2 * std::sqrt(C142 + 1.) * (C138 + std::sqrt(C142 + 1.)) * C136)) /
+              std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaBb + SigmaGuard) / C136 +
                            1.,
                        2) +
-          C127 * std::pow(rhoB, C127 - 1) *
-              (C139 +
-               0.0042 * C138 /
-                   (std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * std::sqrt(sigmaBb) / C132 +
-                    1.)))) +
-        C146 * std::pow(rhoB, C127) * -0.0042 * C138 * std::log(C134 + std::sqrt(C138 + 1.)) *
-            0.0252 * std::sqrt(sigmaBb) /
-            (std::pow(C132, 2) *
-             std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 * std::sqrt(sigmaBb) / C132 +
-                          1.,
-                      2));
+          C131 * std::pow(rhoB, C131 - 1) *
+              (C143 + 0.0042 * C142 /
+                          (std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaBb + SigmaGuard) / C136 +
+                           1.)))) +
+        C157 * std::pow(rhoB, C131) * -0.0042 * C142 * std::log(C138 + std::sqrt(C142 + 1.)) *
+            0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
+            (std::pow(C136, 2) * std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                                                  std::sqrt(sigmaBb + SigmaGuard) / C136 +
+                                              1.,
+                                          2));
 
-    const double C149 = 1 / (2 * std::sqrt(sigmaAa + SigmaGuard) * C131);
-    const double C150 = 2 * C133 * C149;
+    const double C165 = 1 / (2 * std::sqrt(sigmaAa + SigmaGuard) * C135);
+    const double C166 = 2 * C137 * C165;
 
     result.vsigmaAa =
-        (std::pow(rhoA, C127) * 0.0042 * C137 * 0.0252 * std::log(C133 + std::sqrt(C137 + 1.)) /
-             (2 * std::sqrt(sigmaAa + SigmaGuard) * C131 *
-              std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaAa + SigmaGuard) / C131 +
+        (std::pow(rhoA, C131) * 0.0042 * C141 * 0.0252 * std::log(C137 + std::sqrt(C141 + 1.)) /
+             (2 * std::sqrt(sigmaAa + SigmaGuard) * C135 *
+              std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaAa + SigmaGuard) / C135 +
                            1.,
                        2)) -
-         C150 * std::pow(rhoA, C127) *
-             (0.0042 * (std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaAa + SigmaGuard) / C131 +
+         C166 * std::pow(rhoA, C131) *
+             (0.0042 * (std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                            std::sqrt(sigmaAa + SigmaGuard) / C135 +
                         1.) -
-              0.0042 * C137 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                  (2 * std::sqrt(C137 + 1.) * (C133 + std::sqrt(C137 + 1.)) * C131)) /
-             std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C131 +
+              0.0042 * C141 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
+                  (2 * std::sqrt(C141 + 1.) * (C137 + std::sqrt(C141 + 1.)) * C135)) /
+             std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                              std::sqrt(sigmaAa + SigmaGuard) / C135 +
                           1.,
                       2)) +
-        C149 * std::pow(rhoA, C127) * 0.0042 * C137 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-            ((C133 + std::sqrt(C137 + 1.)) * C131 *
-             std::pow(std::log(C133 + std::sqrt(C137 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C131 +
+        C165 * std::pow(rhoA, C131) * 0.0042 * C141 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
+            ((C137 + std::sqrt(C141 + 1.)) * C135 *
+             std::pow(std::log(C137 + std::sqrt(C141 + 1.)) * 0.0252 *
+                              std::sqrt(sigmaAa + SigmaGuard) / C135 +
                           1.,
                       2));
 
     result.vsigmaAb = 0;
 
-    const double C151 = 1 / (2 * std::sqrt(sigmaBb + SigmaGuard) * C132);
-    const double C152 = 2 * C134 * C151;
+    const double C167 = 1 / (2 * std::sqrt(sigmaBb + SigmaGuard) * C136);
+    const double C168 = 2 * C138 * C167;
 
     result.vsigmaBb =
-        (std::pow(rhoB, C127) * 0.0042 * C138 * 0.0252 * std::log(C134 + std::sqrt(C138 + 1.)) /
-             (2 * std::sqrt(sigmaBb + SigmaGuard) * C132 *
-              std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaBb + SigmaGuard) / C132 +
+        (std::pow(rhoB, C131) * 0.0042 * C142 * 0.0252 * std::log(C138 + std::sqrt(C142 + 1.)) /
+             (2 * std::sqrt(sigmaBb + SigmaGuard) * C136 *
+              std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                               std::sqrt(sigmaBb + SigmaGuard) / C136 +
                            1.,
                        2)) -
-         C152 * std::pow(rhoB, C127) *
-             (0.0042 * (std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaBb + SigmaGuard) / C132 +
+         C168 * std::pow(rhoB, C131) *
+             (0.0042 * (std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                            std::sqrt(sigmaBb + SigmaGuard) / C136 +
                         1.) -
-              0.0042 * C138 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                  (2 * std::sqrt(C138 + 1.) * (C134 + std::sqrt(C138 + 1.)) * C132)) /
-             std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C132 +
+              0.0042 * C142 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
+                  (2 * std::sqrt(C142 + 1.) * (C138 + std::sqrt(C142 + 1.)) * C136)) /
+             std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                              std::sqrt(sigmaBb + SigmaGuard) / C136 +
                           1.,
                       2)) +
-        C151 * std::pow(rhoB, C127) * 0.0042 * C138 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-            ((C134 + std::sqrt(C138 + 1.)) * C132 *
-             std::pow(std::log(C134 + std::sqrt(C138 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C132 +
+        C167 * std::pow(rhoB, C131) * 0.0042 * C142 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
+            ((C138 + std::sqrt(C142 + 1.)) * C136 *
+             std::pow(std::log(C138 + std::sqrt(C142 + 1.)) * 0.0252 *
+                              std::sqrt(sigmaBb + SigmaGuard) / C136 +
                           1.,
                       2));
 
@@ -219,1096 +223,842 @@ void Becke88ExchangeSecondDerivatives(double rhoA,
 
     const double C46 = 4. * Pi;
     const double C47 = rhoA + 1e-16;
-    const double C49 = 1. / 3.;
-    const double C50 = 4. / 3.;
-    const double C51 = std::sqrt(sigmaAa);
+    const double C49 = sigmaAa + SigmaGuard;
+    const double C51 = 1. / 3.;
+    const double C52 = 4. / 3.;
     const double C53 = 3. / C46;
-    const double C54 = std::pow(C47, C50);
-    const double C56 = C51 / C54;
-    const double C58 = std::pow(C53, C49);
-    const double C59 = 3. * C58;
-    const double C60 = std::pow(C56, 2);
-    const double C62 = C59 / 2.;
-    const double C67 = 1;
-    const double C68 = C50 * std::pow(C47, C50 - 1) * C67;
-    const double C69 = (-C68 * std::sqrt(sigmaAa + SigmaGuard)) / std::pow(C54, 2);
-    const double C70 = 2 * C56 * C69;
-    const double C79 = C50 * (C50 - 1) * std::pow(C47, C50 - 2) * std::pow(C67, 2);
-    const double C80 = C68 * C68 * std::sqrt(sigmaAa + SigmaGuard) * 2 * C54 / std::pow(C54, 4) -
-                       C79 * std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2);
-    const double C81 = 2 * std::pow(C69, 2) + 2 * C56 * C80;
+    const double C54 = std::sqrt(C49);
+    const double C56 = std::pow(C47, C52);
+    const double C58 = C54 / C56;
+    const double C60 = std::pow(C53, C51);
+    const double C61 = 3. * C60;
+    const double C62 = std::pow(C58, 2);
+    const double C64 = C61 / 2.;
+    const double C69 = 1;
+    const double C70 = C52 * std::pow(C47, C52 - 1) * C69;
+    const double C71 = (-C70 * std::sqrt(C49)) / std::pow(C56, 2);
+    const double C72 = 2 * C58 * C71;
+    const double C83 = C52 * (C52 - 1) * std::pow(C47, C52 - 2) * std::pow(C69, 2);
+    const double C84 = C70 * C70 * std::sqrt(C49) * 2 * C56 / std::pow(C56, 4) -
+                       C83 * std::sqrt(C49) / std::pow(C56, 2);
+    const double C85 = 2 * std::pow(C71, 2) + 2 * C58 * C84;
     matrix.upper[0] =
-        (((((((C69 * C50 * std::pow(rhoA, C50 - 1) * 0.0042 * C60 * 0.0252 *
-                   std::sqrt(sigmaAa + SigmaGuard) /
-                   ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                    std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaAa + SigmaGuard) / C54 +
+        (((((((C71 * C52 * std::pow(rhoA, C52 - 1) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                   ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                    std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                  1.,
                              2)) -
-               (C70 * C50 * std::pow(rhoA, C50 - 1) *
-                    (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
+               (C72 * C52 * std::pow(rhoA, C52 - 1) *
+                    (0.0042 * (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                1.) -
-                     0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                         (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                    std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                     0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                         (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                    std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                  1.,
                              2) +
-                C50 * (C50 - 1) * std::pow(rhoA, C50 - 2) *
-                    (C62 + 0.0042 * C60 /
-                               (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                1.)))) +
-              C68 * C50 * std::pow(rhoA, C50 - 1) * -0.0042 * C60 *
-                  std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                  (std::pow(C54, 2) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                       std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                                   1.,
-                                               2))) +
-             C80 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                 ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+                C52 * (C52 - 1) * std::pow(rhoA, C52 - 2) *
+                    (C64 +
+                     0.0042 * C62 /
+                         (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
+                          1.)))) +
+              C70 * C52 * std::pow(rhoA, C52 - 1) * -0.0042 * C62 *
+                  std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                  (std::pow(C56, 2) *
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
+                                1.,
+                            2))) +
+             C84 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                 ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            2))) +
-            ((((C56 + std::sqrt(C60 + 1.)) * C54 *
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+            ((((C58 + std::sqrt(C62 + 1.)) * C56 *
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             2) *
-                   C69 * std::pow(rhoA, C50) * 0.00010584 * std::sqrt(sigmaAa + SigmaGuard) -
-               C69 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-                   ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                        (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                             std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                         1.) *
-                        0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                        (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54) +
-                    std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                   C71 * std::pow(rhoA, C52) * 0.00010584 * std::sqrt(C49) -
+               C71 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+                   ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                        (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                        0.0504 * std::sqrt(C49) /
+                        (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56) +
+                    std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                  1.,
                              2) *
-                        C54 / (2 * std::sqrt(C60 + 1.)))) /
-                  std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                               std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                        C56 / (2 * std::sqrt(C62 + 1.)))) /
+                  std::pow((C58 + std::sqrt(C62 + 1.)) * C56 *
+                               std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                                std::sqrt(C49) / C56 +
                                             1.,
                                         2),
                            2) -
-              ((std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                             1.,
+              ((std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                          2) *
-                    C70 * std::pow(rhoA, C50) *
-                    (0.00010584 * std::sqrt(sigmaAa + SigmaGuard) /
-                         (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54) -
-                     (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54 * 0.00010584 *
-                          std::sqrt(sigmaAa + SigmaGuard) -
-                      0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                          (std::sqrt(C60 + 1.) + (C56 + std::sqrt(C60 + 1.))) /
-                          std::sqrt(C60 + 1.)) /
-                         std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-                C70 * std::pow(rhoA, C50) *
-                    (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                    C72 * std::pow(rhoA, C52) *
+                    (0.00010584 * std::sqrt(C49) /
+                         (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56) -
+                     (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56 * 0.00010584 *
+                          std::sqrt(C49) -
+                      0.0042 * C62 * 0.0252 * std::sqrt(C49) * C56 *
+                          (std::sqrt(C62 + 1.) + (C58 + std::sqrt(C62 + 1.))) /
+                          std::sqrt(C62 + 1.)) /
+                         std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+                C72 * std::pow(rhoA, C52) *
+                    (0.0042 * (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                1.) -
-                     0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                         (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                    (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                     1.) *
-                    0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                    (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                     0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                         (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                    (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                    0.0504 * std::sqrt(C49) /
+                    (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             4) +
-               C50 * std::pow(rhoA, C50 - 1) *
-                   (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.) -
-                    0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+               C52 * std::pow(rhoA, C52 - 1) *
+                   (0.0042 *
+                        (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                    0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                        (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             2))) +
-             (std::pow(C54, 2) *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+             (std::pow(C56, 2) *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            2) *
-                  C68 * std::pow(rhoA, C50) * -0.0042 *
-                  (C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.))) +
-                   std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard)) -
-              C68 * std::pow(rhoA, C50) * -0.0042 * C60 * std::log(C56 + std::sqrt(C60 + 1.)) *
-                  0.0252 * std::sqrt(sigmaAa + SigmaGuard) * std::pow(C54, 2) *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                  (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                 std::pow(std::pow(C54, 2) *
-                              std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                           1.,
-                                       2),
+                  C70 * std::pow(rhoA, C52) * -0.0042 *
+                  (C62 * 0.0252 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.))) +
+                   std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49)) -
+              C70 * std::pow(rhoA, C52) * -0.0042 * C62 * std::log(C58 + std::sqrt(C62 + 1.)) *
+                  0.0252 * std::sqrt(C49) * std::pow(C56, 2) *
+                  (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                  0.0504 * std::sqrt(C49) /
+                  (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                 std::pow(std::pow(C56, 2) * std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                                              std::sqrt(C49) / C56 +
+                                                          1.,
+                                                      2),
                           2)) *
-                C70) +
-           (((-C69 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-              ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                   (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        C54 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaAa + SigmaGuard) / ((C56 + std::sqrt(C60 + 1.)) * C54) +
-               C54 * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                      std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                C72) +
+           (((-C71 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+              ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                   (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                   0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56) +
+               C56 * std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                   1.,
                               2))) /
-                 std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                              std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                 std::pow((C58 + std::sqrt(C62 + 1.)) * C56 *
+                              std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                               std::sqrt(C49) / C56 +
                                            1.,
                                        2),
                           2) -
-             ((std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                            1.,
+             ((std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                         2) *
-                   C70 * std::pow(rhoA, C50) *
-                   (0.00010584 * std::sqrt(sigmaAa + SigmaGuard) /
-                        ((C56 + std::sqrt(C60 + 1.)) * C54) -
-                    (-0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * 2 *
-                     std::sqrt(C60 + 1.) * C54) /
-                        std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-               C70 * std::pow(rhoA, C50) *
-                   (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.) -
-                    0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                   (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        C54 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaAa + SigmaGuard) / ((C56 + std::sqrt(C60 + 1.)) * C54)) /
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+                   C72 * std::pow(rhoA, C52) *
+                   (0.00010584 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56) -
+                    (-0.0042 * C62 * 0.0252 * std::sqrt(C49) * 2 * std::sqrt(C62 + 1.) * C56) /
+                        std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+               C72 * std::pow(rhoA, C52) *
+                   (0.0042 *
+                        (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                    0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                        (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                   (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                   0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56)) /
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            4) -
-              C50 * std::pow(rhoA, C50 - 1) * 0.0042 * C60 * 0.0252 *
-                  std::sqrt(sigmaAa + SigmaGuard) /
-                  ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+              C52 * std::pow(rhoA, C52 - 1) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                  ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             2)))) +
-            (std::pow(C54, 2) *
-                 std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.,
+            (std::pow(C56, 2) *
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                           2) *
-                 C68 * std::pow(rhoA, C50) * -0.0042 * C60 * 0.0252 *
-                 std::sqrt(sigmaAa + SigmaGuard) / (C56 + std::sqrt(C60 + 1.)) -
-             C68 * std::pow(rhoA, C50) * -0.0042 * C60 * std::log(C56 + std::sqrt(C60 + 1.)) *
-                 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * std::pow(C54, 2) *
-                 (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                      C54 +
-                  1.) *
-                 0.0504 * std::sqrt(sigmaAa + SigmaGuard) / ((C56 + std::sqrt(C60 + 1.)) * C54)) /
-                std::pow(std::pow(C54, 2) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                             std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                 C70 * std::pow(rhoA, C52) * -0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                 (C58 + std::sqrt(C62 + 1.)) -
+             C70 * std::pow(rhoA, C52) * -0.0042 * C62 * std::log(C58 + std::sqrt(C62 + 1.)) *
+                 0.0252 * std::sqrt(C49) * std::pow(C56, 2) *
+                 (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                 0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56)) /
+                std::pow(std::pow(C56, 2) * std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                                             std::sqrt(C49) / C56 +
                                                          1.,
                                                      2),
                          2)) *
-               C69) +
-          (((-C69 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-             ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) +
-              (C56 + std::sqrt(C60 + 1.)) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                             std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                                         1.,
-                                                     2))) /
-                std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
+               C71) +
+          (((-C71 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+             ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                  (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) * -2 *
+                  std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / std::pow(C56, 2) +
+              (C58 + std::sqrt(C62 + 1.)) *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                           2))) /
+                std::pow((C58 + std::sqrt(C62 + 1.)) * C56 *
+                             std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                              std::sqrt(C49) / C56 +
                                           1.,
                                       2),
                          2) -
-            ((std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                           1.,
+            ((std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                        2) *
-                  C70 * std::pow(rhoA, C50) *
-                  (-0.0042 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                       std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) -
-                   (-0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * 2 *
-                    std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.))) /
-                       std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-              C70 * std::pow(rhoA, C50) *
-                  (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                             1.) -
-                   0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2)) /
-                 std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.,
+                  C72 * std::pow(rhoA, C52) *
+                  (-0.0042 * std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                       std::pow(C56, 2) -
+                   (-0.0042 * C62 * 0.0252 * std::sqrt(C49) * 2 * std::sqrt(C62 + 1.) *
+                    (C58 + std::sqrt(C62 + 1.))) /
+                       std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+              C72 * std::pow(rhoA, C52) *
+                  (0.0042 *
+                       (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                   0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                  (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) * -2 *
+                  std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                  std::pow(C56, 2)) /
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                           4) -
-             C50 * std::pow(rhoA, C50 - 1) * -0.0042 * C60 * std::log(C56 + std::sqrt(C60 + 1.)) *
-                 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                 (std::pow(C54, 2) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                      std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                                  1.,
-                                              2)))) -
-           C68 * std::pow(rhoA, C50) * -0.0042 * C60 * std::log(C56 + std::sqrt(C60 + 1.)) *
-               0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-               (std::pow(C54, 2) *
-                    (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                     1.) *
-                    -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                    std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) +
-                2 * C54 *
-                    std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaAa + SigmaGuard) / C54 +
+             C52 * std::pow(rhoA, C52 - 1) * -0.0042 * C62 * std::log(C58 + std::sqrt(C62 + 1.)) *
+                 0.0252 * std::sqrt(C49) /
+                 (std::pow(C56, 2) *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                           2)))) -
+           C70 * std::pow(rhoA, C52) * -0.0042 * C62 * std::log(C58 + std::sqrt(C62 + 1.)) *
+               0.0252 * std::sqrt(C49) *
+               (std::pow(C56, 2) *
+                    (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                    -2 * std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                    std::pow(C56, 2) +
+                2 * C56 *
+                    std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                  1.,
                              2)) /
-               std::pow(std::pow(C54, 2) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                            std::sqrt(sigmaAa + SigmaGuard) / C54 +
+               std::pow(std::pow(C56, 2) * std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                                            std::sqrt(C49) / C56 +
                                                         1.,
                                                     2),
                         2)) *
-              C68) -
-         C81 * std::pow(rhoA, C50) *
-             (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                        1.) -
-              0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                  (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                          1.,
+              C70) -
+         C85 * std::pow(rhoA, C52) *
+             (0.0042 * (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+              0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                  (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+             std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                       2)) +
-        C79 * std::pow(rhoA, C50) * -0.0042 * C60 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-            std::sqrt(sigmaAa + SigmaGuard) /
-            (std::pow(C54, 2) * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                             1.,
-                                         2));
+        C83 * std::pow(rhoA, C52) * -0.0042 * C62 * std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+            std::sqrt(C49) /
+            (std::pow(C56, 2) *
+             std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1., 2));
 
     matrix.upper[1] = 0;
 
-    const double C75 = 1 / (2 * std::sqrt(sigmaAa + SigmaGuard) * C54);
-    const double C76 = 2 * C56 * C75;
-    const double C82 = (-C68 * 2 * std::sqrt(sigmaAa + SigmaGuard)) /
-                       std::pow(2 * std::sqrt(sigmaAa + SigmaGuard) * C54, 2);
-    const double C83 = 2 * C75 * C69 + 2 * C56 * C82;
+    const double C77 = 1;
+    const double C78 = C77 / (2 * std::sqrt(C49) * C56);
+    const double C79 = 2 * C58 * C78;
+    const double C86 = (-C70 * C77 * 2 * std::sqrt(C49)) / std::pow(2 * std::sqrt(C49) * C56, 2);
+    const double C87 = 2 * C78 * C71 + 2 * C58 * C86;
     matrix.upper[2] =
-        ((((((C50 * std::pow(rhoA, C50 - 1) * 0.0042 * C60 * 0.0252 *
-                  std::log(C56 + std::sqrt(C60 + 1.)) /
-                  (2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+        ((((((C78 * C52 * std::pow(rhoA, C52 - 1) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                  ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             2)) -
-              C76 * C50 * std::pow(rhoA, C50 - 1) *
-                  (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                             1.) -
-                   0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+              C79 * C52 * std::pow(rhoA, C52 - 1) *
+                  (0.0042 *
+                       (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                   0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            2)) +
-             C75 * C50 * std::pow(rhoA, C50 - 1) * 0.0042 * C60 * 0.0252 *
-                 std::sqrt(sigmaAa + SigmaGuard) /
-                 ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+             C77 * C52 * std::pow(rhoA, C52 - 1) * 0.0042 * C62 * 0.0252 *
+                 std::log(C58 + std::sqrt(C62 + 1.)) /
+                 (2 * std::sqrt(C49) * C56 *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            2))) +
-            (((2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
+            C86 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                          2))) +
+           ((((C58 + std::sqrt(C62 + 1.)) * C56 *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                           2) *
+                  C78 * std::pow(rhoA, C52) * 0.00010584 * std::sqrt(C49) -
+              C78 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+                  ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                       (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                       0.0504 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56) +
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
                                 1.,
                             2) *
-                   std::pow(rhoA, C50) * 0.0042 *
-                   (0.0252 * C60 / (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.))) +
-                    0.0252 * std::log(C56 + std::sqrt(C60 + 1.))) -
-               std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::log(C56 + std::sqrt(C60 + 1.)) *
-                   std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                   (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        C54 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                   (std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                  std::pow(2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                               std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                                std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                            1.,
-                                        2),
-                           2) -
-              (std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                            1.,
-                        2) *
-                   C76 * std::pow(rhoA, C50) *
-                   (0.00010584 * std::sqrt(sigmaAa + SigmaGuard) /
-                        (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54) -
-                    (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54 * 0.00010584 *
-                         std::sqrt(sigmaAa + SigmaGuard) -
-                     0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                         (std::sqrt(C60 + 1.) + (C56 + std::sqrt(C60 + 1.))) /
-                         std::sqrt(C60 + 1.)) /
-                        std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-               C76 * std::pow(rhoA, C50) *
-                   (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.) -
-                    0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                   (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                        C54 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                   (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
-                           4)) +
-             ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
-                           2) *
-                  C75 * std::pow(rhoA, C50) * 0.00010584 * std::sqrt(sigmaAa + SigmaGuard) -
-              C75 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-                  ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                       (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                        1.) *
-                       0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                       (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54) +
-                   std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                1.,
-                            2) *
-                       C54 / (2 * std::sqrt(C60 + 1.)))) /
-                 std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                              std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                           1.,
-                                       2),
-                          2)) *
-                C70) +
-           (((2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
-                           2) *
-                  std::pow(rhoA, C50) * 0.00010584 * C60 / (C56 + std::sqrt(C60 + 1.)) -
-              std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::log(C56 + std::sqrt(C60 + 1.)) *
-                  2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaAa + SigmaGuard) / ((C56 + std::sqrt(C60 + 1.)) * C54)) /
-                 std::pow(2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                              std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                       C56 / (2 * std::sqrt(C62 + 1.)))) /
+                 std::pow((C58 + std::sqrt(C62 + 1.)) * C56 *
+                              std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                               std::sqrt(C49) / C56 +
                                            1.,
                                        2),
                           2) -
-             (std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                           1.,
+             (std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                        2) *
-                  C76 * std::pow(rhoA, C50) *
-                  (0.00010584 * std::sqrt(sigmaAa + SigmaGuard) /
-                       ((C56 + std::sqrt(C60 + 1.)) * C54) -
-                   (-0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * 2 *
-                    std::sqrt(C60 + 1.) * C54) /
-                       std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-              C76 * std::pow(rhoA, C50) *
-                  (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                             1.) -
-                   0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaAa + SigmaGuard) / ((C56 + std::sqrt(C60 + 1.)) * C54)) /
-                 std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                              1.,
-                          4)) -
-            C75 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-                ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                     (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                          std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                      1.) *
-                     0.0504 * std::sqrt(sigmaAa + SigmaGuard) /
-                     ((C56 + std::sqrt(C60 + 1.)) * C54) +
-                 C54 * std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                        std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                    1.,
-                                2)) /
-                std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                  C79 * std::pow(rhoA, C52) *
+                  (0.00010584 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56) -
+                   (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56 * 0.00010584 *
+                        std::sqrt(C49) -
+                    0.0042 * C62 * 0.0252 * std::sqrt(C49) * C56 *
+                        (std::sqrt(C62 + 1.) + (C58 + std::sqrt(C62 + 1.))) / std::sqrt(C62 + 1.)) /
+                       std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+              C79 * std::pow(rhoA, C52) *
+                  (0.0042 *
+                       (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                   0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                       (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                  (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                  0.0504 * std::sqrt(C49) /
+                  (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                          4)) +
+            (2 * std::sqrt(C49) * C56 *
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                          2) *
+                 C77 * std::pow(rhoA, C52) * 0.0042 *
+                 (0.0252 * C62 / (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.))) +
+                  0.0252 * std::log(C58 + std::sqrt(C62 + 1.))) -
+             C77 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 *
+                 std::log(C58 + std::sqrt(C62 + 1.)) * std::sqrt(C49) * C56 *
+                 (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                 0.0504 * std::sqrt(C49) /
+                 (std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+                std::pow(2 * std::sqrt(C49) * C56 *
+                             std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                              std::sqrt(C49) / C56 +
                                           1.,
                                       2),
                          2)) *
-               C69) +
-          (((-std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::log(C56 + std::sqrt(C60 + 1.)) *
-             2 *
-             (std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                  (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                       C54 +
-                   1.) *
-                  -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) +
-              std::sqrt(sigmaAa + SigmaGuard) *
-                  std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                               1.,
+               C72) +
+          (((-C78 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+             ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                  (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                  0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56) +
+              C56 *
+                  std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
                            2))) /
-                std::pow(2 * std::sqrt(sigmaAa + SigmaGuard) * C54 *
-                             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
+                std::pow((C58 + std::sqrt(C62 + 1.)) * C56 *
+                             std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 *
+                                              std::sqrt(C49) / C56 +
                                           1.,
                                       2),
                          2) -
-            (std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                          1.,
-                      2) *
-                 C76 * std::pow(rhoA, C50) *
-                 (-0.0042 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                      std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) -
-                  (-0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) * 2 *
-                   std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.))) /
-                      std::pow(2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54, 2)) -
-             C76 * std::pow(rhoA, C50) *
-                 (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                            1.) -
-                  0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                      (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) *
-                 (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                      C54 +
-                  1.) *
-                 -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                 std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2)) /
-                std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                             1.,
-                         4)) -
-           C75 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) *
-               ((C56 + std::sqrt(C60 + 1.)) * C54 *
-                    (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                     1.) *
-                    -2 * std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                    std::sqrt(sigmaAa + SigmaGuard) / std::pow(C54, 2) +
-                (C56 + std::sqrt(C60 + 1.)) *
-                    std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                 1.,
-                             2)) /
-               std::pow((C56 + std::sqrt(C60 + 1.)) * C54 *
-                            std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                                             std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                                         1.,
-                                     2),
-                        2)) *
-              C68) -
-         C83 * std::pow(rhoA, C50) *
-             (0.0042 * (std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                        1.) -
-              0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-                  (2 * std::sqrt(C60 + 1.) * (C56 + std::sqrt(C60 + 1.)) * C54)) /
-             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                          1.,
-                      2)) +
-        C82 * std::pow(rhoA, C50) * 0.0042 * C60 * 0.0252 * std::sqrt(sigmaAa + SigmaGuard) /
-            ((C56 + std::sqrt(C60 + 1.)) * C54 *
-             std::pow(std::log(C56 + std::sqrt(C60 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaAa + SigmaGuard) / C54 +
-                          1.,
-                      2));
+            (std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1., 2) *
+                 C79 * std::pow(rhoA, C52) *
+                 (0.00010584 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56) -
+                  (-0.0042 * C62 * 0.0252 * std::sqrt(C49) * 2 * std::sqrt(C62 + 1.) * C56) /
+                      std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+             C79 * std::pow(rhoA, C52) *
+                 (0.0042 *
+                      (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                  0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                      (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                 (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                 0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56)) /
+                std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                         4)) +
+           (2 * std::sqrt(C49) * C56 *
+                std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                         2) *
+                C77 * std::pow(rhoA, C52) * 0.00010584 * C62 / (C58 + std::sqrt(C62 + 1.)) -
+            C77 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 *
+                std::log(C58 + std::sqrt(C62 + 1.)) * 2 * std::sqrt(C49) * C56 *
+                (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) *
+                0.0504 * std::sqrt(C49) / ((C58 + std::sqrt(C62 + 1.)) * C56)) /
+               std::pow(
+                   2 * std::sqrt(C49) * C56 *
+                       std::pow(
+                           std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                           2),
+                   2)) *
+              C71) +
+         (((-C78 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::sqrt(C49) *
+            ((C58 + std::sqrt(C62 + 1.)) * C56 *
+                 (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) * -2 *
+                 std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / std::pow(C56, 2) +
+             (C58 + std::sqrt(C62 + 1.)) *
+                 std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                          2))) /
+               std::pow(
+                   (C58 + std::sqrt(C62 + 1.)) * C56 *
+                       std::pow(
+                           std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                           2),
+                   2) -
+           (std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1., 2) *
+                C79 * std::pow(rhoA, C52) *
+                (-0.0042 * std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                     std::pow(C56, 2) -
+                 (-0.0042 * C62 * 0.0252 * std::sqrt(C49) * 2 * std::sqrt(C62 + 1.) *
+                  (C58 + std::sqrt(C62 + 1.))) /
+                     std::pow(2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56, 2)) -
+            C79 * std::pow(rhoA, C52) *
+                (0.0042 *
+                     (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+                 0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                     (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) *
+                (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) * -2 *
+                std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / std::pow(C56, 2)) /
+               std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.,
+                        4)) -
+          C77 * std::pow(rhoA, C52) * 0.0042 * C62 * 0.0252 * std::log(C58 + std::sqrt(C62 + 1.)) *
+              2 *
+              (std::sqrt(C49) * C56 *
+                   (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) * -2 *
+                   std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) /
+                   std::pow(C56, 2) +
+               std::sqrt(C49) *
+                   std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
+                                1.,
+                            2)) /
+              std::pow(
+                  2 * std::sqrt(C49) * C56 *
+                      std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 +
+                                   1.,
+                               2),
+                  2)) *
+             C70) -
+        C87 * std::pow(rhoA, C52) *
+            (0.0042 * (std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1.) -
+             0.0042 * C62 * 0.0252 * std::sqrt(C49) /
+                 (2 * std::sqrt(C62 + 1.) * (C58 + std::sqrt(C62 + 1.)) * C56)) /
+            std::pow(std::log(C58 + std::sqrt(C62 + 1.)) * 0.0252 * std::sqrt(C49) / C56 + 1., 2);
 
     matrix.upper[3] = 0;
 
     matrix.upper[4] = 0;
 
     const double C48 = rhoB + 1e-16;
-    const double C52 = std::sqrt(sigmaBb);
-    const double C55 = std::pow(C48, C50);
-    const double C57 = C52 / C55;
-    const double C61 = std::pow(C57, 2);
-    const double C71 = 1;
-    const double C72 = C50 * std::pow(C48, C50 - 1) * C71;
-    const double C73 = (-C72 * std::sqrt(sigmaBb + SigmaGuard)) / std::pow(C55, 2);
-    const double C74 = 2 * C57 * C73;
-    const double C84 = C50 * (C50 - 1) * std::pow(C48, C50 - 2) * std::pow(C71, 2);
-    const double C85 = C72 * C72 * std::sqrt(sigmaBb + SigmaGuard) * 2 * C55 / std::pow(C55, 4) -
-                       C84 * std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2);
-    const double C86 = 2 * std::pow(C73, 2) + 2 * C57 * C85;
+    const double C50 = sigmaBb + SigmaGuard;
+    const double C55 = std::sqrt(C50);
+    const double C57 = std::pow(C48, C52);
+    const double C59 = C55 / C57;
+    const double C63 = std::pow(C59, 2);
+    const double C73 = 1;
+    const double C74 = C52 * std::pow(C48, C52 - 1) * C73;
+    const double C75 = (-C74 * std::sqrt(C50)) / std::pow(C57, 2);
+    const double C76 = 2 * C59 * C75;
+    const double C88 = C52 * (C52 - 1) * std::pow(C48, C52 - 2) * std::pow(C73, 2);
+    const double C89 = C74 * C74 * std::sqrt(C50) * 2 * C57 / std::pow(C57, 4) -
+                       C88 * std::sqrt(C50) / std::pow(C57, 2);
+    const double C90 = 2 * std::pow(C75, 2) + 2 * C59 * C89;
     matrix.upper[5] =
-        (((((((C73 * C50 * std::pow(rhoB, C50 - 1) * 0.0042 * C61 * 0.0252 *
-                   std::sqrt(sigmaBb + SigmaGuard) /
-                   ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                    std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaBb + SigmaGuard) / C55 +
+        (((((((C75 * C52 * std::pow(rhoB, C52 - 1) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                   ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                    std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                  1.,
                              2)) -
-               (C74 * C50 * std::pow(rhoB, C50 - 1) *
-                    (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
+               (C76 * C52 * std::pow(rhoB, C52 - 1) *
+                    (0.0042 * (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                1.) -
-                     0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                         (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                    std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                     0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                         (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                    std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                  1.,
                              2) +
-                C50 * (C50 - 1) * std::pow(rhoB, C50 - 2) *
-                    (C62 + 0.0042 * C61 /
-                               (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                1.)))) +
-              C72 * C50 * std::pow(rhoB, C50 - 1) * -0.0042 * C61 *
-                  std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                  (std::pow(C55, 2) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                       std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                                   1.,
-                                               2))) +
-             C85 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                 ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+                C52 * (C52 - 1) * std::pow(rhoB, C52 - 2) *
+                    (C64 +
+                     0.0042 * C63 /
+                         (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
+                          1.)))) +
+              C74 * C52 * std::pow(rhoB, C52 - 1) * -0.0042 * C63 *
+                  std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                  (std::pow(C57, 2) *
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
+                                1.,
+                            2))) +
+             C89 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                 ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            2))) +
-            ((((C57 + std::sqrt(C61 + 1.)) * C55 *
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+            ((((C59 + std::sqrt(C63 + 1.)) * C57 *
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             2) *
-                   C73 * std::pow(rhoB, C50) * 0.00010584 * std::sqrt(sigmaBb + SigmaGuard) -
-               C73 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-                   ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                        (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                             std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                         1.) *
-                        0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                        (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55) +
-                    std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                   C75 * std::pow(rhoB, C52) * 0.00010584 * std::sqrt(C50) -
+               C75 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+                   ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                        (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                        0.0504 * std::sqrt(C50) /
+                        (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57) +
+                    std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                  1.,
                              2) *
-                        C55 / (2 * std::sqrt(C61 + 1.)))) /
-                  std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                               std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                        C57 / (2 * std::sqrt(C63 + 1.)))) /
+                  std::pow((C59 + std::sqrt(C63 + 1.)) * C57 *
+                               std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                                std::sqrt(C50) / C57 +
                                             1.,
                                         2),
                            2) -
-              ((std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                             1.,
+              ((std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                          2) *
-                    C74 * std::pow(rhoB, C50) *
-                    (0.00010584 * std::sqrt(sigmaBb + SigmaGuard) /
-                         (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55) -
-                     (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55 * 0.00010584 *
-                          std::sqrt(sigmaBb + SigmaGuard) -
-                      0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                          (std::sqrt(C61 + 1.) + (C57 + std::sqrt(C61 + 1.))) /
-                          std::sqrt(C61 + 1.)) /
-                         std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-                C74 * std::pow(rhoB, C50) *
-                    (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                    C76 * std::pow(rhoB, C52) *
+                    (0.00010584 * std::sqrt(C50) /
+                         (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57) -
+                     (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57 * 0.00010584 *
+                          std::sqrt(C50) -
+                      0.0042 * C63 * 0.0252 * std::sqrt(C50) * C57 *
+                          (std::sqrt(C63 + 1.) + (C59 + std::sqrt(C63 + 1.))) /
+                          std::sqrt(C63 + 1.)) /
+                         std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+                C76 * std::pow(rhoB, C52) *
+                    (0.0042 * (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                1.) -
-                     0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                         (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                    (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                     1.) *
-                    0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                    (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                     0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                         (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                    (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                    0.0504 * std::sqrt(C50) /
+                    (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             4) +
-               C50 * std::pow(rhoB, C50 - 1) *
-                   (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.) -
-                    0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+               C52 * std::pow(rhoB, C52 - 1) *
+                   (0.0042 *
+                        (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                    0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                        (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             2))) +
-             (std::pow(C55, 2) *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+             (std::pow(C57, 2) *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            2) *
-                  C72 * std::pow(rhoB, C50) * -0.0042 *
-                  (C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.))) +
-                   std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard)) -
-              C72 * std::pow(rhoB, C50) * -0.0042 * C61 * std::log(C57 + std::sqrt(C61 + 1.)) *
-                  0.0252 * std::sqrt(sigmaBb + SigmaGuard) * std::pow(C55, 2) *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                  (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                 std::pow(std::pow(C55, 2) *
-                              std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                           1.,
-                                       2),
+                  C74 * std::pow(rhoB, C52) * -0.0042 *
+                  (C63 * 0.0252 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.))) +
+                   std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50)) -
+              C74 * std::pow(rhoB, C52) * -0.0042 * C63 * std::log(C59 + std::sqrt(C63 + 1.)) *
+                  0.0252 * std::sqrt(C50) * std::pow(C57, 2) *
+                  (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                  0.0504 * std::sqrt(C50) /
+                  (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                 std::pow(std::pow(C57, 2) * std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                                              std::sqrt(C50) / C57 +
+                                                          1.,
+                                                      2),
                           2)) *
-                C74) +
-           (((-C73 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-              ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                   (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        C55 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaBb + SigmaGuard) / ((C57 + std::sqrt(C61 + 1.)) * C55) +
-               C55 * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                      std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                C76) +
+           (((-C75 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+              ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                   (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                   0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57) +
+               C57 * std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                   1.,
                               2))) /
-                 std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                              std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                 std::pow((C59 + std::sqrt(C63 + 1.)) * C57 *
+                              std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                               std::sqrt(C50) / C57 +
                                            1.,
                                        2),
                           2) -
-             ((std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                            1.,
+             ((std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                         2) *
-                   C74 * std::pow(rhoB, C50) *
-                   (0.00010584 * std::sqrt(sigmaBb + SigmaGuard) /
-                        ((C57 + std::sqrt(C61 + 1.)) * C55) -
-                    (-0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * 2 *
-                     std::sqrt(C61 + 1.) * C55) /
-                        std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-               C74 * std::pow(rhoB, C50) *
-                   (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.) -
-                    0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                   (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        C55 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaBb + SigmaGuard) / ((C57 + std::sqrt(C61 + 1.)) * C55)) /
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+                   C76 * std::pow(rhoB, C52) *
+                   (0.00010584 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57) -
+                    (-0.0042 * C63 * 0.0252 * std::sqrt(C50) * 2 * std::sqrt(C63 + 1.) * C57) /
+                        std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+               C76 * std::pow(rhoB, C52) *
+                   (0.0042 *
+                        (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                    0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                        (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                   (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                   0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57)) /
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            4) -
-              C50 * std::pow(rhoB, C50 - 1) * 0.0042 * C61 * 0.0252 *
-                  std::sqrt(sigmaBb + SigmaGuard) /
-                  ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+              C52 * std::pow(rhoB, C52 - 1) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                  ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             2)))) +
-            (std::pow(C55, 2) *
-                 std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.,
+            (std::pow(C57, 2) *
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                           2) *
-                 C72 * std::pow(rhoB, C50) * -0.0042 * C61 * 0.0252 *
-                 std::sqrt(sigmaBb + SigmaGuard) / (C57 + std::sqrt(C61 + 1.)) -
-             C72 * std::pow(rhoB, C50) * -0.0042 * C61 * std::log(C57 + std::sqrt(C61 + 1.)) *
-                 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * std::pow(C55, 2) *
-                 (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                      C55 +
-                  1.) *
-                 0.0504 * std::sqrt(sigmaBb + SigmaGuard) / ((C57 + std::sqrt(C61 + 1.)) * C55)) /
-                std::pow(std::pow(C55, 2) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                             std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                 C74 * std::pow(rhoB, C52) * -0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                 (C59 + std::sqrt(C63 + 1.)) -
+             C74 * std::pow(rhoB, C52) * -0.0042 * C63 * std::log(C59 + std::sqrt(C63 + 1.)) *
+                 0.0252 * std::sqrt(C50) * std::pow(C57, 2) *
+                 (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                 0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57)) /
+                std::pow(std::pow(C57, 2) * std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                                             std::sqrt(C50) / C57 +
                                                          1.,
                                                      2),
                          2)) *
-               C73) +
-          (((-C73 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-             ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) +
-              (C57 + std::sqrt(C61 + 1.)) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                             std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                                         1.,
-                                                     2))) /
-                std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
+               C75) +
+          (((-C75 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+             ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                  (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) * -2 *
+                  std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / std::pow(C57, 2) +
+              (C59 + std::sqrt(C63 + 1.)) *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                           2))) /
+                std::pow((C59 + std::sqrt(C63 + 1.)) * C57 *
+                             std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                              std::sqrt(C50) / C57 +
                                           1.,
                                       2),
                          2) -
-            ((std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                           1.,
+            ((std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                        2) *
-                  C74 * std::pow(rhoB, C50) *
-                  (-0.0042 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                       std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) -
-                   (-0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * 2 *
-                    std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.))) /
-                       std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-              C74 * std::pow(rhoB, C50) *
-                  (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                             1.) -
-                   0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2)) /
-                 std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.,
+                  C76 * std::pow(rhoB, C52) *
+                  (-0.0042 * std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                       std::pow(C57, 2) -
+                   (-0.0042 * C63 * 0.0252 * std::sqrt(C50) * 2 * std::sqrt(C63 + 1.) *
+                    (C59 + std::sqrt(C63 + 1.))) /
+                       std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+              C76 * std::pow(rhoB, C52) *
+                  (0.0042 *
+                       (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                   0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                  (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) * -2 *
+                  std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                  std::pow(C57, 2)) /
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                           4) -
-             C50 * std::pow(rhoB, C50 - 1) * -0.0042 * C61 * std::log(C57 + std::sqrt(C61 + 1.)) *
-                 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                 (std::pow(C55, 2) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                      std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                                  1.,
-                                              2)))) -
-           C72 * std::pow(rhoB, C50) * -0.0042 * C61 * std::log(C57 + std::sqrt(C61 + 1.)) *
-               0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-               (std::pow(C55, 2) *
-                    (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                     1.) *
-                    -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                    std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) +
-                2 * C55 *
-                    std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaBb + SigmaGuard) / C55 +
+             C52 * std::pow(rhoB, C52 - 1) * -0.0042 * C63 * std::log(C59 + std::sqrt(C63 + 1.)) *
+                 0.0252 * std::sqrt(C50) /
+                 (std::pow(C57, 2) *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                           2)))) -
+           C74 * std::pow(rhoB, C52) * -0.0042 * C63 * std::log(C59 + std::sqrt(C63 + 1.)) *
+               0.0252 * std::sqrt(C50) *
+               (std::pow(C57, 2) *
+                    (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                    -2 * std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                    std::pow(C57, 2) +
+                2 * C57 *
+                    std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                  1.,
                              2)) /
-               std::pow(std::pow(C55, 2) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                            std::sqrt(sigmaBb + SigmaGuard) / C55 +
+               std::pow(std::pow(C57, 2) * std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                                            std::sqrt(C50) / C57 +
                                                         1.,
                                                     2),
                         2)) *
-              C72) -
-         C86 * std::pow(rhoB, C50) *
-             (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                        1.) -
-              0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                  (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                          1.,
+              C74) -
+         C90 * std::pow(rhoB, C52) *
+             (0.0042 * (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+              0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                  (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+             std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                       2)) +
-        C84 * std::pow(rhoB, C50) * -0.0042 * C61 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-            std::sqrt(sigmaBb + SigmaGuard) /
-            (std::pow(C55, 2) * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                             1.,
-                                         2));
+        C88 * std::pow(rhoB, C52) * -0.0042 * C63 * std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+            std::sqrt(C50) /
+            (std::pow(C57, 2) *
+             std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1., 2));
 
     matrix.upper[6] = 0;
 
     matrix.upper[7] = 0;
 
-    const double C77 = 1 / (2 * std::sqrt(sigmaBb + SigmaGuard) * C55);
-    const double C78 = 2 * C57 * C77;
-    const double C87 = (-C72 * 2 * std::sqrt(sigmaBb + SigmaGuard)) /
-                       std::pow(2 * std::sqrt(sigmaBb + SigmaGuard) * C55, 2);
-    const double C88 = 2 * C77 * C73 + 2 * C57 * C87;
+    const double C80 = 1;
+    const double C81 = C80 / (2 * std::sqrt(C50) * C57);
+    const double C82 = 2 * C59 * C81;
+    const double C91 = (-C74 * C80 * 2 * std::sqrt(C50)) / std::pow(2 * std::sqrt(C50) * C57, 2);
+    const double C92 = 2 * C81 * C75 + 2 * C59 * C91;
     matrix.upper[8] =
-        ((((((C50 * std::pow(rhoB, C50 - 1) * 0.0042 * C61 * 0.0252 *
-                  std::log(C57 + std::sqrt(C61 + 1.)) /
-                  (2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+        ((((((C81 * C52 * std::pow(rhoB, C52 - 1) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                  ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             2)) -
-              C78 * C50 * std::pow(rhoB, C50 - 1) *
-                  (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                             1.) -
-                   0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+              C82 * C52 * std::pow(rhoB, C52 - 1) *
+                  (0.0042 *
+                       (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                   0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            2)) +
-             C77 * C50 * std::pow(rhoB, C50 - 1) * 0.0042 * C61 * 0.0252 *
-                 std::sqrt(sigmaBb + SigmaGuard) /
-                 ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+             C80 * C52 * std::pow(rhoB, C52 - 1) * 0.0042 * C63 * 0.0252 *
+                 std::log(C59 + std::sqrt(C63 + 1.)) /
+                 (2 * std::sqrt(C50) * C57 *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            2))) +
-            (((2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
+            C91 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                          2))) +
+           ((((C59 + std::sqrt(C63 + 1.)) * C57 *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                           2) *
+                  C81 * std::pow(rhoB, C52) * 0.00010584 * std::sqrt(C50) -
+              C81 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+                  ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                       (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                       0.0504 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57) +
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
                                 1.,
                             2) *
-                   std::pow(rhoB, C50) * 0.0042 *
-                   (0.0252 * C61 / (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.))) +
-                    0.0252 * std::log(C57 + std::sqrt(C61 + 1.))) -
-               std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::log(C57 + std::sqrt(C61 + 1.)) *
-                   std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                   (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        C55 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                   (std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                  std::pow(2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                               std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                                std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                            1.,
-                                        2),
-                           2) -
-              (std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                            1.,
-                        2) *
-                   C78 * std::pow(rhoB, C50) *
-                   (0.00010584 * std::sqrt(sigmaBb + SigmaGuard) /
-                        (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55) -
-                    (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55 * 0.00010584 *
-                         std::sqrt(sigmaBb + SigmaGuard) -
-                     0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                         (std::sqrt(C61 + 1.) + (C57 + std::sqrt(C61 + 1.))) /
-                         std::sqrt(C61 + 1.)) /
-                        std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-               C78 * std::pow(rhoB, C50) *
-                   (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.) -
-                    0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                   (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                        C55 +
-                    1.) *
-                   0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                   (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
-                           4)) +
-             ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
-                           2) *
-                  C77 * std::pow(rhoB, C50) * 0.00010584 * std::sqrt(sigmaBb + SigmaGuard) -
-              C77 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-                  ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                       (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                        1.) *
-                       0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                       (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55) +
-                   std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                    std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                1.,
-                            2) *
-                       C55 / (2 * std::sqrt(C61 + 1.)))) /
-                 std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                              std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                           1.,
-                                       2),
-                          2)) *
-                C74) +
-           (((2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
-                           2) *
-                  std::pow(rhoB, C50) * 0.00010584 * C61 / (C57 + std::sqrt(C61 + 1.)) -
-              std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::log(C57 + std::sqrt(C61 + 1.)) *
-                  2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaBb + SigmaGuard) / ((C57 + std::sqrt(C61 + 1.)) * C55)) /
-                 std::pow(2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                              std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                       C57 / (2 * std::sqrt(C63 + 1.)))) /
+                 std::pow((C59 + std::sqrt(C63 + 1.)) * C57 *
+                              std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                               std::sqrt(C50) / C57 +
                                            1.,
                                        2),
                           2) -
-             (std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                               std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                           1.,
+             (std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                        2) *
-                  C78 * std::pow(rhoB, C50) *
-                  (0.00010584 * std::sqrt(sigmaBb + SigmaGuard) /
-                       ((C57 + std::sqrt(C61 + 1.)) * C55) -
-                   (-0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * 2 *
-                    std::sqrt(C61 + 1.) * C55) /
-                       std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-              C78 * std::pow(rhoB, C50) *
-                  (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                             1.) -
-                   0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  0.0504 * std::sqrt(sigmaBb + SigmaGuard) / ((C57 + std::sqrt(C61 + 1.)) * C55)) /
-                 std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                  std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                              1.,
-                          4)) -
-            C77 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-                ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                     (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                          std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                      1.) *
-                     0.0504 * std::sqrt(sigmaBb + SigmaGuard) /
-                     ((C57 + std::sqrt(C61 + 1.)) * C55) +
-                 C55 * std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                        std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                    1.,
-                                2)) /
-                std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                  C82 * std::pow(rhoB, C52) *
+                  (0.00010584 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57) -
+                   (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57 * 0.00010584 *
+                        std::sqrt(C50) -
+                    0.0042 * C63 * 0.0252 * std::sqrt(C50) * C57 *
+                        (std::sqrt(C63 + 1.) + (C59 + std::sqrt(C63 + 1.))) / std::sqrt(C63 + 1.)) /
+                       std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+              C82 * std::pow(rhoB, C52) *
+                  (0.0042 *
+                       (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                   0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                       (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                  (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                  0.0504 * std::sqrt(C50) /
+                  (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                          4)) +
+            (2 * std::sqrt(C50) * C57 *
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                          2) *
+                 C80 * std::pow(rhoB, C52) * 0.0042 *
+                 (0.0252 * C63 / (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.))) +
+                  0.0252 * std::log(C59 + std::sqrt(C63 + 1.))) -
+             C80 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 *
+                 std::log(C59 + std::sqrt(C63 + 1.)) * std::sqrt(C50) * C57 *
+                 (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                 0.0504 * std::sqrt(C50) /
+                 (std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+                std::pow(2 * std::sqrt(C50) * C57 *
+                             std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                              std::sqrt(C50) / C57 +
                                           1.,
                                       2),
                          2)) *
-               C73) +
-          (((-std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::log(C57 + std::sqrt(C61 + 1.)) *
-             2 *
-             (std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                  (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                       C55 +
-                   1.) *
-                  -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                  std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) +
-              std::sqrt(sigmaBb + SigmaGuard) *
-                  std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                   std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                               1.,
+               C76) +
+          (((-C81 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+             ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                  (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                  0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57) +
+              C57 *
+                  std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
                            2))) /
-                std::pow(2 * std::sqrt(sigmaBb + SigmaGuard) * C55 *
-                             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
+                std::pow((C59 + std::sqrt(C63 + 1.)) * C57 *
+                             std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 *
+                                              std::sqrt(C50) / C57 +
                                           1.,
                                       2),
                          2) -
-            (std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                          1.,
-                      2) *
-                 C78 * std::pow(rhoB, C50) *
-                 (-0.0042 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                      std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) -
-                  (-0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) * 2 *
-                   std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.))) /
-                      std::pow(2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55, 2)) -
-             C78 * std::pow(rhoB, C50) *
-                 (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                            1.) -
-                  0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                      (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) *
-                 (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                      C55 +
-                  1.) *
-                 -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                 std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2)) /
-                std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                 std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                             1.,
-                         4)) -
-           C77 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) *
-               ((C57 + std::sqrt(C61 + 1.)) * C55 *
-                    (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                         std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                     1.) *
-                    -2 * std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                    std::sqrt(sigmaBb + SigmaGuard) / std::pow(C55, 2) +
-                (C57 + std::sqrt(C61 + 1.)) *
-                    std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                     std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                 1.,
-                             2)) /
-               std::pow((C57 + std::sqrt(C61 + 1.)) * C55 *
-                            std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                                             std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                                         1.,
-                                     2),
-                        2)) *
-              C72) -
-         C88 * std::pow(rhoB, C50) *
-             (0.0042 * (std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                            std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                        1.) -
-              0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-                  (2 * std::sqrt(C61 + 1.) * (C57 + std::sqrt(C61 + 1.)) * C55)) /
-             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                          1.,
-                      2)) +
-        C87 * std::pow(rhoB, C50) * 0.0042 * C61 * 0.0252 * std::sqrt(sigmaBb + SigmaGuard) /
-            ((C57 + std::sqrt(C61 + 1.)) * C55 *
-             std::pow(std::log(C57 + std::sqrt(C61 + 1.)) * 0.0252 *
-                              std::sqrt(sigmaBb + SigmaGuard) / C55 +
-                          1.,
-                      2));
+            (std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1., 2) *
+                 C82 * std::pow(rhoB, C52) *
+                 (0.00010584 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57) -
+                  (-0.0042 * C63 * 0.0252 * std::sqrt(C50) * 2 * std::sqrt(C63 + 1.) * C57) /
+                      std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+             C82 * std::pow(rhoB, C52) *
+                 (0.0042 *
+                      (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                  0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                      (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                 (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                 0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57)) /
+                std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                         4)) +
+           (2 * std::sqrt(C50) * C57 *
+                std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                         2) *
+                C80 * std::pow(rhoB, C52) * 0.00010584 * C63 / (C59 + std::sqrt(C63 + 1.)) -
+            C80 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 *
+                std::log(C59 + std::sqrt(C63 + 1.)) * 2 * std::sqrt(C50) * C57 *
+                (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) *
+                0.0504 * std::sqrt(C50) / ((C59 + std::sqrt(C63 + 1.)) * C57)) /
+               std::pow(
+                   2 * std::sqrt(C50) * C57 *
+                       std::pow(
+                           std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                           2),
+                   2)) *
+              C75) +
+         (((-C81 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::sqrt(C50) *
+            ((C59 + std::sqrt(C63 + 1.)) * C57 *
+                 (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) * -2 *
+                 std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / std::pow(C57, 2) +
+             (C59 + std::sqrt(C63 + 1.)) *
+                 std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                          2))) /
+               std::pow(
+                   (C59 + std::sqrt(C63 + 1.)) * C57 *
+                       std::pow(
+                           std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                           2),
+                   2) -
+           (std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1., 2) *
+                C82 * std::pow(rhoB, C52) *
+                (-0.0042 * std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                     std::pow(C57, 2) -
+                 (-0.0042 * C63 * 0.0252 * std::sqrt(C50) * 2 * std::sqrt(C63 + 1.) *
+                  (C59 + std::sqrt(C63 + 1.))) /
+                     std::pow(2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57, 2)) -
+            C82 * std::pow(rhoB, C52) *
+                (0.0042 *
+                     (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+                 0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                     (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) *
+                (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) * -2 *
+                std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / std::pow(C57, 2)) /
+               std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.,
+                        4)) -
+          C80 * std::pow(rhoB, C52) * 0.0042 * C63 * 0.0252 * std::log(C59 + std::sqrt(C63 + 1.)) *
+              2 *
+              (std::sqrt(C50) * C57 *
+                   (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) * -2 *
+                   std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) /
+                   std::pow(C57, 2) +
+               std::sqrt(C50) *
+                   std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
+                                1.,
+                            2)) /
+              std::pow(
+                  2 * std::sqrt(C50) * C57 *
+                      std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 +
+                                   1.,
+                               2),
+                  2)) *
+             C74) -
+        C92 * std::pow(rhoB, C52) *
+            (0.0042 * (std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1.) -
+             0.0042 * C63 * 0.0252 * std::sqrt(C50) /
+                 (2 * std::sqrt(C63 + 1.) * (C59 + std::sqrt(C63 + 1.)) * C57)) /
+            std::pow(std::log(C59 + std::sqrt(C63 + 1.)) * 0.0252 * std::sqrt(C50) / C57 + 1., 2);
 
-    const double C89 = rhoA + 1e-16;
-    const double C90 = 4. / 3.;
-    const double C91 = std::sqrt(sigmaAa);
-    const double C92 = 0.0252 * C91;
-    const double C93 = std::pow(C89, C90);
-    const double C94 = C91 / C93;
-    const double C95 = excgrid::internal::AsinhOverX(C94);
-    const double C96 = std::pow(C94, 2);
-    const double C97 = C96 + 1.;
-    const double C98 = std::sqrt(C97);
-    const double C99 = C94 + C98;
-    const double C100 = 1 / C98;
-    const double C101 = C95 + C100;
-    const double C102 = std::log(C99);
-    const double C103 = C102 * C92;
-    const double C104 = C103 / C93;
-    const double C105 = C104 + 1;
-    matrix.upper[9] = std::pow(rhoA, C90) * 0.00010584 *
-                      ((C105 * (C96 + 2) * std::pow(C100, 3) + 3 * C105 * C101) -
-                       0.0504 * C96 * std::pow(C101, 2)) /
-                      (std::pow(C105, 3) * 4 * std::pow(C89, 16. / 3.));
+    const double C93 = rhoA + 1e-16;
+    const double C94 = 4. / 3.;
+    const double C95 = std::sqrt(sigmaAa);
+    const double C96 = 0.0252 * C95;
+    const double C97 = std::pow(C93, C94);
+    const double C98 = C95 / C97;
+    const double C99 = excgrid::internal::AsinhOverX(C98);
+    const double C100 = std::pow(C98, 2);
+    const double C101 = C100 + 1.;
+    const double C102 = std::sqrt(C101);
+    const double C103 = C98 + C102;
+    const double C104 = 1 / C102;
+    const double C105 = C99 + C104;
+    const double C106 = std::log(C103);
+    const double C107 = C106 * C96;
+    const double C108 = C107 / C97;
+    const double C109 = C108 + 1;
+    matrix.upper[9] = std::pow(rhoA, C94) * 0.00010584 *
+                      ((C109 * (C100 + 2) * std::pow(C104, 3) + 3 * C109 * C105) -
+                       0.0504 * C100 * std::pow(C105, 2)) /
+                      (std::pow(C109, 3) * 4 * std::pow(C93, 16. / 3.));
 
     matrix.upper[10] = 0;
 
@@ -1318,27 +1068,27 @@ void Becke88ExchangeSecondDerivatives(double rhoA,
 
     matrix.upper[13] = 0;
 
-    const double C106 = rhoB + 1e-16;
-    const double C107 = 4. / 3.;
-    const double C108 = std::sqrt(sigmaBb);
-    const double C109 = 0.0252 * C108;
-    const double C110 = std::pow(C106, C107);
-    const double C111 = C108 / C110;
-    const double C112 = excgrid::internal::AsinhOverX(C111);
-    const double C113 = std::pow(C111, 2);
-    const double C114 = C113 + 1.;
-    const double C115 = std::sqrt(C114);
-    const double C116 = C111 + C115;
-    const double C117 = 1 / C115;
-    const double C118 = C112 + C117;
-    const double C119 = std::log(C116);
-    const double C120 = C119 * C109;
-    const double C121 = C120 / C110;
-    const double C122 = C121 + 1;
-    matrix.upper[14] = std::pow(rhoB, C107) * 0.00010584 *
-                       ((C122 * (C113 + 2) * std::pow(C117, 3) + 3 * C122 * C118) -
-                        0.0504 * C113 * std::pow(C118, 2)) /
-                       (std::pow(C122, 3) * 4 * std::pow(C106, 16. / 3.));
+    const double C110 = rhoB + 1e-16;
+    const double C111 = 4. / 3.;
+    const double C112 = std::sqrt(sigmaBb);
+    const double C113 = 0.0252 * C112;
+    const double C114 = std::pow(C110, C111);
+    const double C115 = C112 / C114;
+    const double C116 = excgrid::internal::AsinhOverX(C115);
+    const double C117 = std::pow(C115, 2);
+    const double C118 = C117 + 1.;
+    const double C119 = std::sqrt(C118);
+    const double C120 = C115 + C119;
+    const double C121 = 1 / C119;
+    const double C122 = C116 + C121;
+    const double C123 = std::log(C120);
+    const double C124 = C123 * C113;
+    const double C125 = C124 / C114;
+    const double C126 = C125 + 1;
+    matrix.upper[14] = std::pow(rhoB, C111) * 0.00010584 *
+                       ((C126 * (C117 + 2) * std::pow(C121, 3) + 3 * C126 * C122) -
+                        0.0504 * C117 * std::pow(C122, 2)) /
+                       (std::pow(C126, 3) * 4 * std::pow(C110, 16. / 3.));
 }
 
 } // namespace excgrid

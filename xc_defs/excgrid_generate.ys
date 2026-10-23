@@ -386,6 +386,30 @@ Function("ExCancelDensityPower", {e, rho, others})
         ]);
 ];
 
+// Shift a density-multiple base of a negative two-thirds power by its scale.
+Function("ExGuardDensityPower", {e, rho, others, csl})
+[
+    Local(l, u, k, args, i);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 3) And (l[1] = ^)
+                And IsZero(ExProgramExpand(csl, l[3]) * 3. + 2.),
+                [
+                    u := ExGuardDensityPower(l[2], rho, others, csl);
+                    k := ExDensityPowerScale(ExProgramExpand(csl, u), rho, others);
+                    If (IsZero(k), UnList({^, u, l[3]}),
+                        UnList({^, u + k * SigmaGuard, l[3]}));
+                ],
+                [
+                    args := {};
+                    For (i := 2, i <= Length(l), i := i + 1)
+                        [ args := Concat(args, {ExGuardDensityPower(l[i], rho, others, csl)}); ];
+                    UnList(Concat({l[1]}, args));
+                ]);
+        ]);
+];
+
 // --- Guarding the sigma-edge radical the cancellation cannot reach ---------
 //
 // Differentiating w.r.t. a sigma component leaves one factor 1 / Sqrt(gamma)
@@ -461,6 +485,16 @@ Function("ExSigmaRadicalScale", {u, sigma, others})
     If (IsNumber(c) And (c > 0) And (v = 0), c, 0);
 ];
 
+// The same scale over a set of components: the first that applies.
+Function("ExSigmaRadicalScaleAny", {u, sigmas})
+[
+    Local(c, s);
+    c := 0;
+    ForEach(s, sigmas)
+        [ If (IsZero(c), c := ExSigmaRadicalScale(u, s, ExWithout(sigmas, s))); ];
+    c;
+];
+
 // The walk itself: inside every radical the guard applies to, replace the
 // radicand u by u + c * SigmaGuard, where c is its scale (above) and
 // SigmaGuard is the constant the skeletons declare beside Pi.  Radicals are
@@ -492,6 +526,75 @@ Function("ExGuardSigmaRadical", {e, sigma, others})
             );
         ]
     );
+];
+
+// Shift every sigma-edge radical of an expression.  The scale is read from the
+// radicand expanded through `csl`, so a tag-carried radicand is still measured.
+Function("ExGuardSigmaRadicals", {e, sigmas, csl})
+[
+    Local(l, u, c, args, i);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 2) And (l[1] = Sqrt),
+                [
+                    u := ExGuardSigmaRadicals(l[2], sigmas, csl);
+                    c := ExSigmaRadicalScaleAny(ExProgramExpand(csl, l[2]), sigmas);
+                    If (IsZero(c), UnList({Sqrt, u}), UnList({Sqrt, u + c * SigmaGuard}));
+                ],
+                [
+                    args := {};
+                    For (i := 2, i <= Length(l), i := i + 1)
+                        [ args := Concat(args, {ExGuardSigmaRadicals(l[i], sigmas, csl)}); ];
+                    UnList(Concat({l[1]}, args));
+                ]
+            );
+        ]
+    );
+];
+
+// Apply the radical shift to every assignment and the reduced expression of a
+// CSE program.  Every scale is measured against the original program, so the
+// shifts added by earlier assignments do not feed back into later scales.
+Function("ExProgramGuardSigma", {csl, reduced, sigmas})
+[
+    Local(out, as);
+    out := {};
+    ForEach(as, csl)
+        [ out := Concat(out, {{as[1], ExGuardSigmaRadicals(as[2], sigmas, csl)}}); ];
+    {out, ExGuardSigmaRadicals(reduced, sigmas, csl)};
+];
+
+// Does the expression carry a square root?
+Function("ExHasRadical", {e})
+[
+    Local(l, hit, x);
+    If (IsAtom(e), False,
+        [
+            l := Listify(e);
+            If ((Length(l) = 2) And (l[1] = Sqrt), True,
+                [
+                    hit := False;
+                    ForEach(x, l) [ If (ExHasRadical(x), hit := True); ];
+                    hit;
+                ]);
+        ]);
+];
+
+// The square of an expression with every square root reduced to its radicand.
+Function("ExSquareWithRadicals", {e})
+[
+    Local(l);
+    If (IsAtom(e), e * e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 2) And (l[1] = Sqrt), l[2],
+            If (ExOpIs(l, ExU / ExV),
+                ExSquareWithRadicals(l[2]) / ExSquareWithRadicals(l[3]),
+            If (ExOpIs(l, ExU * ExV),
+                ExSquareWithRadicals(l[2]) * ExSquareWithRadicals(l[3]),
+                UnList({^, e, 2}))));
+        ]);
 ];
 
 // Rebuilds a CSE assignment list for the skeleton: the yacas CSE tags
@@ -578,9 +681,9 @@ RuleBaseListed("ExKernelGenerate", {fname, e, args});
 //   TierGuard     - the tier, with every applicable radical shifted
 //                   (ExGuardSigmaRadical) so the entry is finite at a zero
 //                   gradient.  The shift is applied to the FIRST derivative,
-//                   before the second differentiation.  The correlation
-//                   forms, and becke88/pw91 for their entries other than the
-//                   two hand-derived ones.
+//                   before the second differentiation.  becke88/pw91 and p86.
+//   TierRational  - the tier, with the squared gradient tag reduced to its
+//                   radicand after CSE (ExReduceTagPowers).  The PBE forms.
 //   TierCancelSum - the tier, with the numerator sum's nested quotients
 //                   cancelled (ExCancelSumQuotients).  PBEsol only.
 // The default, when the list has no mode element, is True.
@@ -1304,6 +1407,62 @@ Function("ExProgramInlineRadicals", {prog})
     {red, out};
 ];
 
+// The right-hand side a program gives a tag, or {} when it defines none.
+Function("ExProgramTagRhs", {csl, t})
+[
+    Local(out, as, found);
+    out := {};
+    found := False;
+    ForEach(as, csl)
+        [ If (Not found And (as[1] = t), [ out := as[2]; found := True; ]); ];
+    out;
+];
+
+// Reduce an even power of a tag whose right-hand side carries a square root:
+// the squared gradient tag becomes a power of its radicand.
+Function("ExReduceTagPowers", {e, csl})
+[
+    Local(l, u, rhs, r, i, n, args);
+    If (IsAtom(e), e,
+        [
+            l := Listify(e);
+            If ((Length(l) = 3) And (l[1] = ^) And IsInteger(l[3]) And (l[3] > 0)
+                And IsZero(Mod(l[3], 2)),
+                [
+                    u := ExReduceTagPowers(l[2], csl);
+                    rhs := {};
+                    If (IsAtom(u), rhs := ExProgramTagRhs(csl, u));
+                    If (ExHasRadical(rhs),
+                        [
+                            r := 1;
+                            n := l[3] / 2;
+                            For (i := 1, i <= n, i := i + 1)
+                                [ r := ExMul(r, ExSquareWithRadicals(rhs)); ];
+                            r;
+                        ],
+                        UnList({^, u, l[3]}));
+                ],
+                [
+                    args := {};
+                    For (i := 2, i <= Length(l), i := i + 1)
+                        [ args := Concat(args, {ExReduceTagPowers(l[i], csl)}); ];
+                    UnList(Concat({l[1]}, args));
+                ]);
+        ]);
+];
+
+// Apply the tag-power reduction to every assignment and the reduced expression.
+Function("ExProgramReduceTagPowers", {prog})
+[
+    Local(csl, out, red, as);
+    csl := prog[2];
+    out := {};
+    ForEach(as, csl)
+        [ out := Concat(out, {{as[1], ExReduceTagPowers(as[2], csl)}}); ];
+    red := ExReduceTagPowers(prog[1], csl);
+    {red, out};
+];
+
 // One repair, selected by an atom rather than by a function argument.
 Function("ExProgramRepairExpr", {e, mode, v, rest})
 [
@@ -1322,6 +1481,16 @@ Function("ExProgramRepair", {csl, reduced, mode, v, rest})
         [ out := Concat(out, {{as[1], ExProgramRepairExpr(as[2], mode, v, rest)}}); ];
     red := ExProgramRepairExpr(reduced, mode, v, rest);
     {out, red};
+];
+
+// The density-base shift over every assignment and the reduced expression.
+Function("ExProgramGuardDensity", {csl, reduced, rho, others, res})
+[
+    Local(out, as);
+    out := {};
+    ForEach(as, csl)
+        [ out := Concat(out, {{as[1], ExGuardDensityPower(as[2], rho, others, res)}}); ];
+    {out, ExGuardDensityPower(reduced, rho, others, res)};
 ];
 
 // Apply the spin-edge limit substitution to every assignment and the reduced
@@ -1383,6 +1552,8 @@ Function("ExFirstDerivOutput", {Pd, v, mode, gv, rest, sl})
     Local(r, rep, csl, kept);
     r := ExProgramDeriv(Pd, v);
     rep := ExProgramRepair(r[2], r[1], mode, gv, rest);
+    If (mode = DensityPower,
+        rep := ExProgramGuardDensity(rep[1], rep[2], gv, rest, Pd[2]));
     csl := ExProgramNeeded(Concat(Pd[2], rep[1]), rep[2]);
     kept := ExKeepNew(csl, rep[1]);
     {rep[2], kept};
@@ -1390,15 +1561,21 @@ Function("ExFirstDerivOutput", {Pd, v, mode, gv, rest, sl})
 
 // The GGA straight-line kernel on the program representation.
 ExGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, tier) := [
-    Local(P, Pd, ecsl, eexpr, r);
+    Local(P, Pd, ecsl, eexpr, r, etier, gp);
 
     asecondDerivativeEntries := {};
     atierNeedsGuard := (tier = TierGuard);
     If (Not (tier = False),
-        asecondDerivativeEntries :=
-            ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier));
+        [
+            etier := e;
+            If (tier = TierGuard, etier := ExGuardSigmaRadicals(e, {gaa, gab, gbb}, {}));
+            asecondDerivativeEntries :=
+                ExSecondDerivativeEntries(etier, {ra, rb, gaa, gab, gbb}, {gaa, gab, gbb}, tier);
+        ]);
 
     {eexpr, ecsl} := CSE(e);
+    gp := ExProgramGuardSigma(ecsl, eexpr, {gaa, gab, gbb});
+    ecsl := gp[1]; eexpr := gp[2];
     P := {eexpr, ecsl};
     Pd := ExProgramInlineRadicals(P);
 
@@ -1431,6 +1608,7 @@ Function("ExSecondDerivativeEntries", {e, vars, radicalVars, tierMode})
     {e, cslP} := CSE(e);
     P := {e, cslP};
     Pd := ExProgramInlineRadicals(P);
+    If (tierMode = TierRational, Pd := ExProgramReduceTagPowers(Pd));
 
     RD := Association'Create();
     ForEach(v, vars)

@@ -13,10 +13,6 @@
 
     e := X'PbeCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // TierGuard: the order-1 kernel now guards the TOTAL-gradient radical, so
-    // it answers the finite limit at exactly zero gradient instead of dividing
-    // a CSE temporary by its own zero (owner ruling 2026-10-19).  The tier is
-    // generated with the same shift; values above ~1e-284 in the gradient are
-    // bit-identical to the old arithmetic.
-    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
+    // TierRational: the tier squares the gradient only through its radicand.
+    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierRational);
 ?>

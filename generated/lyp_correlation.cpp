@@ -141,23 +141,23 @@ XcKernelValue LypCorrelation(
              C158) -
         C182 * sigmaAb * C162 * -7. * C148 / (9. * C158);
 
-    const double C186 = rhoA;
-    const double C187 = 1;
-    const double C188 = C150 * std::pow(C149, C150 - 1) * C187;
-    const double C189 = C151 * std::pow(C149, C151 - 1) * C187;
-    const double C190 = 0.2533 * C189 / std::pow(C154, 2);
-    const double C191 = -0.2533 * C189 / std::pow(C154, 2);
-    const double C192 = -0.349 * C189 / std::pow(C154, 2);
-    const double C193 = C192;
-    const double C194 = std::exp(C155) * C190;
-    const double C195 = C159 * C188 + C153 * C194;
-    const double C196 = C158 * C189 + C154 * C193;
-    const double C197 = 0.00649176 * C195;
-    const double C198 = -0.349 * C196 / std::pow(C161, 2);
-    const double C199 = C191 + C198;
-    const double C200 = 3. * C199;
-    const double C201 = C199;
-    const double C202 = -C200;
+    const double C196 = rhoA;
+    const double C197 = 1;
+    const double C198 = C150 * std::pow(C149, C150 - 1) * C197;
+    const double C199 = C151 * std::pow(C149, C151 - 1) * C197;
+    const double C200 = 0.2533 * C199 / std::pow(C154, 2);
+    const double C201 = -0.2533 * C199 / std::pow(C154, 2);
+    const double C202 = -0.349 * C199 / std::pow(C154, 2);
+    const double C203 = C202;
+    const double C204 = std::exp(C155) * C200;
+    const double C205 = C159 * C198 + C153 * C204;
+    const double C206 = C158 * C199 + C154 * C203;
+    const double C207 = 0.00649176 * C205;
+    const double C208 = -0.349 * C206 / std::pow(C161, 2);
+    const double C209 = C201 + C208;
+    const double C210 = 3. * C209;
+    const double C211 = C209;
+    const double C212 = -C210;
 
     result.vrhoB =
         ((((((((sigmaBb * C162 * C148 * C166 / (C149 * 9. * C158) -
@@ -174,7 +174,7 @@ XcKernelValue LypCorrelation(
                   0.19672 * rhoA * rhoB * C158 / std::pow(C149 * C158, 2)) -
                  sigmaAb * C162 * 8. * C149 / (3. * C158)) +
                 sigmaBb * C162 * C148 * C166 * rhoB / (9. * std::pow(C149, 2) * C158)) *
-                   C187) +
+                   C197) +
               (sigmaBb * ((C167 - C166 * rhoB / C149) * C148 / 9. - std::pow(rhoA, 2)) * C162 /
                    std::pow(C158, 2) -
                ((((-10. * (std::pow(rhoA, C152) + std::pow(rhoB, C152)) * rhoB * rhoA * 0.00649176 *
@@ -185,24 +185,24 @@ XcKernelValue LypCorrelation(
                      std::pow(C158, 2)) -
                 sigmaAb * ((47. - 7. * C164) * C148 / 9. - 4. * std::pow(C149, 2) / 3.) * C162 /
                     std::pow(C158, 2))) *
-                  C193) -
-             C195 * (std::pow(rhoA, C152) + std::pow(rhoB, C152)) * rhoB * rhoA * 0.00649176 *
+                  C203) -
+             C205 * (std::pow(rhoA, C152) + std::pow(rhoB, C152)) * rhoB * rhoA * 0.00649176 *
                  std::pow(3. * std::pow(Pi, 2), 2. / 3.) * 3. * std::pow(2., 11. / 3.) /
                  (10. * C158)) -
-            C202 * (sigmaAa * C162 * C148 + sigmaBb * C162 * C148) / (9. * C158)) +
+            C212 * (sigmaAa * C162 * C148 + sigmaBb * C162 * C148) / (9. * C158)) +
            (sigmaAa * C162 * C148 * rhoA / (C149 * 9. * C158) -
             (-sigmaBb * C162 * C148 * rhoB / C149) / (9. * C158)) *
-               C201) -
-          C186 *
+               C211) -
+          C196 *
               ((sigmaAa * C162 * (C167 - C166 * rhoA / C149) + sigmaAb * C162 * (47. - 7. * C164)) +
                sigmaBb * C162 * (C167 - C166 * rhoB / C149)) /
               (9. * C158)) -
-         C197 *
+         C207 *
              ((sigmaAa * ((C167 - C166 * rhoA / C149) * C148 / 9. - std::pow(rhoB, 2)) +
                sigmaAb * ((47. - 7. * C164) * C148 / 9. - 4. * std::pow(C149, 2) / 3.)) +
               sigmaBb * ((C167 - C166 * rhoB / C149) * C148 / 9. - std::pow(rhoA, 2))) /
              C158) -
-        C199 * sigmaAb * C162 * -7. * C148 / (9. * C158);
+        C209 * sigmaAb * C162 * -7. * C148 / (9. * C158);
 
     result.vsigmaAa = -((C167 - C166 * rhoA / C149) * C148 / 9. - std::pow(rhoB, 2)) * C162 / C158;
 

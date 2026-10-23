@@ -14,8 +14,6 @@
 
     e := X'Pw91Correlation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // TierGuard: the order-1 kernel now guards the TOTAL-gradient radical, so
-    // it answers the finite limit at exactly zero gradient (owner ruling
-    // 2026-10-19).  The tier is generated with the same shift.
-    ExKernelGenerate("Pw91Correlation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard);
+    // TierRational: the tier squares the gradient only through its radicand.
+    ExKernelGenerate("Pw91Correlation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierRational);
 ?>

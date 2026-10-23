@@ -74,7 +74,7 @@ XcKernelValue Pw91Correlation(
     const double C1223 = 1. - C1218;
     const double C1224 = 1. - C1219;
     const double C1225 = 3. / C1215;
-    const double C1226 = std::sqrt(C1216);
+    const double C1226 = std::sqrt(C1216 + SigmaGuard);
     const double C1227 = std::pow(C1214, C1204);
     const double C1228 = C1227 / Pi;
     const double C1229 = std::sqrt(C1225);
@@ -180,105 +180,105 @@ XcKernelValue Pw91Correlation(
              std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * C1250, 2) * C1290 /
                       std::pow(C1214, C1205)));
 
-    const double C1315 = 1;
-    const double C1316 = 1;
-    const double C1317 = 0.9999999999999999 * C1316 + 0.;
-    const double C1318 = C1207 * C1315;
-    const double C1319 = Pi * C1315;
-    const double C1320 = C1316 / C1202 - C1315 * C1203 / std::pow(C1202, 2);
-    const double C1321 = 3. * C1318;
-    const double C1322 = 4. * C1319;
-    const double C1323 = C1317 / C1202 - C1315 * C1208 / std::pow(C1202, 2);
-    const double C1324 = 4 * std::pow(C1212, 3) * C1320;
-    const double C1325 = 0.;
-    const double C1326 = C1323;
-    const double C1327 = -C1323;
-    const double C1328 = -C1324;
-    const double C1329 = -3. * C1322 / std::pow(C1215, 2);
-    const double C1330 = C1204 * std::pow(C1214, C1204 - 1) * C1321;
-    const double C1331 = C1330 / Pi;
-    const double C1332 = C1205 * std::pow(C1222, C1205 - 1) * C1326;
-    const double C1333 = C1206 * std::pow(C1222, C1206 - 1) * C1326;
-    const double C1334 = C1205 * std::pow(C1223, C1205 - 1) * C1327;
-    const double C1335 = C1206 * std::pow(C1223, C1206 - 1) * C1327;
-    const double C1336 = C1204 * std::pow(C1225, C1204 - 1) * C1329;
-    const double C1337 = C1205 * std::pow(C1225, C1205 - 1) * C1329;
-    const double C1338 = 0.11125 * C1336;
-    const double C1339 = 0.20548 * C1336;
-    const double C1340 = 0.2137 * C1336;
-    const double C1341 = 0.49294 * C1337;
-    const double C1342 = 0.49671 * C1337;
-    const double C1343 = 0.62517 * C1337;
-    const double C1344 = 0.88026 * C1329 / (2 * std::sqrt(C1225));
-    const double C1345 = 1.6382 * C1329 / (2 * std::sqrt(C1225));
-    const double C1346 = 3.3662 * C1329 / (2 * std::sqrt(C1225));
-    const double C1347 = 3.5876 * C1336;
-    const double C1348 = 3.6231 * C1336;
-    const double C1349 = 6.1977 * C1336;
-    const double C1350 = C1332 + C1334;
-    const double C1351 = C1333 + C1335;
-    const double C1352 = 7.5957 * C1336 / (2 * std::sqrt(C1234));
-    const double C1353 = 10.357 * C1336 / (2 * std::sqrt(C1234));
-    const double C1354 = 0.141189e2 * C1336 / (2 * std::sqrt(C1234));
-    const double C1355 = C1331 * C1248 / (2 * std::sqrt(C1228)) + std::sqrt(C1228) * C1350;
-    const double C1356 = C1338;
-    const double C1357 = C1339;
-    const double C1358 = C1340;
-    const double C1359 = C1351;
-    const double C1360 = C1350 / 2.;
-    const double C1361 = 2. * C1355;
-    const double C1362 = C1352 + C1347;
-    const double C1363 = C1353 + C1348;
-    const double C1364 = C1354 + C1349;
-    const double C1365 = 3 * std::pow(C1260, 2) * C1360;
-    const double C1366 = 0.4452402138403639e-2 * C1365 + 0.;
-    const double C1367 = C1261 * C1315 + C1202 * C1361;
-    const double C1368 = C1362 + C1345;
-    const double C1369 = C1363 + C1344;
-    const double C1370 = C1364 + C1346;
-    const double C1371 = C1368 + C1341;
-    const double C1372 = C1369 + C1342;
-    const double C1373 = C1370 + C1343;
-    const double C1374 = C1367 / 2.;
-    const double C1375 = 0.03109 * C1373;
-    const double C1376 = 0.033774 * C1372;
-    const double C1377 = 0.062182 * C1371;
-    const double C1378 = C1374;
-    const double C1379 = 2. * C1378;
-    const double C1380 = (-C1375) / std::pow(C1275, 2);
-    const double C1381 = (-C1376) / std::pow(C1276, 2);
-    const double C1382 = (-C1377) / std::pow(C1277, 2);
-    const double C1383 = C1380;
-    const double C1384 = C1381;
-    const double C1385 = C1382;
-    const double C1386 = (-C1379 * std::sqrt(C1216)) / std::pow(C1279, 2);
-    const double C1387 = C1383 / C1283;
-    const double C1388 = C1384 / C1284;
-    const double C1389 = C1385 / C1285;
-    const double C1390 = 2 * C1286 * C1386;
-    const double C1391 = 0.18 * C1390;
-    const double C1392 = C1288 * C1356 + C1256 * C1388;
-    const double C1393 = C1287 * C1357 + C1257 * C1387;
-    const double C1394 = C1289 * C1358 + C1258 * C1389;
-    const double C1395 = 0.03109 * C1393;
-    const double C1396 = 0.062182 * C1394;
-    const double C1397 = C1259 * C1392 + C1292 * C1359;
-    const double C1398 = C1224 * C1397 + C1297 * C1328;
-    const double C1399 = C1396 - C1395;
-    const double C1400 = 0.033774 * C1398;
-    const double C1401 = C1259 * C1399 + C1299 * C1359;
-    const double C1402 = C1301 * C1324 + C1219 * C1401;
-    const double C1403 = C1400 / C1221 - C1325 * C1300 / std::pow(C1221, 2);
-    const double C1404 = C1403 - C1396;
-    const double C1405 = C1402 / C1220;
-    const double C1406 = C1404 + C1405;
-    const double C1407 = 0.18 * C1406;
-    const double C1408 = C1407 / C1266 - C1366 * C1307 / std::pow(C1266, 2);
-    const double C1409 = -C1408;
-    const double C1410 = std::exp(C1309) * C1409;
-    const double C1411 = C1410;
-    const double C1412 = 0.6672632268006112e-1 * C1411 + 0.;
-    const double C1413 = C1391 / C1312 - C1412 * C1291 / std::pow(C1312, 2);
+    const double C1319 = 1;
+    const double C1320 = 1;
+    const double C1321 = 0.9999999999999999 * C1320 + 0.;
+    const double C1322 = C1207 * C1319;
+    const double C1323 = Pi * C1319;
+    const double C1324 = C1320 / C1202 - C1319 * C1203 / std::pow(C1202, 2);
+    const double C1325 = 3. * C1322;
+    const double C1326 = 4. * C1323;
+    const double C1327 = C1321 / C1202 - C1319 * C1208 / std::pow(C1202, 2);
+    const double C1328 = 4 * std::pow(C1212, 3) * C1324;
+    const double C1329 = 0.;
+    const double C1330 = C1327;
+    const double C1331 = -C1327;
+    const double C1332 = -C1328;
+    const double C1333 = -3. * C1326 / std::pow(C1215, 2);
+    const double C1334 = C1204 * std::pow(C1214, C1204 - 1) * C1325;
+    const double C1335 = C1334 / Pi;
+    const double C1336 = C1205 * std::pow(C1222, C1205 - 1) * C1330;
+    const double C1337 = C1206 * std::pow(C1222, C1206 - 1) * C1330;
+    const double C1338 = C1205 * std::pow(C1223, C1205 - 1) * C1331;
+    const double C1339 = C1206 * std::pow(C1223, C1206 - 1) * C1331;
+    const double C1340 = C1204 * std::pow(C1225, C1204 - 1) * C1333;
+    const double C1341 = C1205 * std::pow(C1225, C1205 - 1) * C1333;
+    const double C1342 = 0.11125 * C1340;
+    const double C1343 = 0.20548 * C1340;
+    const double C1344 = 0.2137 * C1340;
+    const double C1345 = 0.49294 * C1341;
+    const double C1346 = 0.49671 * C1341;
+    const double C1347 = 0.62517 * C1341;
+    const double C1348 = 0.88026 * C1333 / (2 * std::sqrt(C1225));
+    const double C1349 = 1.6382 * C1333 / (2 * std::sqrt(C1225));
+    const double C1350 = 3.3662 * C1333 / (2 * std::sqrt(C1225));
+    const double C1351 = 3.5876 * C1340;
+    const double C1352 = 3.6231 * C1340;
+    const double C1353 = 6.1977 * C1340;
+    const double C1354 = C1336 + C1338;
+    const double C1355 = C1337 + C1339;
+    const double C1356 = 7.5957 * C1340 / (2 * std::sqrt(C1234));
+    const double C1357 = 10.357 * C1340 / (2 * std::sqrt(C1234));
+    const double C1358 = 0.141189e2 * C1340 / (2 * std::sqrt(C1234));
+    const double C1359 = C1335 * C1248 / (2 * std::sqrt(C1228)) + std::sqrt(C1228) * C1354;
+    const double C1360 = C1342;
+    const double C1361 = C1343;
+    const double C1362 = C1344;
+    const double C1363 = C1355;
+    const double C1364 = C1354 / 2.;
+    const double C1365 = 2. * C1359;
+    const double C1366 = C1356 + C1351;
+    const double C1367 = C1357 + C1352;
+    const double C1368 = C1358 + C1353;
+    const double C1369 = 3 * std::pow(C1260, 2) * C1364;
+    const double C1370 = 0.4452402138403639e-2 * C1369 + 0.;
+    const double C1371 = C1261 * C1319 + C1202 * C1365;
+    const double C1372 = C1366 + C1349;
+    const double C1373 = C1367 + C1348;
+    const double C1374 = C1368 + C1350;
+    const double C1375 = C1372 + C1345;
+    const double C1376 = C1373 + C1346;
+    const double C1377 = C1374 + C1347;
+    const double C1378 = C1371 / 2.;
+    const double C1379 = 0.03109 * C1377;
+    const double C1380 = 0.033774 * C1376;
+    const double C1381 = 0.062182 * C1375;
+    const double C1382 = C1378;
+    const double C1383 = 2. * C1382;
+    const double C1384 = (-C1379) / std::pow(C1275, 2);
+    const double C1385 = (-C1380) / std::pow(C1276, 2);
+    const double C1386 = (-C1381) / std::pow(C1277, 2);
+    const double C1387 = C1384;
+    const double C1388 = C1385;
+    const double C1389 = C1386;
+    const double C1390 = (-C1383 * std::sqrt(C1216 + SigmaGuard)) / std::pow(C1279, 2);
+    const double C1391 = C1387 / C1283;
+    const double C1392 = C1388 / C1284;
+    const double C1393 = C1389 / C1285;
+    const double C1394 = 2 * C1286 * C1390;
+    const double C1395 = 0.18 * C1394;
+    const double C1396 = C1288 * C1360 + C1256 * C1392;
+    const double C1397 = C1287 * C1361 + C1257 * C1391;
+    const double C1398 = C1289 * C1362 + C1258 * C1393;
+    const double C1399 = 0.03109 * C1397;
+    const double C1400 = 0.062182 * C1398;
+    const double C1401 = C1259 * C1396 + C1292 * C1363;
+    const double C1402 = C1224 * C1401 + C1297 * C1332;
+    const double C1403 = C1400 - C1399;
+    const double C1404 = 0.033774 * C1402;
+    const double C1405 = C1259 * C1403 + C1299 * C1363;
+    const double C1406 = C1301 * C1328 + C1219 * C1405;
+    const double C1407 = C1404 / C1221 - C1329 * C1300 / std::pow(C1221, 2);
+    const double C1408 = C1407 - C1400;
+    const double C1409 = C1406 / C1220;
+    const double C1410 = C1408 + C1409;
+    const double C1411 = 0.18 * C1410;
+    const double C1412 = C1411 / C1266 - C1370 * C1307 / std::pow(C1266, 2);
+    const double C1413 = -C1412;
+    const double C1414 = std::exp(C1309) * C1413;
+    const double C1415 = C1414;
+    const double C1416 = 0.6672632268006112e-1 * C1415 + 0.;
+    const double C1417 = C1395 / C1312 - C1416 * C1291 / std::pow(C1312, 2);
 
     result.vrhoA =
         ((((((((((0. * C1202 / 0.18 +
@@ -299,8 +299,8 @@ XcKernelValue Pw91Correlation(
                         C1265 * C1290 *
                         std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                                  C1290 / std::pow(C1214, C1205)))) *
-                      C1315) +
-                 C1406 * 0.18 * C1202 / 0.18) +
+                      C1319) +
+                 C1410 * 0.18 * C1202 / 0.18) +
                 C1202 *
                     (0.4452402138403639e-2 *
                          std::log(
@@ -318,7 +318,7 @@ XcKernelValue Pw91Correlation(
                          C1290 *
                          std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                                   C1290 / std::pow(C1214, C1205))) *
-                    C1365) +
+                    C1369) +
                C1202 *
                    (0.4452402138403639e-2 * C1265 * 0.18 * (C1313 + 1.) /
                         (0.12010738082411e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) *
@@ -348,7 +348,7 @@ XcKernelValue Pw91Correlation(
                                       std::pow(C1214, C1205)) *
                              100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) /
                              std::pow(C1214, C1205))) *
-                   C1390) +
+                   C1394) +
               C1202 *
                   (0.4452402138403639e-2 * C1265 *
                        (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) * 0.18 * C1290 -
@@ -359,7 +359,7 @@ XcKernelValue Pw91Correlation(
                              (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.)) +
                          1.)) +
                    0.) *
-                  C1413) +
+                  C1417) +
              C1202 *
                  (0. / 0.18 +
                   15.7559203494831455 *
@@ -370,7 +370,7 @@ XcKernelValue Pw91Correlation(
                        0.8723e4 * ((23.266 * C1234 + 0.007389 * C1235) + 2.568)) /
                       std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                                2)) *
-                 C1336) +
+                 C1340) +
             C1202 *
                 (0. / 0.18 +
                  15.7559203494831455 *
@@ -381,7 +381,7 @@ XcKernelValue Pw91Correlation(
                       0.472e3 * ((23.266 * C1234 + 0.007389 * C1235) + 2.568)) /
                      std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                               2)) *
-                C1337) +
+                C1341) +
            C1202 *
                (0. / 0.18 +
                 -15.7559203494831455 *
@@ -391,7 +391,7 @@ XcKernelValue Pw91Correlation(
                     (std::pow(C1215, 2) *
                      std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                               2))) *
-               C1322) +
+               C1326) +
           C1202 *
               (0. / 0.18 +
                -15.7559203494831455 *
@@ -405,7 +405,7 @@ XcKernelValue Pw91Correlation(
                             C1290 / std::pow(C1214, C1205)) *
                    400. * std::pow(C1260, 3) * std::pow(2. * std::sqrt(C1228), 2) * C1290 /
                    std::pow(C1214, C1205)) *
-              C1360) +
+              C1364) +
          C1202 *
              (0. / 0.18 +
               -15.7559203494831455 *
@@ -419,7 +419,7 @@ XcKernelValue Pw91Correlation(
                            std::pow(C1214, C1205)) *
                   100. * C1290 * std::pow(C1260, 4) * 8. * std::sqrt(C1228) /
                   (2 * std::sqrt(C1228) * std::pow(C1214, C1205))) *
-             C1331) +
+             C1335) +
         C1202 *
             (0. / 0.18 +
              15.7559203494831455 *
@@ -433,107 +433,107 @@ XcKernelValue Pw91Correlation(
                           std::pow(C1214, C1205)) *
                  100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) * C1290 * C1205 *
                  std::pow(C1214, C1205 - 1) / std::pow(std::pow(C1214, C1205), 2)) *
-            C1321;
+            C1325;
 
-    const double C1414 = 1;
-    const double C1415 = -1;
-    const double C1416 = 0.9999999999999999 * C1415 + 0.;
-    const double C1417 = C1207 * C1414;
-    const double C1418 = Pi * C1414;
-    const double C1419 = C1415 / C1202 - C1414 * C1203 / std::pow(C1202, 2);
-    const double C1420 = 3. * C1417;
-    const double C1421 = 4. * C1418;
-    const double C1422 = C1416 / C1202 - C1414 * C1208 / std::pow(C1202, 2);
-    const double C1423 = 4 * std::pow(C1212, 3) * C1419;
-    const double C1424 = 0.;
-    const double C1425 = C1422;
-    const double C1426 = -C1422;
-    const double C1427 = -C1423;
-    const double C1428 = -3. * C1421 / std::pow(C1215, 2);
-    const double C1429 = C1204 * std::pow(C1214, C1204 - 1) * C1420;
-    const double C1430 = C1429 / Pi;
-    const double C1431 = C1205 * std::pow(C1222, C1205 - 1) * C1425;
-    const double C1432 = C1206 * std::pow(C1222, C1206 - 1) * C1425;
-    const double C1433 = C1205 * std::pow(C1223, C1205 - 1) * C1426;
-    const double C1434 = C1206 * std::pow(C1223, C1206 - 1) * C1426;
-    const double C1435 = C1204 * std::pow(C1225, C1204 - 1) * C1428;
-    const double C1436 = C1205 * std::pow(C1225, C1205 - 1) * C1428;
-    const double C1437 = 0.11125 * C1435;
-    const double C1438 = 0.20548 * C1435;
-    const double C1439 = 0.2137 * C1435;
-    const double C1440 = 0.49294 * C1436;
-    const double C1441 = 0.49671 * C1436;
-    const double C1442 = 0.62517 * C1436;
-    const double C1443 = 0.88026 * C1428 / (2 * std::sqrt(C1225));
-    const double C1444 = 1.6382 * C1428 / (2 * std::sqrt(C1225));
-    const double C1445 = 3.3662 * C1428 / (2 * std::sqrt(C1225));
-    const double C1446 = 3.5876 * C1435;
-    const double C1447 = 3.6231 * C1435;
-    const double C1448 = 6.1977 * C1435;
-    const double C1449 = C1431 + C1433;
-    const double C1450 = C1432 + C1434;
-    const double C1451 = 7.5957 * C1435 / (2 * std::sqrt(C1234));
-    const double C1452 = 10.357 * C1435 / (2 * std::sqrt(C1234));
-    const double C1453 = 0.141189e2 * C1435 / (2 * std::sqrt(C1234));
-    const double C1454 = C1430 * C1248 / (2 * std::sqrt(C1228)) + std::sqrt(C1228) * C1449;
-    const double C1455 = C1437;
-    const double C1456 = C1438;
-    const double C1457 = C1439;
-    const double C1458 = C1450;
-    const double C1459 = C1449 / 2.;
-    const double C1460 = 2. * C1454;
-    const double C1461 = C1451 + C1446;
-    const double C1462 = C1452 + C1447;
-    const double C1463 = C1453 + C1448;
-    const double C1464 = 3 * std::pow(C1260, 2) * C1459;
-    const double C1465 = 0.4452402138403639e-2 * C1464 + 0.;
-    const double C1466 = C1261 * C1414 + C1202 * C1460;
-    const double C1467 = C1461 + C1444;
-    const double C1468 = C1462 + C1443;
-    const double C1469 = C1463 + C1445;
-    const double C1470 = C1467 + C1440;
-    const double C1471 = C1468 + C1441;
-    const double C1472 = C1469 + C1442;
-    const double C1473 = C1466 / 2.;
-    const double C1474 = 0.03109 * C1472;
-    const double C1475 = 0.033774 * C1471;
-    const double C1476 = 0.062182 * C1470;
-    const double C1477 = C1473;
-    const double C1478 = 2. * C1477;
-    const double C1479 = (-C1474) / std::pow(C1275, 2);
-    const double C1480 = (-C1475) / std::pow(C1276, 2);
-    const double C1481 = (-C1476) / std::pow(C1277, 2);
-    const double C1482 = C1479;
-    const double C1483 = C1480;
-    const double C1484 = C1481;
-    const double C1485 = (-C1478 * std::sqrt(C1216)) / std::pow(C1279, 2);
-    const double C1486 = C1482 / C1283;
-    const double C1487 = C1483 / C1284;
-    const double C1488 = C1484 / C1285;
-    const double C1489 = 2 * C1286 * C1485;
-    const double C1490 = 0.18 * C1489;
-    const double C1491 = C1288 * C1455 + C1256 * C1487;
-    const double C1492 = C1287 * C1456 + C1257 * C1486;
-    const double C1493 = C1289 * C1457 + C1258 * C1488;
-    const double C1494 = 0.03109 * C1492;
-    const double C1495 = 0.062182 * C1493;
-    const double C1496 = C1259 * C1491 + C1292 * C1458;
-    const double C1497 = C1224 * C1496 + C1297 * C1427;
-    const double C1498 = C1495 - C1494;
-    const double C1499 = 0.033774 * C1497;
-    const double C1500 = C1259 * C1498 + C1299 * C1458;
-    const double C1501 = C1301 * C1423 + C1219 * C1500;
-    const double C1502 = C1499 / C1221 - C1424 * C1300 / std::pow(C1221, 2);
-    const double C1503 = C1502 - C1495;
-    const double C1504 = C1501 / C1220;
-    const double C1505 = C1503 + C1504;
-    const double C1506 = 0.18 * C1505;
-    const double C1507 = C1506 / C1266 - C1465 * C1307 / std::pow(C1266, 2);
-    const double C1508 = -C1507;
-    const double C1509 = std::exp(C1309) * C1508;
-    const double C1510 = C1509;
-    const double C1511 = 0.6672632268006112e-1 * C1510 + 0.;
-    const double C1512 = C1490 / C1312 - C1511 * C1291 / std::pow(C1312, 2);
+    const double C1442 = 1;
+    const double C1443 = -1;
+    const double C1444 = 0.9999999999999999 * C1443 + 0.;
+    const double C1445 = C1207 * C1442;
+    const double C1446 = Pi * C1442;
+    const double C1447 = C1443 / C1202 - C1442 * C1203 / std::pow(C1202, 2);
+    const double C1448 = 3. * C1445;
+    const double C1449 = 4. * C1446;
+    const double C1450 = C1444 / C1202 - C1442 * C1208 / std::pow(C1202, 2);
+    const double C1451 = 4 * std::pow(C1212, 3) * C1447;
+    const double C1452 = 0.;
+    const double C1453 = C1450;
+    const double C1454 = -C1450;
+    const double C1455 = -C1451;
+    const double C1456 = -3. * C1449 / std::pow(C1215, 2);
+    const double C1457 = C1204 * std::pow(C1214, C1204 - 1) * C1448;
+    const double C1458 = C1457 / Pi;
+    const double C1459 = C1205 * std::pow(C1222, C1205 - 1) * C1453;
+    const double C1460 = C1206 * std::pow(C1222, C1206 - 1) * C1453;
+    const double C1461 = C1205 * std::pow(C1223, C1205 - 1) * C1454;
+    const double C1462 = C1206 * std::pow(C1223, C1206 - 1) * C1454;
+    const double C1463 = C1204 * std::pow(C1225, C1204 - 1) * C1456;
+    const double C1464 = C1205 * std::pow(C1225, C1205 - 1) * C1456;
+    const double C1465 = 0.11125 * C1463;
+    const double C1466 = 0.20548 * C1463;
+    const double C1467 = 0.2137 * C1463;
+    const double C1468 = 0.49294 * C1464;
+    const double C1469 = 0.49671 * C1464;
+    const double C1470 = 0.62517 * C1464;
+    const double C1471 = 0.88026 * C1456 / (2 * std::sqrt(C1225));
+    const double C1472 = 1.6382 * C1456 / (2 * std::sqrt(C1225));
+    const double C1473 = 3.3662 * C1456 / (2 * std::sqrt(C1225));
+    const double C1474 = 3.5876 * C1463;
+    const double C1475 = 3.6231 * C1463;
+    const double C1476 = 6.1977 * C1463;
+    const double C1477 = C1459 + C1461;
+    const double C1478 = C1460 + C1462;
+    const double C1479 = 7.5957 * C1463 / (2 * std::sqrt(C1234));
+    const double C1480 = 10.357 * C1463 / (2 * std::sqrt(C1234));
+    const double C1481 = 0.141189e2 * C1463 / (2 * std::sqrt(C1234));
+    const double C1482 = C1458 * C1248 / (2 * std::sqrt(C1228)) + std::sqrt(C1228) * C1477;
+    const double C1483 = C1465;
+    const double C1484 = C1466;
+    const double C1485 = C1467;
+    const double C1486 = C1478;
+    const double C1487 = C1477 / 2.;
+    const double C1488 = 2. * C1482;
+    const double C1489 = C1479 + C1474;
+    const double C1490 = C1480 + C1475;
+    const double C1491 = C1481 + C1476;
+    const double C1492 = 3 * std::pow(C1260, 2) * C1487;
+    const double C1493 = 0.4452402138403639e-2 * C1492 + 0.;
+    const double C1494 = C1261 * C1442 + C1202 * C1488;
+    const double C1495 = C1489 + C1472;
+    const double C1496 = C1490 + C1471;
+    const double C1497 = C1491 + C1473;
+    const double C1498 = C1495 + C1468;
+    const double C1499 = C1496 + C1469;
+    const double C1500 = C1497 + C1470;
+    const double C1501 = C1494 / 2.;
+    const double C1502 = 0.03109 * C1500;
+    const double C1503 = 0.033774 * C1499;
+    const double C1504 = 0.062182 * C1498;
+    const double C1505 = C1501;
+    const double C1506 = 2. * C1505;
+    const double C1507 = (-C1502) / std::pow(C1275, 2);
+    const double C1508 = (-C1503) / std::pow(C1276, 2);
+    const double C1509 = (-C1504) / std::pow(C1277, 2);
+    const double C1510 = C1507;
+    const double C1511 = C1508;
+    const double C1512 = C1509;
+    const double C1513 = (-C1506 * std::sqrt(C1216 + SigmaGuard)) / std::pow(C1279, 2);
+    const double C1514 = C1510 / C1283;
+    const double C1515 = C1511 / C1284;
+    const double C1516 = C1512 / C1285;
+    const double C1517 = 2 * C1286 * C1513;
+    const double C1518 = 0.18 * C1517;
+    const double C1519 = C1288 * C1483 + C1256 * C1515;
+    const double C1520 = C1287 * C1484 + C1257 * C1514;
+    const double C1521 = C1289 * C1485 + C1258 * C1516;
+    const double C1522 = 0.03109 * C1520;
+    const double C1523 = 0.062182 * C1521;
+    const double C1524 = C1259 * C1519 + C1292 * C1486;
+    const double C1525 = C1224 * C1524 + C1297 * C1455;
+    const double C1526 = C1523 - C1522;
+    const double C1527 = 0.033774 * C1525;
+    const double C1528 = C1259 * C1526 + C1299 * C1486;
+    const double C1529 = C1301 * C1451 + C1219 * C1528;
+    const double C1530 = C1527 / C1221 - C1452 * C1300 / std::pow(C1221, 2);
+    const double C1531 = C1530 - C1523;
+    const double C1532 = C1529 / C1220;
+    const double C1533 = C1531 + C1532;
+    const double C1534 = 0.18 * C1533;
+    const double C1535 = C1534 / C1266 - C1493 * C1307 / std::pow(C1266, 2);
+    const double C1536 = -C1535;
+    const double C1537 = std::exp(C1309) * C1536;
+    const double C1538 = C1537;
+    const double C1539 = 0.6672632268006112e-1 * C1538 + 0.;
+    const double C1540 = C1518 / C1312 - C1539 * C1291 / std::pow(C1312, 2);
 
     result.vrhoB =
         ((((((((((0. * C1202 / 0.18 +
@@ -554,8 +554,8 @@ XcKernelValue Pw91Correlation(
                         C1265 * C1290 *
                         std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                                  C1290 / std::pow(C1214, C1205)))) *
-                      C1414) +
-                 C1505 * 0.18 * C1202 / 0.18) +
+                      C1442) +
+                 C1533 * 0.18 * C1202 / 0.18) +
                 C1202 *
                     (0.4452402138403639e-2 *
                          std::log(
@@ -573,7 +573,7 @@ XcKernelValue Pw91Correlation(
                          C1290 *
                          std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                                   C1290 / std::pow(C1214, C1205))) *
-                    C1464) +
+                    C1492) +
                C1202 *
                    (0.4452402138403639e-2 * C1265 * 0.18 * (C1313 + 1.) /
                         (0.12010738082411e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) *
@@ -603,7 +603,7 @@ XcKernelValue Pw91Correlation(
                                       std::pow(C1214, C1205)) *
                              100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) /
                              std::pow(C1214, C1205))) *
-                   C1489) +
+                   C1517) +
               C1202 *
                   (0.4452402138403639e-2 * C1265 *
                        (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) * 0.18 * C1290 -
@@ -614,7 +614,7 @@ XcKernelValue Pw91Correlation(
                              (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.)) +
                          1.)) +
                    0.) *
-                  C1512) +
+                  C1540) +
              C1202 *
                  (0. / 0.18 +
                   15.7559203494831455 *
@@ -625,7 +625,7 @@ XcKernelValue Pw91Correlation(
                        0.8723e4 * ((23.266 * C1234 + 0.007389 * C1235) + 2.568)) /
                       std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                                2)) *
-                 C1435) +
+                 C1463) +
             C1202 *
                 (0. / 0.18 +
                  15.7559203494831455 *
@@ -636,7 +636,7 @@ XcKernelValue Pw91Correlation(
                       0.472e3 * ((23.266 * C1234 + 0.007389 * C1235) + 2.568)) /
                      std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                               2)) *
-                C1436) +
+                C1464) +
            C1202 *
                (0. / 0.18 +
                 -15.7559203494831455 *
@@ -646,7 +646,7 @@ XcKernelValue Pw91Correlation(
                     (std::pow(C1215, 2) *
                      std::pow(1000. * (((8.723 * C1234 + 0.472 * C1235) + 0.22167 / C1215) + 1.),
                               2))) *
-               C1421) +
+               C1449) +
           C1202 *
               (0. / 0.18 +
                -15.7559203494831455 *
@@ -660,7 +660,7 @@ XcKernelValue Pw91Correlation(
                             C1290 / std::pow(C1214, C1205)) *
                    400. * std::pow(C1260, 3) * std::pow(2. * std::sqrt(C1228), 2) * C1290 /
                    std::pow(C1214, C1205)) *
-              C1459) +
+              C1487) +
          C1202 *
              (0. / 0.18 +
               -15.7559203494831455 *
@@ -674,7 +674,7 @@ XcKernelValue Pw91Correlation(
                            std::pow(C1214, C1205)) *
                   100. * C1290 * std::pow(C1260, 4) * 8. * std::sqrt(C1228) /
                   (2 * std::sqrt(C1228) * std::pow(C1214, C1205))) *
-             C1430) +
+             C1458) +
         C1202 *
             (0. / 0.18 +
              15.7559203494831455 *
@@ -688,54 +688,54 @@ XcKernelValue Pw91Correlation(
                           std::pow(C1214, C1205)) *
                  100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) * C1290 * C1205 *
                  std::pow(C1214, C1205 - 1) / std::pow(std::pow(C1214, C1205), 2)) *
-            C1420;
+            C1448;
 
-    const double C1513 = 0.;
-    const double C1514 = 1;
-    const double C1515 = C1514;
-    const double C1516 = C1513 / C1202;
-    const double C1517 = 0.;
-    const double C1518 = C1516;
-    const double C1519 = -C1516;
-    const double C1520 = C1205 * std::pow(C1222, C1205 - 1) * C1518;
-    const double C1521 = C1206 * std::pow(C1222, C1206 - 1) * C1518;
-    const double C1522 = C1205 * std::pow(C1223, C1205 - 1) * C1519;
-    const double C1523 = C1206 * std::pow(C1223, C1206 - 1) * C1519;
-    const double C1524 = C1520 + C1522;
-    const double C1525 = C1521 + C1523;
-    const double C1526 = std::sqrt(C1228) * C1524;
-    const double C1527 = C1525;
-    const double C1528 = C1524 / 2.;
-    const double C1529 = 2. * C1526;
-    const double C1530 = 3 * std::pow(C1260, 2) * C1528;
-    const double C1531 = 0.4452402138403639e-2 * C1530 + 0.;
-    const double C1532 = C1202 * C1529;
-    const double C1533 = C1532 / 2.;
-    const double C1534 = C1533;
-    const double C1535 = 2. * C1534;
-    const double C1536 =
-        C1515 / (2 * std::sqrt(C1216) * C1279) - C1535 * std::sqrt(C1216) / std::pow(C1279, 2);
-    const double C1537 = 2 * C1286 * C1536;
-    const double C1538 = 0.18 * C1537;
-    const double C1539 = C1292 * C1527;
-    const double C1540 = C1224 * C1539;
-    const double C1541 = 0.033774 * C1540;
-    const double C1542 = C1299 * C1527;
-    const double C1543 = C1219 * C1542;
-    const double C1544 = C1541 / C1221 - C1517 * C1300 / std::pow(C1221, 2);
-    const double C1545 = C1544;
-    const double C1546 = C1543 / C1220;
-    const double C1547 = C1545 + C1546;
-    const double C1548 = 0.18 * C1547;
-    const double C1549 = C1548 / C1266 - C1531 * C1307 / std::pow(C1266, 2);
-    const double C1550 = -C1549;
-    const double C1551 = std::exp(C1309) * C1550;
-    const double C1552 = C1551;
-    const double C1553 = 0.6672632268006112e-1 * C1552 + 0.;
-    const double C1554 = C1538 / C1312 - C1553 * C1291 / std::pow(C1312, 2);
+    const double C1565 = 0.;
+    const double C1566 = 1;
+    const double C1567 = C1566;
+    const double C1568 = C1565 / C1202;
+    const double C1569 = 0.;
+    const double C1570 = C1568;
+    const double C1571 = -C1568;
+    const double C1572 = C1205 * std::pow(C1222, C1205 - 1) * C1570;
+    const double C1573 = C1206 * std::pow(C1222, C1206 - 1) * C1570;
+    const double C1574 = C1205 * std::pow(C1223, C1205 - 1) * C1571;
+    const double C1575 = C1206 * std::pow(C1223, C1206 - 1) * C1571;
+    const double C1576 = C1572 + C1574;
+    const double C1577 = C1573 + C1575;
+    const double C1578 = std::sqrt(C1228) * C1576;
+    const double C1579 = C1577;
+    const double C1580 = C1576 / 2.;
+    const double C1581 = 2. * C1578;
+    const double C1582 = 3 * std::pow(C1260, 2) * C1580;
+    const double C1583 = 0.4452402138403639e-2 * C1582 + 0.;
+    const double C1584 = C1202 * C1581;
+    const double C1585 = C1584 / 2.;
+    const double C1586 = C1585;
+    const double C1587 = 2. * C1586;
+    const double C1588 = C1567 / (2 * std::sqrt(C1216 + SigmaGuard) * C1279) -
+                         C1587 * std::sqrt(C1216 + SigmaGuard) / std::pow(C1279, 2);
+    const double C1589 = 2 * C1286 * C1588;
+    const double C1590 = 0.18 * C1589;
+    const double C1591 = C1292 * C1579;
+    const double C1592 = C1224 * C1591;
+    const double C1593 = 0.033774 * C1592;
+    const double C1594 = C1299 * C1579;
+    const double C1595 = C1219 * C1594;
+    const double C1596 = C1593 / C1221 - C1569 * C1300 / std::pow(C1221, 2);
+    const double C1597 = C1596;
+    const double C1598 = C1595 / C1220;
+    const double C1599 = C1597 + C1598;
+    const double C1600 = 0.18 * C1599;
+    const double C1601 = C1600 / C1266 - C1583 * C1307 / std::pow(C1266, 2);
+    const double C1602 = -C1601;
+    const double C1603 = std::exp(C1309) * C1602;
+    const double C1604 = C1603;
+    const double C1605 = 0.6672632268006112e-1 * C1604 + 0.;
+    const double C1606 = C1590 / C1312 - C1605 * C1291 / std::pow(C1312, 2);
 
     result.vsigmaAa =
-        ((((0. * C1202 + C1547 * 0.18 * C1202) / 0.18 +
+        ((((0. * C1202 + C1599 * 0.18 * C1202) / 0.18 +
            C1202 *
                (0.4452402138403639e-2 *
                     std::log(0.18 * C1290 * (C1313 + 1.) /
@@ -751,7 +751,7 @@ XcKernelValue Pw91Correlation(
                     C1290 *
                     std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                              C1290 / std::pow(C1214, C1205))) *
-               C1530) +
+               C1582) +
           C1202 *
               (0.4452402138403639e-2 * C1265 * 0.18 * (C1313 + 1.) /
                    (0.12010738082411e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) *
@@ -777,7 +777,7 @@ XcKernelValue Pw91Correlation(
                                  C1290 / std::pow(C1214, C1205)) *
                         100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) /
                         std::pow(C1214, C1205))) *
-              C1537) +
+              C1589) +
          C1202 *
              (0.4452402138403639e-2 * C1265 *
                   (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) * 0.18 * C1290 -
@@ -787,7 +787,7 @@ XcKernelValue Pw91Correlation(
                         (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.)) +
                     1.)) +
               0.) *
-             C1554) +
+             C1606) +
         C1202 *
             (0. / 0.18 +
              -15.7559203494831455 *
@@ -801,55 +801,55 @@ XcKernelValue Pw91Correlation(
                           std::pow(C1214, C1205)) *
                  400. * std::pow(C1260, 3) * std::pow(2. * std::sqrt(C1228), 2) * C1290 /
                  std::pow(C1214, C1205)) *
-            C1528;
+            C1580;
 
-    const double C1555 = 2.;
-    const double C1556 = 0.;
-    const double C1557 = C1555;
-    const double C1558 = C1557;
-    const double C1559 = C1556 / C1202;
-    const double C1560 = 0.;
-    const double C1561 = C1559;
-    const double C1562 = -C1559;
-    const double C1563 = C1205 * std::pow(C1222, C1205 - 1) * C1561;
-    const double C1564 = C1206 * std::pow(C1222, C1206 - 1) * C1561;
-    const double C1565 = C1205 * std::pow(C1223, C1205 - 1) * C1562;
-    const double C1566 = C1206 * std::pow(C1223, C1206 - 1) * C1562;
-    const double C1567 = C1563 + C1565;
-    const double C1568 = C1564 + C1566;
-    const double C1569 = std::sqrt(C1228) * C1567;
-    const double C1570 = C1568;
-    const double C1571 = C1567 / 2.;
-    const double C1572 = 2. * C1569;
-    const double C1573 = 3 * std::pow(C1260, 2) * C1571;
-    const double C1574 = 0.4452402138403639e-2 * C1573 + 0.;
-    const double C1575 = C1202 * C1572;
-    const double C1576 = C1575 / 2.;
-    const double C1577 = C1576;
-    const double C1578 = 2. * C1577;
-    const double C1579 =
-        C1558 / (2 * std::sqrt(C1216) * C1279) - C1578 * std::sqrt(C1216) / std::pow(C1279, 2);
-    const double C1580 = 2 * C1286 * C1579;
-    const double C1581 = 0.18 * C1580;
-    const double C1582 = C1292 * C1570;
-    const double C1583 = C1224 * C1582;
-    const double C1584 = 0.033774 * C1583;
-    const double C1585 = C1299 * C1570;
-    const double C1586 = C1219 * C1585;
-    const double C1587 = C1584 / C1221 - C1560 * C1300 / std::pow(C1221, 2);
-    const double C1588 = C1587;
-    const double C1589 = C1586 / C1220;
-    const double C1590 = C1588 + C1589;
-    const double C1591 = 0.18 * C1590;
-    const double C1592 = C1591 / C1266 - C1574 * C1307 / std::pow(C1266, 2);
-    const double C1593 = -C1592;
-    const double C1594 = std::exp(C1309) * C1593;
-    const double C1595 = C1594;
-    const double C1596 = 0.6672632268006112e-1 * C1595 + 0.;
-    const double C1597 = C1581 / C1312 - C1596 * C1291 / std::pow(C1312, 2);
+    const double C1607 = 2.;
+    const double C1608 = 0.;
+    const double C1609 = C1607;
+    const double C1610 = C1609;
+    const double C1611 = C1608 / C1202;
+    const double C1612 = 0.;
+    const double C1613 = C1611;
+    const double C1614 = -C1611;
+    const double C1615 = C1205 * std::pow(C1222, C1205 - 1) * C1613;
+    const double C1616 = C1206 * std::pow(C1222, C1206 - 1) * C1613;
+    const double C1617 = C1205 * std::pow(C1223, C1205 - 1) * C1614;
+    const double C1618 = C1206 * std::pow(C1223, C1206 - 1) * C1614;
+    const double C1619 = C1615 + C1617;
+    const double C1620 = C1616 + C1618;
+    const double C1621 = std::sqrt(C1228) * C1619;
+    const double C1622 = C1620;
+    const double C1623 = C1619 / 2.;
+    const double C1624 = 2. * C1621;
+    const double C1625 = 3 * std::pow(C1260, 2) * C1623;
+    const double C1626 = 0.4452402138403639e-2 * C1625 + 0.;
+    const double C1627 = C1202 * C1624;
+    const double C1628 = C1627 / 2.;
+    const double C1629 = C1628;
+    const double C1630 = 2. * C1629;
+    const double C1631 = C1610 / (2 * std::sqrt(C1216 + SigmaGuard) * C1279) -
+                         C1630 * std::sqrt(C1216 + SigmaGuard) / std::pow(C1279, 2);
+    const double C1632 = 2 * C1286 * C1631;
+    const double C1633 = 0.18 * C1632;
+    const double C1634 = C1292 * C1622;
+    const double C1635 = C1224 * C1634;
+    const double C1636 = 0.033774 * C1635;
+    const double C1637 = C1299 * C1622;
+    const double C1638 = C1219 * C1637;
+    const double C1639 = C1636 / C1221 - C1612 * C1300 / std::pow(C1221, 2);
+    const double C1640 = C1639;
+    const double C1641 = C1638 / C1220;
+    const double C1642 = C1640 + C1641;
+    const double C1643 = 0.18 * C1642;
+    const double C1644 = C1643 / C1266 - C1626 * C1307 / std::pow(C1266, 2);
+    const double C1645 = -C1644;
+    const double C1646 = std::exp(C1309) * C1645;
+    const double C1647 = C1646;
+    const double C1648 = 0.6672632268006112e-1 * C1647 + 0.;
+    const double C1649 = C1633 / C1312 - C1648 * C1291 / std::pow(C1312, 2);
 
     result.vsigmaAb =
-        ((((0. * C1202 + C1590 * 0.18 * C1202) / 0.18 +
+        ((((0. * C1202 + C1642 * 0.18 * C1202) / 0.18 +
            C1202 *
                (0.4452402138403639e-2 *
                     std::log(0.18 * C1290 * (C1313 + 1.) /
@@ -865,7 +865,7 @@ XcKernelValue Pw91Correlation(
                     C1290 *
                     std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                              C1290 / std::pow(C1214, C1205))) *
-               C1573) +
+               C1625) +
           C1202 *
               (0.4452402138403639e-2 * C1265 * 0.18 * (C1313 + 1.) /
                    (0.12010738082411e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) *
@@ -891,7 +891,7 @@ XcKernelValue Pw91Correlation(
                                  C1290 / std::pow(C1214, C1205)) *
                         100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) /
                         std::pow(C1214, C1205))) *
-              C1580) +
+              C1632) +
          C1202 *
              (0.4452402138403639e-2 * C1265 *
                   (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) * 0.18 * C1290 -
@@ -901,7 +901,7 @@ XcKernelValue Pw91Correlation(
                         (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.)) +
                     1.)) +
               0.) *
-             C1597) +
+             C1649) +
         C1202 *
             (0. / 0.18 +
              -15.7559203494831455 *
@@ -915,53 +915,53 @@ XcKernelValue Pw91Correlation(
                           std::pow(C1214, C1205)) *
                  400. * std::pow(C1260, 3) * std::pow(2. * std::sqrt(C1228), 2) * C1290 /
                  std::pow(C1214, C1205)) *
-            C1571;
+            C1623;
 
-    const double C1598 = 0.;
-    const double C1599 = 1;
-    const double C1600 = C1598 / C1202;
-    const double C1601 = 0.;
-    const double C1602 = C1600;
-    const double C1603 = -C1600;
-    const double C1604 = C1205 * std::pow(C1222, C1205 - 1) * C1602;
-    const double C1605 = C1206 * std::pow(C1222, C1206 - 1) * C1602;
-    const double C1606 = C1205 * std::pow(C1223, C1205 - 1) * C1603;
-    const double C1607 = C1206 * std::pow(C1223, C1206 - 1) * C1603;
-    const double C1608 = C1604 + C1606;
-    const double C1609 = C1605 + C1607;
-    const double C1610 = std::sqrt(C1228) * C1608;
-    const double C1611 = C1609;
-    const double C1612 = C1608 / 2.;
-    const double C1613 = 2. * C1610;
-    const double C1614 = 3 * std::pow(C1260, 2) * C1612;
-    const double C1615 = 0.4452402138403639e-2 * C1614 + 0.;
-    const double C1616 = C1202 * C1613;
-    const double C1617 = C1616 / 2.;
-    const double C1618 = C1617;
-    const double C1619 = 2. * C1618;
-    const double C1620 =
-        C1599 / (2 * std::sqrt(C1216) * C1279) - C1619 * std::sqrt(C1216) / std::pow(C1279, 2);
-    const double C1621 = 2 * C1286 * C1620;
-    const double C1622 = 0.18 * C1621;
-    const double C1623 = C1292 * C1611;
-    const double C1624 = C1224 * C1623;
-    const double C1625 = 0.033774 * C1624;
-    const double C1626 = C1299 * C1611;
-    const double C1627 = C1219 * C1626;
-    const double C1628 = C1625 / C1221 - C1601 * C1300 / std::pow(C1221, 2);
-    const double C1629 = C1628;
-    const double C1630 = C1627 / C1220;
-    const double C1631 = C1629 + C1630;
-    const double C1632 = 0.18 * C1631;
-    const double C1633 = C1632 / C1266 - C1615 * C1307 / std::pow(C1266, 2);
-    const double C1634 = -C1633;
-    const double C1635 = std::exp(C1309) * C1634;
-    const double C1636 = C1635;
-    const double C1637 = 0.6672632268006112e-1 * C1636 + 0.;
-    const double C1638 = C1622 / C1312 - C1637 * C1291 / std::pow(C1312, 2);
+    const double C1650 = 0.;
+    const double C1651 = 1;
+    const double C1652 = C1650 / C1202;
+    const double C1653 = 0.;
+    const double C1654 = C1652;
+    const double C1655 = -C1652;
+    const double C1656 = C1205 * std::pow(C1222, C1205 - 1) * C1654;
+    const double C1657 = C1206 * std::pow(C1222, C1206 - 1) * C1654;
+    const double C1658 = C1205 * std::pow(C1223, C1205 - 1) * C1655;
+    const double C1659 = C1206 * std::pow(C1223, C1206 - 1) * C1655;
+    const double C1660 = C1656 + C1658;
+    const double C1661 = C1657 + C1659;
+    const double C1662 = std::sqrt(C1228) * C1660;
+    const double C1663 = C1661;
+    const double C1664 = C1660 / 2.;
+    const double C1665 = 2. * C1662;
+    const double C1666 = 3 * std::pow(C1260, 2) * C1664;
+    const double C1667 = 0.4452402138403639e-2 * C1666 + 0.;
+    const double C1668 = C1202 * C1665;
+    const double C1669 = C1668 / 2.;
+    const double C1670 = C1669;
+    const double C1671 = 2. * C1670;
+    const double C1672 = C1651 / (2 * std::sqrt(C1216 + SigmaGuard) * C1279) -
+                         C1671 * std::sqrt(C1216 + SigmaGuard) / std::pow(C1279, 2);
+    const double C1673 = 2 * C1286 * C1672;
+    const double C1674 = 0.18 * C1673;
+    const double C1675 = C1292 * C1663;
+    const double C1676 = C1224 * C1675;
+    const double C1677 = 0.033774 * C1676;
+    const double C1678 = C1299 * C1663;
+    const double C1679 = C1219 * C1678;
+    const double C1680 = C1677 / C1221 - C1653 * C1300 / std::pow(C1221, 2);
+    const double C1681 = C1680;
+    const double C1682 = C1679 / C1220;
+    const double C1683 = C1681 + C1682;
+    const double C1684 = 0.18 * C1683;
+    const double C1685 = C1684 / C1266 - C1667 * C1307 / std::pow(C1266, 2);
+    const double C1686 = -C1685;
+    const double C1687 = std::exp(C1309) * C1686;
+    const double C1688 = C1687;
+    const double C1689 = 0.6672632268006112e-1 * C1688 + 0.;
+    const double C1690 = C1674 / C1312 - C1689 * C1291 / std::pow(C1312, 2);
 
     result.vsigmaBb =
-        ((((0. * C1202 + C1631 * 0.18 * C1202) / 0.18 +
+        ((((0. * C1202 + C1683 * 0.18 * C1202) / 0.18 +
            C1202 *
                (0.4452402138403639e-2 *
                     std::log(0.18 * C1290 * (C1313 + 1.) /
@@ -977,7 +977,7 @@ XcKernelValue Pw91Correlation(
                     C1290 *
                     std::exp(-100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) *
                              C1290 / std::pow(C1214, C1205))) *
-               C1614) +
+               C1666) +
           C1202 *
               (0.4452402138403639e-2 * C1265 * 0.18 * (C1313 + 1.) /
                    (0.12010738082411e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) *
@@ -1003,7 +1003,7 @@ XcKernelValue Pw91Correlation(
                                  C1290 / std::pow(C1214, C1205)) *
                         100. * std::pow(C1260, 4) * std::pow(2. * std::sqrt(C1228), 2) /
                         std::pow(C1214, C1205))) *
-              C1621) +
+              C1673) +
          C1202 *
              (0.4452402138403639e-2 * C1265 *
                   (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.) * 0.18 * C1290 -
@@ -1013,7 +1013,7 @@ XcKernelValue Pw91Correlation(
                         (0.6672632268006112e-1 * ((C1313 + std::pow(C1313, 2)) + 1.)) +
                     1.)) +
               0.) *
-             C1638) +
+             C1690) +
         C1202 *
             (0. / 0.18 +
              -15.7559203494831455 *
@@ -1027,7 +1027,7 @@ XcKernelValue Pw91Correlation(
                           std::pow(C1214, C1205)) *
                  400. * std::pow(C1260, 3) * std::pow(2. * std::sqrt(C1228), 2) * C1290 /
                  std::pow(C1214, C1205)) *
-            C1612;
+            C1664;
 
     return result;
 }
@@ -1039,7 +1039,6 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
                                       double sigmaBb,
                                       PointSecondDerivativeMatrix& matrix) {
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
-    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())
     {
@@ -1230,11 +1229,10 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C231 = C228;
     const double C232 = C229;
     const double C233 = C230;
-    const double C234 = (-C227 * std::sqrt(C61)) / std::pow(C124, 2);
     const double C235 = C231 / C128;
     const double C236 = C232 / C129;
     const double C237 = C233 / C130;
-    const double C238 = 2 * C131 * C234;
+    const double C238 = (-C227 * C61 * 2 * C124) / std::pow(C124, 4);
     const double C239 = 0.18 * C238;
     const double C240 = C133 * C204 + C101 * C236;
     const double C241 = C132 * C205 + C102 * C235;
@@ -1349,12 +1347,14 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C548 = C545;
     const double C549 = C546;
     const double C550 = C547;
-    const double C551 = C227 * C227 * std::sqrt(C61) * 2 * C124 / std::pow(C124, 4) -
-                        C544 * std::sqrt(C61) / std::pow(C124, 2);
     const double C552 = C548 / C128 - std::pow(C231, 2) / std::pow(C128, 2);
     const double C553 = C549 / C129 - std::pow(C232, 2) / std::pow(C129, 2);
     const double C554 = C550 / C130 - std::pow(C233, 2) / std::pow(C130, 2);
-    const double C555 = 2 * std::pow(C234, 2) + 2 * C131 * C551;
+    const double C555 =
+        C227 *
+            (C227 * C61 * 2 * C124 * 4 * std::pow(C124, 3) - std::pow(C124, 4) * C227 * 2 * C61) /
+            std::pow(C124, 8) -
+        C544 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C556 = 0.18 * C555;
     const double C557 = ((C204 * C236 + C133 * C521) + C236 * C204) + C101 * C553;
     const double C558 = ((C205 * C235 + C132 * C522) + C235 * C205) + C102 * C552;
@@ -3675,11 +3675,10 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C330 = C327;
     const double C331 = C328;
     const double C332 = C329;
-    const double C333 = (-C326 * std::sqrt(C61)) / std::pow(C124, 2);
     const double C334 = C330 / C128;
     const double C335 = C331 / C129;
     const double C336 = C332 / C130;
-    const double C337 = 2 * C131 * C333;
+    const double C337 = (-C326 * C61 * 2 * C124) / std::pow(C124, 4);
     const double C338 = 0.18 * C337;
     const double C339 = C133 * C303 + C101 * C335;
     const double C340 = C132 * C304 + C102 * C334;
@@ -3789,12 +3788,14 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C640 = C637;
     const double C641 = C638;
     const double C642 = C639;
-    const double C643 = C326 * C227 * std::sqrt(C61) * 2 * C124 / std::pow(C124, 4) -
-                        C636 * std::sqrt(C61) / std::pow(C124, 2);
     const double C644 = C640 / C128 - C330 * C231 / std::pow(C128, 2);
     const double C645 = C641 / C129 - C331 * C232 / std::pow(C129, 2);
     const double C646 = C642 / C130 - C332 * C233 / std::pow(C130, 2);
-    const double C647 = 2 * C234 * C333 + 2 * C131 * C643;
+    const double C647 =
+        C326 *
+            (C227 * C61 * 2 * C124 * 4 * std::pow(C124, 3) - std::pow(C124, 4) * C227 * 2 * C61) /
+            std::pow(C124, 8) -
+        C636 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C648 = 0.18 * C647;
     const double C649 = ((C204 * C335 + C133 * C613) + C236 * C303) + C101 * C645;
     const double C650 = ((C205 * C334 + C132 * C614) + C235 * C304) + C102 * C644;
@@ -6067,9 +6068,7 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C381 = C380 / 2.;
     const double C382 = C381;
     const double C383 = 2. * C382;
-    const double C384 =
-        C363 / (2 * std::sqrt(C61) * C124) - C383 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C385 = 2 * C131 * C384;
+    const double C385 = C363 / std::pow(C124, 2) - C383 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C386 = 0.18 * C385;
     const double C387 = C137 * C375;
     const double C388 = C69 * C387;
@@ -6110,11 +6109,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C687 = C686 / 2.;
     const double C688 = C687;
     const double C689 = 2. * C688;
-    const double C690 = ((-C363 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C383 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C227 -
-                        C689 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C691 = 2 * C384 * C234 + 2 * C131 * C690;
+    const double C691 =
+        ((-C363 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C383 * 2 * C61 - C383 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C227 -
+        C689 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C692 = 0.18 * C691;
     const double C693 = C375 * C240 + C137 * C681;
     const double C694 = C387 * C176 + C69 * C693;
@@ -7094,9 +7094,7 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C424 = C423 / 2.;
     const double C425 = C424;
     const double C426 = 2. * C425;
-    const double C427 =
-        C406 / (2 * std::sqrt(C61) * C124) - C426 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C428 = 2 * C131 * C427;
+    const double C428 = C406 / std::pow(C124, 2) - C426 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C429 = 0.18 * C428;
     const double C430 = C137 * C418;
     const double C431 = C69 * C430;
@@ -7137,11 +7135,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C725 = C724 / 2.;
     const double C726 = C725;
     const double C727 = 2. * C726;
-    const double C728 = ((-C406 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C426 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C227 -
-                        C727 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C729 = 2 * C427 * C234 + 2 * C131 * C728;
+    const double C729 =
+        ((-C406 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C426 * 2 * C61 - C426 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C227 -
+        C727 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C730 = 0.18 * C729;
     const double C731 = C418 * C240 + C137 * C719;
     const double C732 = C430 * C176 + C69 * C731;
@@ -8119,9 +8118,7 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C465 = C464 / 2.;
     const double C466 = C465;
     const double C467 = 2. * C466;
-    const double C468 =
-        C447 / (2 * std::sqrt(C61) * C124) - C467 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C469 = 2 * C131 * C468;
+    const double C469 = C447 / std::pow(C124, 2) - C467 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C470 = 0.18 * C469;
     const double C471 = C137 * C459;
     const double C472 = C69 * C471;
@@ -8162,11 +8159,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C763 = C762 / 2.;
     const double C764 = C763;
     const double C765 = 2. * C764;
-    const double C766 = ((-C447 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C467 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C227 -
-                        C765 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C767 = 2 * C468 * C234 + 2 * C131 * C766;
+    const double C767 =
+        ((-C447 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C467 * 2 * C61 - C467 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C227 -
+        C765 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C768 = 0.18 * C767;
     const double C769 = C459 * C240 + C137 * C757;
     const double C770 = C471 * C176 + C69 * C769;
@@ -9213,12 +9211,14 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C846 = C843;
     const double C847 = C844;
     const double C848 = C845;
-    const double C849 = C326 * C326 * std::sqrt(C61) * 2 * C124 / std::pow(C124, 4) -
-                        C842 * std::sqrt(C61) / std::pow(C124, 2);
     const double C850 = C846 / C128 - std::pow(C330, 2) / std::pow(C128, 2);
     const double C851 = C847 / C129 - std::pow(C331, 2) / std::pow(C129, 2);
     const double C852 = C848 / C130 - std::pow(C332, 2) / std::pow(C130, 2);
-    const double C853 = 2 * std::pow(C333, 2) + 2 * C131 * C849;
+    const double C853 =
+        C326 *
+            (C326 * C61 * 2 * C124 * 4 * std::pow(C124, 3) - std::pow(C124, 4) * C326 * 2 * C61) /
+            std::pow(C124, 8) -
+        C842 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C854 = 0.18 * C853;
     const double C855 = ((C303 * C335 + C133 * C819) + C335 * C303) + C101 * C851;
     const double C856 = ((C304 * C334 + C132 * C820) + C334 * C304) + C102 * C850;
@@ -11491,11 +11491,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C893 = C892 / 2.;
     const double C894 = C893;
     const double C895 = 2. * C894;
-    const double C896 = ((-C363 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C383 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C326 -
-                        C895 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C897 = 2 * C384 * C333 + 2 * C131 * C896;
+    const double C897 =
+        ((-C363 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C383 * 2 * C61 - C383 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C326 -
+        C895 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C898 = 0.18 * C897;
     const double C899 = C375 * C339 + C137 * C887;
     const double C900 = C387 * C275 + C69 * C899;
@@ -12474,11 +12475,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C931 = C930 / 2.;
     const double C932 = C931;
     const double C933 = 2. * C932;
-    const double C934 = ((-C406 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C426 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C326 -
-                        C933 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C935 = 2 * C427 * C333 + 2 * C131 * C934;
+    const double C935 =
+        ((-C406 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C426 * 2 * C61 - C426 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C326 -
+        C933 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C936 = 0.18 * C935;
     const double C937 = C418 * C339 + C137 * C925;
     const double C938 = C430 * C275 + C69 * C937;
@@ -13457,11 +13459,12 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C969 = C968 / 2.;
     const double C970 = C969;
     const double C971 = 2. * C970;
-    const double C972 = ((-C447 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-                         (-C467 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-                            C326 -
-                        C971 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C973 = 2 * C468 * C333 + 2 * C131 * C972;
+    const double C973 =
+        ((-C447 * 2 * C124) / std::pow(C124, 4) -
+         (std::pow(C124, 4) * C467 * 2 * C61 - C467 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+             std::pow(C124, 8)) *
+            C326 -
+        C971 * C61 * 2 * C124 / std::pow(C124, 4);
     const double C974 = 0.18 * C973;
     const double C975 = C459 * C339 + C137 * C963;
     const double C976 = C471 * C275 + C69 * C975;
@@ -14433,15 +14436,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1004 = C1003 / 2.;
     const double C1005 = C1004;
     const double C1006 = 2. * C1005;
-    const double C1007 =
-        (((-C363 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C383 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C363 +
-         ((-C363 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C383 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C383) -
-        C1006 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1008 = 2 * std::pow(C384, 2) + 2 * C131 * C1007;
+    const double C1008 =
+        (((-C363 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C383 * 2 * C61 - C383 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C383 -
+         C1006 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C363 * C383 * 2 * C124 / std::pow(C124, 4);
     const double C1009 = 0.18 * C1008;
     const double C1010 = C137 * C998;
     const double C1011 = C69 * C1010;
@@ -14961,15 +14962,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1039 = C1038 / 2.;
     const double C1040 = C1039;
     const double C1041 = 2. * C1040;
-    const double C1042 =
-        (((-C363 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C383 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C406 +
-         ((-C363 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C383 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C426) -
-        C1041 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1043 = 2 * C384 * C427 + 2 * C131 * C1042;
+    const double C1043 =
+        (((-C363 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C383 * 2 * C61 - C383 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C426 -
+         C1041 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C406 * C383 * 2 * C124 / std::pow(C124, 4);
     const double C1044 = 0.18 * C1043;
     const double C1045 = C137 * C1033;
     const double C1046 = C69 * C1045;
@@ -15489,15 +15488,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1074 = C1073 / 2.;
     const double C1075 = C1074;
     const double C1076 = 2. * C1075;
-    const double C1077 =
-        (((-C363 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C383 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C447 +
-         ((-C363 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C383 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C467) -
-        C1076 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1078 = 2 * C384 * C468 + 2 * C131 * C1077;
+    const double C1078 =
+        (((-C363 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C383 * 2 * C61 - C383 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C467 -
+         C1076 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C447 * C383 * 2 * C124 / std::pow(C124, 4);
     const double C1079 = 0.18 * C1078;
     const double C1080 = C137 * C1068;
     const double C1081 = C69 * C1080;
@@ -16017,15 +16014,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1109 = C1108 / 2.;
     const double C1110 = C1109;
     const double C1111 = 2. * C1110;
-    const double C1112 =
-        (((-C406 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C426 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C406 +
-         ((-C406 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C426 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C426) -
-        C1111 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1113 = 2 * std::pow(C427, 2) + 2 * C131 * C1112;
+    const double C1113 =
+        (((-C406 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C426 * 2 * C61 - C426 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C426 -
+         C1111 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C406 * C426 * 2 * C124 / std::pow(C124, 4);
     const double C1114 = 0.18 * C1113;
     const double C1115 = C137 * C1103;
     const double C1116 = C69 * C1115;
@@ -16545,15 +16540,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1144 = C1143 / 2.;
     const double C1145 = C1144;
     const double C1146 = 2. * C1145;
-    const double C1147 =
-        (((-C406 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C426 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C447 +
-         ((-C406 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C426 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C467) -
-        C1146 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1148 = 2 * C427 * C468 + 2 * C131 * C1147;
+    const double C1148 =
+        (((-C406 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C426 * 2 * C61 - C426 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C467 -
+         C1146 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C447 * C426 * 2 * C124 / std::pow(C124, 4);
     const double C1149 = 0.18 * C1148;
     const double C1150 = C137 * C1138;
     const double C1151 = C69 * C1150;
@@ -17073,15 +17066,13 @@ void Pw91CorrelationSecondDerivatives(double rhoA,
     const double C1179 = C1178 / 2.;
     const double C1180 = C1179;
     const double C1181 = 2. * C1180;
-    const double C1182 =
-        (((-C447 * C124 / std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          C467 / (2 * std::sqrt(C61) * std::pow(C124, 2))) *
-             C447 +
-         ((-C447 * 2 * std::sqrt(C61)) / std::pow(2 * std::sqrt(C61) * C124, 2) -
-          (-C467 * std::sqrt(C61) * 2 * C124) / std::pow(C124, 4)) *
-             C467) -
-        C1181 * std::sqrt(C61) / std::pow(C124, 2);
-    const double C1183 = 2 * std::pow(C468, 2) + 2 * C131 * C1182;
+    const double C1183 =
+        (((-C447 * 2 * C124) / std::pow(C124, 4) -
+          (std::pow(C124, 4) * C467 * 2 * C61 - C467 * C61 * 2 * C124 * 4 * std::pow(C124, 3)) /
+              std::pow(C124, 8)) *
+             C467 -
+         C1181 * C61 * 2 * C124 / std::pow(C124, 4)) -
+        C447 * C467 * 2 * C124 / std::pow(C124, 4);
     const double C1184 = 0.18 * C1183;
     const double C1185 = C137 * C1173;
     const double C1186 = C69 * C1185;
