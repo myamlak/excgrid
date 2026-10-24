@@ -1,9 +1,4 @@
-// The Bragg-Slater covalent radii, in one home.
-//
-// The Becke partition is a ratio of the two atoms' radii, so the build's
-// weight and the derivative pass over that weight must read the same numbers:
-// a second copy of the table is a second fact, and the two copies would part
-// company silently.  Slater, J. Chem. Phys. 41 (1964) 3199.
+// The Bragg-Slater covalent radii: Slater, J. Chem. Phys. 41 (1964) 3199.
 
 #pragma once
 
@@ -34,7 +29,6 @@ inline constexpr double kBraggSlaterFallbackAngstrom = 1.0;
 inline constexpr double kAngstromToBohr = 1.8897261246257702;
 
 /// The Bragg-Slater covalent radius of an element, in Bohr.
-/// \param atomicNumber The element's Z.
 /// \returns The tabulated radius in Bohr, or the fallback for an element the
 /// table does not carry.
 [[nodiscard]] inline double BraggSlaterRadius(int atomicNumber) noexcept {

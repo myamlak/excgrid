@@ -1,14 +1,8 @@
-// excgrid symbolic functional definitions - fresh authorship for this project
-// (BSD-3-Clause, excgrid).  The formulas are the published literature
-// expressions, encoded symbolically so Yacas derives the first derivatives;
-// per-formula sources are cited in docs/mainpage.md.  This file is the
-// excgrid counterpart of an independent implementation's mechanism, not a
-// copy of its text; that tree is a read-only reference (its license
-// governs only its own tree).
+// excgrid symbolic functional definitions, fresh authorship for this project
+// (BSD-3-Clause).  The published literature expressions, encoded symbolically so Yacas
+// derives the derivatives; per-formula sources are cited in docs/mainpage.md.
 
-// Numerical guard: keeps spin-edge subexpressions finite during symbolic
-// differentiation (the exact spin-zero limits are handled by the generator's
-// limit substitution, excgrid_generate.ys).
+// Numerical guard: keeps spin-edge subexpressions finite during differentiation.
 X'Tiny := 1e-16;
 
 // Dirac/Slater exchange constant, spin-resolved form:
@@ -30,16 +24,8 @@ X'Fz(z) := 1. / 2. * ((1. + z * (1. - X'Tiny))^(4. / 3.) +
                        (1. - z * (1. - X'Tiny))^(4. / 3.) - 2.) / (2.^(1. / 3.) - 1.);
 
 // f''(0), evaluated symbolically: 4/9 / (2^(1/3) - 1) = 1.709920934161... .
-// A transcription-precision note (2026-09-17), because it looks like one and
-// must not be "fixed": every spin-interpolated kernel here divides the
-// spin-stiffness term by this EXACT value, while Libxc divides by the
-// literature's six-digit 1.709921.  The two differ by 6.6e-8 relative, which
-// is what puts the point check's sub-tolerance floor at ~1.6e-9 on polarized
-// points (where this term is alive) and at 1.6e-16 on unpolarized ones (where
-// it vanishes) - `pw92`'s 8.24e-09 worst and the 8.42e-09 floor under
-// `pw91_c` are both this constant and nothing else, measured by re-running
-// the polarized samples with 1.709921, which reproduces Libxc to 1.7e-16.
-// We carry the more precise of the two, so this is recorded, not changed.
+// The exact value, deliberately not Libxc's 1.709921: the 6.6e-8 difference is the
+// point checks' tolerance floor on polarized points, and must not be "fixed".
 X'D2Fz0 := N(Eval(WithValue(z, 0, D(z, 2) X'Fz(z))));
 
 // The spin-scaling factor phi(z) (PBE/PW91 correlation gradient terms).
@@ -77,12 +63,9 @@ X'X(rho, gamma) := Sqrt(gamma) / (rho + X'Tiny)^(4. / 3.);
 // The PBE-style reduced gradient t = |grad rho| / (2 phi ks rho).
 X'T(rho, gamma, z) := 1. / 2. * Sqrt(gamma) / (X'Phi(z) * X'KS(rho) * rho + X'Tiny);
 
-// yacas 1.8's built-in ArcSinh is a PROTECTED symbol whose derivative is
-// NOT defined (D(x)X'Asinh(x) stays unevaluated), and neither `:=` nor the
-// Function() form can override it.  The formulas therefore use this
-// user-defined equivalent - the Ln form differentiates through its body
-// and is exact for the non-negative reduced gradients that occur here
-// (x = sqrt(gamma)/rho^(4/3) >= 0, so z + sqrt(1 + z^2) never cancels).
+// yacas 1.8's built-in ArcSinh is PROTECTED and has no derivative, and neither `:=` nor
+// Function() overrides it.  This Ln form differentiates, and is exact for the
+// non-negative reduced gradients here (z + sqrt(1 + z^2) never cancels).
 X'Asinh(z) := Ln(z + Sqrt(1. + z^2));
 
 // ---------------------------------------------------------------------------
@@ -109,9 +92,8 @@ X'Vwn5Correlation(rhoA, rhoB) := [
     rho * Ec;
 ];
 
-// VWN3: the RPA-parameter interpolation (VWN 1980, Table I parameters) -
-// a DISTINCT functional from VWN5, the two separately named and never
-// conflated.
+// VWN3: the RPA-parameter interpolation (VWN 1980, Table I).  A distinct
+// functional from VWN5; the two are never conflated.
 X'Vwn3Correlation(rhoA, rhoB) := [
     Local(rho, z, x, EcP, EcF, dEc, Ec);
     rho := rhoA + rhoB;
@@ -185,11 +167,7 @@ X'RevPbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
 
 // RPBE (Hammer-Hansen-Norskov 1999): the PBE exchange form replaced by
 //   Fx(s) = 1 + kappa (1 - exp(-mu s^2 / kappa)),
-// kappa = 0.804 and mu = beta pi^2/3 - RPBE keeps PBE's constants and
-// changes only the enhancement's form.  The mu here is that product formed
-// with this tree's own X'PbeCorrBeta, 0.2195149727645171, which is why the
-// pbe and revpbe rules above carry the same value.  The kernel's own .ey
-// carries the longer note.
+// kappa = 0.804, mu = beta pi^2/3 = 0.2195149727645171.
 X'RpbeFx(s, kappa, mu) := 1. + kappa * (1. - Exp(-mu * s^2 / kappa));
 
 X'RpbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
@@ -200,8 +178,7 @@ X'RpbeExchange(rhoA, rhoB, gaa, gab, gbb) := [
     rhoB * X'EpsX(2. * rhoB) * X'RpbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
 ];
 
-// PBEsol: the PBE exchange form with mu = 10/81 (the PBEsol paper's
-// gradient expansion choice), kappa = 0.804.
+// PBEsol: the PBE exchange form with mu = 10/81, kappa = 0.804.
 X'PbeSolExchange(rhoA, rhoB, gaa, gab, gbb) := [
     Local(kappa, mu);
     kappa := 0.804;
@@ -210,13 +187,9 @@ X'PbeSolExchange(rhoA, rhoB, gaa, gab, gbb) := [
     rhoB * X'EpsX(2. * rhoB) * X'PbeFx(X'S(2. * rhoB, 4. * gbb), kappa, mu);
 ];
 
-// mPW91 (modified PW91, Adamo-Barone): the PW91 exchange form with this
-// functional's modified constants, expressed through
-// x = |grad rho| / rho^(4/3).  PW91's damping is Exp(-100 s^2) with
-// s = |grad rho| / (2 kF rho), kF = (6 pi^2 rho)^(1/3); in x that is
-// s = x / (2 (6 pi^2)^(1/3)), so the exponent below is not a fitted or
-// quoted number but the constant 100 / (4 (6 pi^2)^(2/3))
-// = 1.6455307846020557... .  The kernel's own .ey carries the longer note.
+// mPW91 (modified PW91, Adamo-Barone): the PW91 exchange form with this functional's
+// constants.  PW91's Exp(-100 s^2) becomes Exp(-1.6455307846... x^2) in
+// x = |grad rho| / rho^(4/3), with 1.6455307846... = 100 / (4 (6 pi^2)^(2/3)).
 X'MPw91Fx(x) :=
     (0.00426 * x^2 -
      (0.00426 - 5. * (36. * Pi)^(-5. / 3.)) * x^2 * Exp(-1.6455307846 * x^2) -
@@ -346,26 +319,9 @@ X'Pw91Correlation(rhoA, rhoB, gaa, gab, gbb) := [
     rho * (X'Pw91CorrEc(rho, z) + X'Pw91CorrH0(rho, gamma, z) + X'Pw91CorrH1(rho, gamma, z));
 ];
 
-// Perdew 1986 correlation (the gradient correction on the Perdew-Zunger LDA
-// piece; Perdew, Phys. Rev. B 33, 8822 (1986) - the printed equations are the
-// source of every parameter and every analytic piece below).
-//
-// ALL THREE of the terms this rule used to carry differently from the paper
-// were corrected on 2026-09-17 against the paper's printed equations.  They
-// were transcription defects, not an alternative reading, and each is named
-// where it lives below:
-//   1. the LDA piece is the Perdew-Zunger 1981 parametrization the paper
-//      carries - NOT the VWN table-I (RPA) one this rule used to substitute,
-//      which is 29% away at rs = 1.34 and is not the surface the paper's
-//      f = 0.11 was fitted on;
-//   2. C(infinity) in the damping exponent is the INFINITE-DENSITY limit
-//      (rho -> inf, rs -> 0) of C(rho) below - 0.004235, not the rs -> inf
-//      limit 0.001667 this rule used to carry (eq. 9 of the paper);
-//   3. the gradient term is divided by the paper's delta(z) (eq. 4), which
-//      the rule had no denominator for.
-// PZ81 is piecewise at rs = 1, so this is the tree's only branch-carrying
-// kernel; the condition and its source are stated in `p86_correlation.ey`,
-// and the emitted shape is documented in `excgrid_gga_piecewise_skeleton.ey`.
+// Perdew 1986 correlation: the gradient correction on the Perdew-Zunger 1981 LDA piece
+// (Perdew, Phys. Rev. B 33, 8822 (1986)); transcribed from the paper's printed equations.
+// PZ81 is piecewise at rs = 1, so this is the tree's only branch-carrying kernel.
 X'P86F := 0.11;
 
 X'P86C1 := 0.001667;
@@ -389,25 +345,19 @@ X'P86Cc(rho) := [
               (1. + X'P86C5 * r + X'P86C6 * r^2 + X'P86C7 * r^3);
 ];
 
-// C(infinity) of the paper's eq. 9: the INFINITE-DENSITY limit of C(rho)
-// above (rho -> inf, rs -> 0), i.e. C1 + C2 = 0.004235.  The exponent's
-// argument is the density, so this is the constant term of the numerator,
-// not the rs -> inf limit C1 alone.
+// C(infinity) of the paper's eq. 9: the infinite-density limit of C(rho), i.e.
+// C1 + C2 = 0.004235 - not the rs -> inf limit C1 alone.
 X'P86Cinf := X'P86C1 + X'P86C2;
 
-// The paper's spin factor delta(z) (eq. 4), which divides the gradient term:
-//   delta = sqrt(((1+z)^(5/3) + (1-z)^(5/3)) / 2),  z = (rhoA-rhoB)/rho.
-// The Tiny guard matches X'Fz/X'Phi and keeps the spin-edge subexpressions
-// finite during symbolic differentiation.
+// The paper's spin factor delta(z), eq. 4: sqrt(((1+z)^(5/3) + (1-z)^(5/3)) / 2).
+// The Tiny guard matches X'Fz/X'Phi and keeps the spin edges finite.
 X'P86DD(z) := Sqrt(1. / 2. * ((1. + z * (1. - X'Tiny))^(5. / 3.) +
                               (1. - z * (1. - X'Tiny))^(5. / 3.)));
 
-// The Perdew-Zunger 1981 LDA correlation piece (Perdew & Zunger, Phys. Rev.
-// B 23, 5048 (1981)), piecewise at rs = 1 - the LDA surface the P86 paper's
-// gradient correction is defined on:
+// The Perdew-Zunger 1981 LDA correlation piece (Perdew & Zunger, Phys. Rev. B 23, 5048
+// (1981)), piecewise at rs = 1:
 //   rs >= 1 :  gamma / (1 + beta1 sqrt(rs) + beta2 rs)
 //   rs <  1 :  a ln rs + b + c rs ln rs + d rs
-// The spin interpolation is the same f(z) the VWN forms use, so it is X'Fz.
 X'Pz81LowUnpolarized(rs) := -0.1423 / (1. + 1.0529 * Sqrt(rs) + 0.3334 * rs);
 
 X'Pz81LowFerro(rs) := -0.0843 / (1. + 1.3981 * Sqrt(rs) + 0.2611 * rs);
@@ -433,16 +383,10 @@ X'Pz81EcHigh(rho, z) := [
 ];
 
 // e_c^P86 = rho [e_c^PZ + e^{-Phi} C(rho) |grad rho|^2 / (delta(z) rho^(7/3))],
-// Phi = 1.745 f C(inf)/C(rho) |grad rho| / rho^(7/6),
-// C(inf) = C1 + C2 = 0.004235 (the infinite-density limit, not C1 alone).
-// The 1.745 prefactor is the paper's printed value: it is (9 pi)^(1/6)
-// = 1.7454151061... rounded to four digits, and 1.745 is what the paper
-// prints, so it is carried as printed and must not be "sharpened" to the
-// radical.  So is the denominator's cubic coefficient: the paper prints it
-// as 10^4 C4, and C7 below is that product, 0.07389, not the C4 = 7.389e-6
-// it is formed from.
-// The gradient half is identical on both sides of rs = 1, so it is one rule
-// and the two branches differ only in which PZ81 piece they sit on.
+// Phi = 1.745 f C(inf)/C(rho) |grad rho| / rho^(7/6),  C(inf) = C1 + C2 = 0.004235.
+// 1.745 is the paper's printed rounding of (9 pi)^(1/6) = 1.7454151061... and must not
+// be sharpened to the radical; likewise C7 is the paper's 10^4 C4 = 0.07389.
+// The gradient half is identical on both sides of rs = 1.
 X'P86Gradient(rho, z, gamma) := [
     Local(cc, phi);
     cc := X'P86Cc(rho);
@@ -468,38 +412,26 @@ X'P86CorrelationHigh(rhoA, rhoB, gaa, gab, gbb) := [
 
 // --- The meta-GGA (tau-dependent) tier -------------------------------------
 //
-// The second-order gradient expansion of exchange rewritten in the iso-orbital
-// (Pauli) variables.  Per spin channel,
-//
+// The second-order gradient expansion of exchange in the iso-orbital (Pauli) variables.
+// Per spin channel,
 //     e_sigma = e_x^LSDA(rho_sigma) (1 + (1 - tau_P / tau_unif) / 12),
-//
-// with tau_P the Pauli kinetic-energy density and tau_unif its uniform-gas
-// value.  The gradient enters through tau_P alone, so the form carries the
-// exact conditions the table below names rather than reproducing them by fit:
-// the uniform gas (tau_P = tau_unif, enhancement exactly 1, so the kernel IS
-// the spin-scaled Slater kernel) and the slowly varying gas, whose enhancement
-// coefficient is the exact 10/81 of the exchange gradient expansion.
+// with tau_P the Pauli kinetic-energy density and tau_unif its uniform-gas value.
 
 // The spin-scaled Thomas-Fermi kinetic-energy density,
 //   tau_unif = (3/10)(6 pi^2)^(2/3) rho^(5/3)  per spin channel.
-// The 6 pi^2 (rather than 3 pi^2) is the spin scaling: each channel carries its
-// own Fermi sphere.  The Tiny guard sits inside the power rather than beside it
-// so that the zero-density corner stays finite: the kernel multiplies this
-// reciprocal by rho^(4/3), which vanishes there, so the guard only has to keep
-// the intermediate from being infinite.
+// 6 pi^2, not 3 pi^2: each spin channel carries its own Fermi sphere.  The Tiny
+// guard sits inside the power so the zero-density corner stays finite.
 X'TauUnif(rho) := 3. / 10. * (6. * Pi^2)^(2. / 3.) * (rho + X'Tiny)^(5. / 3.);
 
 // The iso-orbital (Pauli) kinetic-energy density of one spin channel,
 //   tau_P = tau - |grad rho|^2 / (8 rho).
-// This is the only place the gradient enters the tier, which is why the
-// von Weizsacker relation between the sigma and tau derivatives is exact here.
+// The only place the gradient enters the tier, so the sigma-tau relation is exact.
 X'TauPauli(rho, sigma, tau) := tau - sigma / (8. * (rho + X'Tiny));
 
 X'TauXChannel(rho, sigma, tau) :=
     -X'Cx * rho^(4. / 3.) * (1. + (1. - X'TauPauli(rho, sigma, tau) / X'TauUnif(rho)) / 12.);
 
-// The spin-resolved exchange energy density of the tier.  The cross gradient
-// invariant does not appear - each channel reads only its own sigma - so the
-// emitted kernel takes sigmaAb and never reads it.
+// The spin-resolved exchange energy density of the tier: each channel reads only its own
+// sigma, so the emitted kernel takes sigmaAb and never reads it.
 X'TauXExchange(rhoA, rhoB, gaa, gab, gbb, ta, tb) :=
     X'TauXChannel(rhoA, gaa, ta) + X'TauXChannel(rhoB, gbb, tb);

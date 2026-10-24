@@ -1,30 +1,8 @@
 #!/usr/bin/env python3
-"""The fast codegen freshness gate: have the .ey sources moved since the blessing?
+"""The codegen freshness gate: the .ey and .ys sources are unchanged since the blessing.
 
-This is the COMMIT-TIME half of the codegen freshness story, and it is
-deliberately not the same check as `regenerate.py --check`:
-
-  * `regenerate.py --check` re-runs Yacas over every functional and diffs the
-    output against the committed generated files.  That is what proves the
-    generated code matches its sources - and it is far too slow to sit in a
-    pre-commit hook, because it expands all fourteen kernels symbolically.
-
-  * This script proves something narrower and much cheaper: that no codegen
-    INPUT has changed since the manifest was blessed.  It reads
-    xc_defs/freshness.json, hashes xc_defs/*.ey and xc_defs/*.ys, and fails if
-    any of them differs, is missing, or is new.  Milliseconds, no Yacas, so a
-    hook running it cannot block an unrelated commit.
-
-Between them the property is covered: a source edited without regenerating
-fails HERE, at the next commit; and the deliberate `--check` run proves the
-generated files are what those sources produce.  Neither check sees a
-generated file that was hand-edited without touching its source - that one is
-`--check`'s to catch, on the deliberate run.
-
-The manifest is written by `regenerate.py` at the end of a SUCCESSFUL
-regeneration, so the routine path cannot bless a stale tree.  `--bless` exists
-for the bootstrap case (adopting the gate on a tree whose outputs were already
-verified by a --check run); it prints what it is asserting and what it is not.
+Cheap enough for a commit hook.  It does not prove the committed generated code
+matches its sources - `python tools/regenerate.py --check` does that.
 
 Usage:
     python tools/check_freshness.py            # verify; exit 1 on any drift
@@ -41,10 +19,7 @@ ROOT = Path(__file__).resolve().parent.parent
 DEFS_DIR = ROOT / "xc_defs"
 MANIFEST = DEFS_DIR / "freshness.json"
 
-# Every codegen input carries one of these suffixes: the functional sources and
-# the skeleton, plus the .ys scripts that expand them.  A file that is not an
-# input does not belong in the manifest, and a NEW input that is not in the
-# manifest is a commit-time failure rather than a silent addition.
+# Codegen input suffixes; a new input missing from the manifest fails the gate.
 SOURCE_SUFFIXES = (".ey", ".ys")
 
 NOTE = (

@@ -1,18 +1,8 @@
 #!/usr/bin/env python3
 """Transcribes the D4 charge-scaling hardnesses into src/d4_hardness_tables.inc.
 
-Equation 2 of the DFT-D4 model (Caldeweyher, Ehlert, Hansen, Neugebauer,
-Spicher, Bannwarth, Grimme, J. Chem. Phys. 150 (2019) 154122) scales the
-atomic reference polarizabilities by a function whose element-specific
-parameter is the chemical hardness gamma(A).  The paper cites that hardness
-to the global atomic hardnesses of Ghosh and Islam (Int. J. Quantum Chem.
-110 (2010) 1206-1213, its ref 42) and does not tabulate it; the values live
-in the committed data file tools/data/d4_hardness.txt, whose own header
-records where they were extracted from and under what terms.
-
-The .inc this script writes is committed; this is a one-time transcription
-step (run again only when the source data changes), NOT a per-build codegen
-step.
+One-time transcription from tools/data/d4_hardness.txt, not a per-build step; the
+values are Ghosh and Islam, Int. J. Quantum Chem. 110 (2010) 1206-1213.
 
 Usage:  python tools/gen_d4_hardness.py            # writes src/d4_hardness_tables.inc
         python tools/gen_d4_hardness.py --check    # verifies the committed file

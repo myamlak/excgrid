@@ -1,20 +1,4 @@
-// The tau tier's hand-written reference, verified by its exact conditions.
-//
-// The functional under test is the second-order gradient expansion of exchange
-// written in the iso-orbital variables (src/meta_gga_reference.cpp):
-//
-//     e_sigma = e_x^LSDA(rho_sigma) (1 + (1 - tau_P/tau_unif)/12),
-//     tau_P = tau_sigma - |grad rho_sigma|^2/(8 rho_sigma),
-//     tau_unif = (3/10)(6 pi^2)^(2/3) rho_sigma^(5/3).
-//
-// What it is checked against is a set of EXACT CONDITIONS rather than another
-// implementation's numbers: the uniform-gas limit seen through both the energy
-// density and the density-functional derivative along the gas's own manifold,
-// the von Weizsacker relation tau_W = |grad rho|^2/(8 rho) that ties the sigma
-// slot to the tau slot, the exact 10/81 of the exchange gradient expansion, the
-// schema's mask semantics on the new inputs, and the finite-difference channel
-// over tau.  A point-value comparison against a reference sharing this code's
-// approximations is not among them on purpose.
+// e_sigma = e_x^LSDA(rho_sigma)(1 + (1 - tau_P/tau_unif)/12), tau_P = tau_sigma - |grad rho_sigma|^2/(8 rho_sigma), tau_unif = (3/10)(6 pi^2)^(2/3) rho_sigma^(5/3).
 
 #include "excgrid/components.hpp"
 #include "excgrid/kernel.hpp"
@@ -27,9 +11,7 @@
 #include <string_view>
 #include <utility>
 
-// Declared here at namespace scope, OUTSIDE the anonymous namespace below: a
-// namespace nested inside an unnamed namespace has internal linkage, so a
-// declaration there would not bind to the definition in src/meta_gga_reference.cpp.
+// At namespace scope: a declaration in the anonymous namespace would not bind to the library's definition.
 namespace excgrid {
 const XcFunctional& MetaGgaReferenceFunctional() noexcept;
 } // namespace excgrid
@@ -45,31 +27,19 @@ using excgrid::XcFunctional;
 
 constexpr double kPi = 3.14159265358979323846;
 
-/// The shipped name of the tau tier's reference.
 constexpr std::string_view kReferenceName = "tau_x";
 
-/// (3/4)(6/pi)^(1/3): the spin-scaled Slater constant, so the LSDA exchange
-/// energy density is -(3/4)(6/pi)^(1/3) rho^(4/3) per spin channel.
+/// (3/4)(6/pi)^(1/3): the spin-scaled Slater constant, e_x^LSDA = -this * rho^(4/3) per channel.
 const double kSlaterSpinPrefactor = 0.75 * std::cbrt(6.0 / kPi);
 
-/// The cube root of 6 pi^2, carried separately so the Thomas-Fermi constant and
-/// the reduced gradient below come from one number.
 const double kSixPiSquaredCbrt = std::cbrt(6.0 * kPi * kPi);
 
-/// (3/10)(6 pi^2)^(2/3): the spin-scaled Thomas-Fermi constant, so a uniform gas
-/// has tau_sigma = this * rho_sigma^(5/3) in that channel.
+/// (3/10)(6 pi^2)^(2/3): tau_sigma = this * rho_sigma^(5/3) for a uniform gas.
 const double kFermiConstant = 0.3 * kSixPiSquaredCbrt * kSixPiSquaredCbrt;
 
-/// The exact-condition tolerance, relative.  Every check below compares two
-/// routes to the same expression, so the residual is round-off only: a handful
-/// of roundings at ~1e-16 each, and at most a 1.3x cancellation in the sums
-/// involved.  1e-14 sits above that floor and ten orders below the smallest
-/// coefficient error any of these checks exists to catch - a wrong von
-/// Weizsacker coefficient of 1/4 in place of 1/8, for instance, moves the sigma
-/// derivative by 100%.
+/// Round-off only; 1e-14 is above the floor and far below any coefficient error.
 constexpr double kIdentityTolerance = 1e-14;
 
-/// One grid point's components, before a mask is put on them.
 struct Point {
     double rhoA = 0.0;
     double rhoB = 0.0;
@@ -80,12 +50,7 @@ struct Point {
     double tauB = 0.0;
 };
 
-/// The point's values with exactly the mask named.
-///
-/// The values go straight into the buffer and the mask is set afterwards, so a
-/// caller can put a value in the buffer and leave it out of the mask - which is
-/// the state the mask tests need, and the only way to reach it (PointInputs::Set
-/// always adds what it writes).
+/// Writes values directly: PointInputs::Set would add what it writes to the mask.
 PointInputs MaskedInputs(const Point& point, const ComponentMask& mask) {
     PointInputs inputs;
     inputs.mask = mask;
@@ -101,18 +66,11 @@ PointInputs MaskedInputs(const Point& point, const ComponentMask& mask) {
 
 class MetaGgaReferenceTest : public ::testing::Test {
 protected:
-    /// The hand-written functional itself, not the registry's name for the tier.
-    ///
-    /// The registry publishes the GENERATED tau-tier kernel under that name, so
-    /// resolving through it here would test the generator's output rather than
-    /// the reference this file is about - and would leave the hand-written
-    /// implementation with no coverage at all.  The agreement between the two is
-    /// checked where the registry is (tests/registry_test.cpp).
+    /// The hand-written reference, not the registry's generated kernel under the same name.
     [[nodiscard]] const XcFunctional& Reference() const {
         return excgrid::MetaGgaReferenceFunctional();
     }
 
-    /// The point through the reference, with the collinear mask unless one is named.
     [[nodiscard]] PointResult Evaluate(
         const Point& point, const ComponentMask& mask = ComponentMask::Collinear()) const {
         const PointInputs inputs = MaskedInputs(point, mask);
@@ -122,8 +80,6 @@ protected:
     }
 };
 
-/// The uniform electron gas in both channels: no gradient, and the channel's
-/// kinetic-energy density at its Thomas-Fermi value.
 Point UniformGasPoint(double rhoA, double rhoB) {
     Point point;
     point.rhoA = rhoA;
@@ -133,16 +89,7 @@ Point UniformGasPoint(double rhoA, double rhoB) {
     return point;
 }
 
-// The exact condition, in the form every meta-GGA owes: a uniform electron gas
-// is described exactly as LSDA describes it.  Its gradient vanishes and its
-// kinetic-energy density is the Thomas-Fermi value above, and both channels must
-// then carry the spin-scaled Slater energy density with no enhancement at all.
-//
-// This is the check that pins the tau NORMALIZATION: the enhancement is 1 only
-// if tau/tau_unif is exactly 1, so a kernel carrying the unpolarized constant
-// (3/10)(3 pi^2)^(2/3) in place of the spin-scaled (3/10)(6 pi^2)^(2/3) lands 3.1%
-// away from the LSDA value here and fails.  Unequal spins are used because a
-// spin-blind normalization would still cancel at rhoA = rhoB.
+// Uniform gas at tau_unif must give LSDA exactly; unequal spins catch a spin-blind normalization.
 TEST_F(MetaGgaReferenceTest, UniformGasReproducesTheLsdaExchange) {
     const std::array<std::pair<double, double>, 3> gases = {
         {{0.26, 0.14}, {0.05, 0.11}, {0.4, 0.4}}};
@@ -158,19 +105,7 @@ TEST_F(MetaGgaReferenceTest, UniformGasReproducesTheLsdaExchange) {
     }
 }
 
-// The same exact condition through the derivative the schema's new component
-// supplies.  A meta-GGA's density-functional derivative along the uniform gas's
-// own manifold is the total derivative of the energy density with tau_sigma
-// following rho_sigma at the Thomas-Fermi rate,
-//
-//     de/d rho = @e/@rho|tau + @e/@tau * (5/3) kFermi rho^(2/3),
-//
-// and it must equal the LSDA exchange potential -(4/3)(3/4)(6/pi)^(1/3) rho^(1/3).
-// This is the condition tying the tau slot to the density slot: the energy check
-// above is passed by a kernel that reads tau with any weight that happens to
-// cancel, while this one is passed only by the right one.  At the point checked
-// the density derivative alone is 8% away from the LSDA potential, so the tau
-// term is load-bearing rather than a rounding correction.
+// de/drho = de/drho|tau + (5/3) kFermi rho^(2/3) de/dtau = -(4/3)(3/4)(6/pi)^(1/3) rho^(1/3).
 TEST_F(MetaGgaReferenceTest, UniformGasReproducesTheLsdaPotentialAlongTheGasManifold) {
     const std::array<std::pair<double, double>, 2> gases = {{{0.26, 0.14}, {0.05, 0.11}}};
 
@@ -195,23 +130,7 @@ TEST_F(MetaGgaReferenceTest, UniformGasReproducesTheLsdaPotentialAlongTheGasMani
     }
 }
 
-// The von Weizsacker relation and the consistency of the kinetic-energy
-// derivative.  A spin channel's von Weizsacker kinetic-energy density is
-//
-//     tau_W,sigma = |grad rho_sigma|^2 / (8 rho_sigma) = sigma_sigma/(8 rho_sigma),
-//
-// with tau_sigma >= tau_W,sigma for every physical density and equality for a
-// single orbital.  The reference's gradient enters through tau_P = tau - tau_W
-// and nothing else, so differentiating that identity gives the tie between the
-// two derivative slots the schema publishes:
-//
-//     @e/@sigma_sigma = -(1/(8 rho_sigma)) @e/@tau_sigma.
-//
-// The tie is exact at every point and is the consistency statement for the
-// kinetic-energy derivative: what it catches is exactly the slip that matters
-// here - the coefficient 8, its reciprocal, or the sign - and it is deliberately
-// a relation between two returned numbers rather than a point value, so no
-// external reference can satisfy it by sharing an approximation.
+// tau_W = sigma/(8 rho); tau_P = tau - tau_W, so de/dsigma_sigma = -(1/(8 rho_sigma)) de/dtau_sigma.
 TEST_F(MetaGgaReferenceTest, VonWeizsackerRelationTiesSigmaToTau) {
     const std::array<Point, 3> points = {{
         {0.42, 0.31, 0.021, 0.004, 0.017, 0.09, 0.07},
@@ -235,23 +154,12 @@ TEST_F(MetaGgaReferenceTest, VonWeizsackerRelationTiesSigmaToTau) {
                     kIdentityTolerance * std::abs(tauDerivativeB) / (8.0 * point.rhoB))
             << "rhoB = " << point.rhoB;
 
-        // The cross invariant is outside the relation: it carries no channel's
-        // own von Weizsacker density, so a channel-separable functional has no
-        // derivative with respect to it.
+        // The cross invariant carries no channel's tau_W: its derivative is exactly zero.
         EXPECT_DOUBLE_EQ(result.first[IndexOf(Component::SigmaAb)], 0.0);
     }
 }
 
-// The von Weizsacker relation at the level of values rather than derivatives: at
-// fixed rho_sigma the pair (sigma_sigma, tau_sigma) may be moved together by
-// (8 rho_sigma delta, delta) without moving tau_P, so the energy density and the
-// two partials it is built from must not move - however far the move goes, and
-// whichever way it takes sigma_sigma.  The density partial is deliberately NOT
-// among them: it is taken at fixed sigma, and the move changes sigma.
-//
-// The equality case of the relation is the physical realization of tau_P = 0: a
-// single orbital has tau_sigma = tau_W,sigma exactly, which is the state the
-// alpha channel is anchored on below.
+// (sigma_sigma, tau_sigma) -> (sigma_sigma + 8 rho delta, tau_sigma + delta) leaves tau_P fixed.
 TEST_F(MetaGgaReferenceTest, GradientEntersOnlyThroughTheVonWeizsackerDensity) {
     Point point;
     point.rhoA = 0.42;
@@ -273,14 +181,9 @@ TEST_F(MetaGgaReferenceTest, GradientEntersOnlyThroughTheVonWeizsackerDensity) {
 
         const PointResult result = Evaluate(moved);
 
-        // tau_P is invariant in exact arithmetic; what is left is the round-off
-        // of the two moves, a couple of ulps of sigma/(8 rho) that reach the
-        // energy density scaled by de/d tau, so a few ulps of exc - hence a
-        // tolerance rather than an equality, and a tight one.
+        // tau_P is invariant; only the two moves' round-off remains, a few ulps.
         EXPECT_NEAR(result.exc, anchored.exc, 1e-15 * std::abs(anchored.exc)) << "delta = " << delta;
 
-        // These two are untouched by construction: the move leaves them exactly
-        // where they were.
         EXPECT_DOUBLE_EQ(result.first[IndexOf(Component::SigmaAa)],
                          anchored.first[IndexOf(Component::SigmaAa)])
             << "delta = " << delta;
@@ -290,28 +193,7 @@ TEST_F(MetaGgaReferenceTest, GradientEntersOnlyThroughTheVonWeizsackerDensity) {
     }
 }
 
-// The exact coefficient of the exchange gradient expansion.  For a slowly
-// varying density the exact second-order expansion of exchange is
-//
-//     e_x = e_x^LSDA (1 + (10/81) s_sigma^2 + O(grad^4)),
-//
-// with s_sigma = |grad rho_sigma|/(2 (6 pi^2)^(1/3) rho_sigma^(4/3)) the
-// spin-scaled reduced gradient, and 10/81 is exact rather than fitted - it is
-// the coefficient PBEsol carries for the same reason.  In the iso-orbital
-// variables the slowly varying gas has tau_W/tau_unif = (5/3) s^2 (an algebraic
-// identity of the two definitions) and tau = tau_unif (1 + (5/27) s^2), the
-// second-order expansion of the kinetic-energy density itself (coefficient 1/72
-// in |grad rho|^2/rho, smaller than the von Weizsacker 1/8 by the well-known
-// factor nine).  Together those give tau_P/tau_unif = 1 - (40/27) s^2, so the
-// enhancement's leading coefficient must come out as (40/27)/12 = 10/81.
-//
-// The point below is built from that physics rather than from the kernel: s and
-// rho determine sigma and tau independently.  The round-off in the ratio
-// (e_x/e_x^LSDA - 1)/s^2 is the energy density's ~1e-15 relative divided by s^2,
-// which is 1e-12 at s^2 = 1e-3 and 1e-11 at 1e-4 - three orders inside the
-// tolerance, and the same tolerance is four orders below the error a wrong
-// coefficient would produce (the bare 1/8 of the von Weizsacker term would give
-// 0.2778 in place of 0.1235).
+// e_x = e_x^LSDA (1 + (10/81) s^2 + O(grad^4)), s = |grad rho|/(2 (6 pi^2)^(1/3) rho^(4/3)); tau_P/tau_unif = 1 - (40/27) s^2, so (40/27)/12 = 10/81.
 TEST_F(MetaGgaReferenceTest, GradientExpansionCoefficientIsTheExactTenOverEightyOne) {
     constexpr double kCoefficientTolerance = 1e-9;
     constexpr double kExactCoefficient = 10.0 / 81.0;
@@ -322,8 +204,7 @@ TEST_F(MetaGgaReferenceTest, GradientExpansionCoefficientIsTheExactTenOverEighty
         {
             Point point;
             point.rhoA = rho;
-            // sigma = |grad rho|^2 from the definition of s, and tau from the
-            // second-order expansion of the kinetic-energy density.
+            // sigma = |grad rho|^2 from s; tau from the second-order kinetic-energy expansion.
             point.sigmaAa = 4.0 * kSixPiSquaredCbrt * kSixPiSquaredCbrt * std::pow(rho, 8.0 / 3.0) *
                             sSquared;
             point.tauA = kFermiConstant * std::pow(rho, 5.0 / 3.0) * (1.0 + (5.0 / 27.0) * sSquared);
@@ -339,10 +220,7 @@ TEST_F(MetaGgaReferenceTest, GradientExpansionCoefficientIsTheExactTenOverEighty
     }
 }
 
-// The schema's mask, on the new input.  The two evaluations below carry the SAME
-// buffer - a large tau in both channels - and differ only in whether the tau bits
-// are in the mask.  An input outside the mask contributes exactly zero, so the
-// results must be bit-identical to the same point with tau zeroed.
+// Same buffer, tau bits differ: an input outside the mask contributes exactly zero.
 TEST_F(MetaGgaReferenceTest, AnInputOutsideTheMaskContributesExactlyZero) {
     Point uncounted;
     uncounted.rhoA = 0.42;
@@ -376,18 +254,7 @@ TEST_F(MetaGgaReferenceTest, AnInputOutsideTheMaskContributesExactlyZero) {
                      fromZeroed.first[IndexOf(Component::TauA)]);
 }
 
-// The other half of the same rule: an input INSIDE the mask is consumed and moves
-// the result.  The two points below share a density and a gradient and differ
-// only in tau - the iso-orbital value tau = tau_W (a single orbital, the equality
-// case of the von Weizsacker relation) against the uniform-gas value - and the
-// energy density must move by the enhancement's own difference, 0.0404
-// Ha/Bohr^3 here.  The check is the order of magnitude, so that a kernel ignoring
-// tau cannot pass by accident.
-//
-// The slot the result publishes follows the caller's mask rather than tau's
-// value, and the reference makes that visible: de/d tau is a constant in tau
-// here, so the slot is identical at both taus and is exactly zero when the bit is
-// clear.
+// Tau inside the mask moves exc; the returned tau slot follows the mask, not tau's value.
 TEST_F(MetaGgaReferenceTest, AnInputInsideTheMaskIsConsumedAndMovesTheResult) {
     Point isoOrbital;
     isoOrbital.rhoA = 0.42;
@@ -404,12 +271,7 @@ TEST_F(MetaGgaReferenceTest, AnInputInsideTheMaskIsConsumedAndMovesTheResult) {
     const PointResult isoResult = Evaluate(isoOrbital);
     const PointResult uniformResult = Evaluate(uniform);
 
-    // The two points differ in tau_P by tau_unif - tau_W in each channel, so the
-    // energy densities differ by the enhancement's own difference: (1/12) of the
-    // channel's LSDA energy density less the von Weizsacker correction, which at
-    // this point comes to 0.0404 Ha/Bohr^3.  The assert is on the order of
-    // magnitude, with four times that as the floor, so a kernel that reads no tau
-    // at all (difference exactly zero) cannot pass.
+    // exc differs by (1/12) of the channel's LSDA energy density less tau_W: 0.0404 here.
     EXPECT_GT(std::abs(uniformResult.exc - isoResult.exc), 1e-2)
         << "iso-orbital " << isoResult.exc << " against uniform " << uniformResult.exc;
 
@@ -423,18 +285,7 @@ TEST_F(MetaGgaReferenceTest, AnInputInsideTheMaskIsConsumedAndMovesTheResult) {
     EXPECT_DOUBLE_EQ(Evaluate(uniform, withoutTau).first[IndexOf(Component::TauA)], 0.0);
 }
 
-// The finite-difference channel over the new input.
-//
-// The reference is linear in tau, so a central difference carries NO truncation
-// error and any step is exact in exact arithmetic: what the step has to clear is
-// the round-off floor, whose relative size is about ulp(exc)/(2 h |de/d tau|) -
-// 2.5e-15/h at the point below, where |de/d tau| is 2.3e-2 in the alpha channel
-// and 2.5e-2 in the beta one and exc is -5.3e-1.  That puts the floor at 2.5e-12
-// for h = 1e-3 and 2.5e-6 for h = 1e-9.  The step used is 1e-3, three orders above
-// the floor at the 1e-9 tolerance, and the ladder MEASURES both ends rather than
-// trusting the model: the same difference at 1e-9 must break the tolerance, and
-// at 1e-2 must still hold it, so the step sits in a range rather than on a knife
-// edge.
+// Linear in tau, so the central difference has no truncation error; 1e-3 sits above the round-off floor, 1e-9 below it.
 TEST_F(MetaGgaReferenceTest, TauDerivativeMatchesCentralFiniteDifferences) {
     constexpr double kChosenStep = 1e-3;
     constexpr double kWiderStep = 1e-2;
@@ -492,9 +343,6 @@ TEST_F(MetaGgaReferenceTest, TauDerivativeMatchesCentralFiniteDifferences) {
     }
 }
 
-// The registry surface: the reference resolves by name, reports the two kinetic-
-// energy densities as required along with the collinear set, and no shipped
-// LDA/GGA functional requires them.
 TEST_F(MetaGgaReferenceTest, TheRegistryResolvesTheReferenceAndRequiresTau) {
     const ComponentMask mask = Reference().RequiredMask();
 
@@ -526,20 +374,7 @@ TEST_F(MetaGgaReferenceTest, TheRegistryResolvesTheReferenceAndRequiresTau) {
     EXPECT_GT(checked, 0) << "no shipped LDA/GGA functional was examined";
 }
 
-/// The density derivative at (rho, sigma, tau), hand-derived from the definition
-/// at the top of this file rather than from the source's term decomposition.
-///
-/// With u = tau_P/tau_unif, e = e_x^LSDA(rho)(1 + (1 - u)/12), so the product and
-/// quotient rules give de/drho = e_x^LSDA'(rho)(1 + (1 - u)/12) - e_x^LSDA(rho) u'/12,
-/// where u' = (sigma/(8 rho^2) tau_unif - tau_P (5/3) kFermiConstant rho^(2/3))/tau_unif^2.
-///
-/// The sigma term of u' is what makes this helper worth having: it carries the
-/// gradient, so it vanishes at sigma = 0, and every other check in this file
-/// evaluates either there or on a slot that term does not reach.
-/// \param rho The channel's density.
-/// \param sigma grad(rho) . grad(rho) for this channel.
-/// \param tau The channel's kinetic-energy density.
-/// \returns de/drho at fixed sigma and tau, Hartree.
+/// de/drho = e_x^LSDA'(rho)(1 + (1-u)/12) - e_x^LSDA(rho) u'/12, u = tau_P/tau_unif.
 [[nodiscard]] double HandDerivedVrho(double rho, double sigma, double tau) {
     const double tauPauli = tau - sigma / (8.0 * rho);
     const double tauUniform = kFermiConstant * std::pow(rho, 5.0 / 3.0);
@@ -554,11 +389,7 @@ TEST_F(MetaGgaReferenceTest, TheRegistryResolvesTheReferenceAndRequiresTau) {
     return lsdaPrime * enhancement - lsda * uPrime / 12.0;
 }
 
-// The density derivative at a gradient that is not zero, against the derivative
-// derived by hand above.  Every other gate in this file evaluates either at
-// sigma = 0 or on a slot the gradient's density term does not reach, so a wrong
-// coefficient on that term passes all of them; this is the case that separates
-// it.  Both channels carry a gradient and neither is at its uniform tau.
+// Neither channel at sigma = 0 or uniform tau: this separates the gradient term of de/drho.
 TEST_F(MetaGgaReferenceTest, DensityDerivativeMatchesTheHandDerivedOneAtNonzeroGradient) {
     Point point;
     point.rhoA = 1.3;
@@ -578,10 +409,7 @@ TEST_F(MetaGgaReferenceTest, DensityDerivativeMatchesTheHandDerivedOneAtNonzeroG
     EXPECT_NEAR(result.first[IndexOf(Component::RhoB)], betaAnalytic,
                 kIdentityTolerance * std::abs(betaAnalytic));
 
-    // The independent route: a central difference of the kernel's own energy
-    // density in rho, at fixed sigma and tau.  It shares no algebra with either
-    // expression above, which is what makes the two a check rather than one
-    // restating the other.
+    // Central difference of the kernel's own energy: shares no algebra with the hand-derived expression.
     constexpr double kStep = 1e-5;
     Point ahead = point;
     Point behind = point;

@@ -16,10 +16,9 @@ namespace {
 constexpr double kSwitchWindow = 0.64; // SSF: |mu| <= a window.
 constexpr std::size_t kCandidateCap = 512; // Nearest-neighbour search cap per step.
 
-// The SSF switching function: s(mu) in [0, 1], s(mu) = 0 for mu >= a,
-// s(mu) = 1 for mu <= -a, and the odd degree-7 polynomial
-// z(t) = t(35 - t^2(35 - t^2(21 - 5 t^2)))/16 in between (Stratmann,
-// Scuseria, Frisch, Chem. Phys. Lett. 257 (1996) 213).
+// The SSF switching function (Stratmann, Scuseria, Frisch, Chem. Phys. Lett. 257
+// (1996) 213): 0 for mu >= a, 1 for mu <= -a, else 0.5 (1 - z(t)), t = mu / a,
+//     z(t) = t(35 - t^2(35 - t^2(21 - 5 t^2)))/16.
 double Switch(double mu) {
     if (mu >= kSwitchWindow)
     {
@@ -38,10 +37,7 @@ double Switch(double mu) {
     return 0.5 * (1.0 - z);
 }
 
-// The per-build work arrays of the partition pass.  The pass runs once per
-// grid point (10^5-10^6 of them), so its buffers are the caller's rather
-// than the callee's, and the Slater radii are resolved once here instead of
-// once per point per atom.
+// The per-build work arrays of the partition pass.
 struct PartitionScratch {
     std::vector<double> radius; // Bragg-Slater radius, one per atom.
     std::vector<double> distance; // |point - atom|, per point.
@@ -77,20 +73,9 @@ PartitionScratch MakePartitionScratch(const Geometry& geometry) {
     return scratch;
 }
 
-// The neighbour list of one shell: every atom whose switch can differ from
-// its plateau value for some point of the owner atom's sphere of radius
-// `radius`.  For a point p on that sphere, p is `radius` from the owner and
-// every other atom b is at least d_ab - radius from p, so an atom with
-// d_ab > 2 radius + 4 kMax (kMax = 0.64 times the largest Slater radius) is
-// farther than radius + 4 kMax from every point of the sphere.  Such an atom
-// is provably inert there: the owner breaks its cell (the owner sits at
-// radius, so the break test r_b >= kA[b] + r_owner + kB[owner] clears by
-// more than 2 kMax), it is farther than any owner-relative factor bound
-// (r_b < r_a + 2 kMax inside the product), and it never enters the smallest
-// two hi, which settle the owner's own break test.  The list is built once
-// per shell and shared by every angular point on it, and the
-// 2 radius + 4 kMax bound is the only cutoff in the pass - it is derived
-// from the switch plateau, not fitted.
+// The neighbour list of one shell: the atoms with d_ab <= 2 radius + 4 kMax,
+// kMax = 0.64 max_a radius_a.  An atom outside is farther than radius + 4 kMax
+// from every point of the shell and is provably inert there.
 void BuildShellWindow(const Geometry& geometry,
                       std::size_t owner,
                       double radius,
@@ -114,26 +99,10 @@ void BuildShellWindow(const Geometry& geometry,
     }
 }
 
-// Becke fuzzy-cell partition weight (Becke, J. Chem. Phys. 88 (1988) 2547)
-// with the SSF step and the Bragg-Slater heteroatom adjustment, normalized
-// to a partition of unity at the point.  Returns the weight of the OWNING
-// atom's cell - the only weight the grid build consumes.
-//
-// The pass is the pair loop's own two comparisons regrouped, not a new
-// approximation.  With kX = 0.64 times a Slater radius, the loop's break
-// test is r_a >= kA[a] + (r_b + kB[b]) and its exactly-1 no-contest case is
-// r_a + kA[a] <= r_b - kB[b].  Writing lo[b] = r_b - kB[b] and
-// hi[b] = r_b + kB[b] those read lo[a] >= hi[b] and hi[a] <= lo[b], so:
-//   - the cell of atom a is exactly zero unless lo[a] < min over b != a of
-//     hi[b] - two running minima settle that for every atom at once, in
-//     place of one scan per atom;
-//   - otherwise its product runs over the {b : lo[b] < hi[a]} only, because
-//     every other factor is exactly 1.0 and multiplying by 1.0 is exact.
-// A broken cell is set to 0 either way and a surviving product multiplies
-// the same factors in the same order as the full N^2 form, so the weights
-// are unchanged.  With the shell window in front of it the pass visits the
-// local atoms instead of the molecule: measured 2.25 candidate atoms per
-// point at 48 atoms and 3.18 at 384 (measured 2026-09-13).
+// Becke fuzzy-cell partition weight (Becke, J. Chem. Phys. 88 (1988) 2547),
+// normalized to unity at the point; returns the OWNING atom's cell.  With
+// lo[b] = r_b - kB[b] and hi[b] = r_b + kB[b], a cell is exactly zero unless
+// lo[a] < min_{b != a} hi[b], and its product runs over {b : lo[b] < hi[a]} only.
 double OwnerPartitionWeight(const std::array<double, 3>& point,
                             const Geometry& geometry,
                             PartitionScratch& scratch,
@@ -183,21 +152,9 @@ double OwnerPartitionWeight(const std::array<double, 3>& point,
         { secondSmallestHi = hi[a]; }
     }
 
-    // Two of the reductions above can read atoms the window leaves out, and
-    // an atom outside the window is farther than `radius + margin` from the
-    // point (that is what excludes it) - call that the floor.  The nearest
-    // atom is always inside (the owner sits at the sphere radius, so
-    // nearest <= radius).  The second nearest is exact whenever it is at most
-    // the floor, because the true one is then the smaller of it and a value
-    // beyond the floor; past the floor the shortcut's comparison is still
-    // settled whenever the nearest sits below 0.5 (1 - a) times the floor,
-    // because the true second nearest is beyond the floor too, so the
-    // comparison is false - and evaluating it with the window's larger value
-    // gives false as well.  The second smallest hi settles the owner's own
-    // break test, and the same floor argument applies: at or below the floor
-    // it is the true value, above it the true value may be an excluded atom's
-    // and the test's answer could differ.  Both are then measured, on the
-    // atom list, for the points that reach that state - never for the rest.
+    // The window's reductions can miss an atom, so the three flags below are
+    // conservative tests for whether the values are the true ones; the scan
+    // recomputes them in full when any fails.
     const double floor = distance[owner] + scratch.windowMargin;
     const bool windowComplete = window.size() == atomCount;
     const bool secondNearestExact = windowComplete || secondNearest <= floor;
@@ -228,10 +185,8 @@ double OwnerPartitionWeight(const std::array<double, 3>& point,
         }
     }
 
-    // Near-nucleus shortcut: within 0.5 (1 - a) of the nearest atom every
-    // switch sits on the mu <= -a plateau (the standard Becke shortcut;
-    // the renormalization below still covers the tail of anomalously
-    // short bonds).
+    // Near-nucleus shortcut: within 0.5 (1 - a) of the nearest atom every switch
+    // sits on the mu <= -a plateau; the renormalization below covers the tail.
     if (nearest > 0.5 * (1.0 - kSwitchWindow) * secondNearest)
     {
         for (const std::size_t a : window)
@@ -264,9 +219,7 @@ double OwnerPartitionWeight(const std::array<double, 3>& point,
         raw[nearestAtom] = 1.0;
     }
 
-    // The normalization runs over the window: every atom outside it has a
-    // cell of exactly 0.0, and adding 0.0 leaves a partial sum unchanged, so
-    // the total is the same sum in the same order.
+    // Atoms outside the window have a cell of exactly 0.0, so the total is unchanged.
     double total = 0.0;
 
     for (const std::size_t a : window)
@@ -278,12 +231,6 @@ double OwnerPartitionWeight(const std::array<double, 3>& point,
 }
 
 // The first free index at or after `start`, or `count` when there is none.
-// The occupancy map holds one bit per point, set while the point is free, so
-// the scan advances a WORD at a time and a run of assigned points costs one
-// step per 64 points instead of one per point.  The bit position inside the
-// word is read from the lowest set bit by popcount of its square minus one
-// (one instruction, branch-free); the standard trailing-zero spelling is a
-// snake_case token the style guard treats as a project identifier.
 std::size_t NextFree(const std::vector<std::uint64_t>& freeWords,
                      std::size_t start,
                      std::size_t count) {
@@ -312,7 +259,6 @@ std::size_t NextFree(const std::vector<std::uint64_t>& freeWords,
     }
 }
 
-// One unassigned-grid-point record for the re-batching pass.
 struct GridPoint {
     std::array<double, 3> position;
     double weight;
@@ -337,15 +283,6 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
         return std::unexpected(angular.error());
     }
 
-    // The per-atom product grids: for every atom, every radial point
-    // times every angular node, folded with r^2 (the volume element the
-    // radial weights deliberately exclude), then the Becke partition
-    // weight of the point, then the trim.  The scratch is built once for
-    // the whole pass: it carries the point-invariant radii, the arrays each
-    // point would otherwise allocate, and the shell window.  One window
-    // serves every angular node of a shell, and a point is dropped here
-    // rather than kept in an intermediate cloud, so the pass holds only the
-    // points that survive.
     std::vector<GridPoint> kept;
     PartitionScratch scratch = MakePartitionScratch(geometry);
 
@@ -382,13 +319,7 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
     const std::size_t count = kept.size();
     std::size_t remaining = count;
 
-    // The re-seed asks a different question from the fill: not "which of the
-    // next kCandidateCap is nearest" (that walk IS the choice rule) but "where
-    // is the next free point".  In the endgame it dominates the pass - 81-87 %
-    // of the seeds run with 10 % or less of the pool free and walk 67-184
-    // times the uniform gap between free points, measured 1999-5368 probes per
-    // block (measured 2026-09-15).  One bit per point answers it a word at a
-    // time; an index per point costs 64 times the memory for no measured gain.
+    // One bit per point, set while the point is free.
     std::vector<std::uint64_t> freeWords(count / 64 + 1, ~0ull);
 
     if (count % 64 != 0)
@@ -398,9 +329,6 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
 
     while (remaining > 0)
     {
-        // The seed is the first free point at or after the cursor, wrapping -
-        // the same point the walk returned, found without traversing the
-        // assigned run.
         std::size_t seed = NextFree(freeWords, cursor, count);
 
         if (seed == count)

@@ -11,14 +11,10 @@ namespace excgrid {
 
 /// \defgroup excgrid-kernel The per-point XC kernel API
 ///
-/// The seam between a functional and its consumer.  Inputs are supplied by
-/// identifier through a mask; the second derivative crosses as a contraction.
-/// Units are the component table's.
+/// Inputs cross by identifier through a mask; units are the component table's.
 
-/// Which components a caller supplies, or a result publishes.
-///
-/// One bit per identifier.  Read it on every evaluation; the number of active
-/// components is not the capacity.
+/// Which components a caller supplies, or a result publishes: one bit per
+/// identifier.
 /// \ingroup excgrid-kernel
 struct ComponentMask {
     std::uint32_t bits = 0; ///< One bit per Component, by its value.
@@ -98,9 +94,7 @@ enum class Request : std::uint8_t {
     kSecondDerivativeMatrix = 2, ///< Additionally the second derivatives, materialised.
 };
 
-/// How an evaluation ended.
-///
-/// Every refusal is named.  None of them is answered with zeros.
+/// How an evaluation ended; every refusal is named.
 /// \ingroup excgrid-kernel
 enum class KernelStatus : std::uint8_t {
     kOk = 0, ///< The values were produced.
@@ -118,10 +112,8 @@ enum class KernelStatus : std::uint8_t {
 /// \ingroup excgrid-kernel
 [[nodiscard]] std::string_view DescribeStatus(KernelStatus status) noexcept;
 
-/// One functional term's per-point value, under named fields.
-///
-/// What the generated kernels return and what composition is written in.  This
-/// is not the type a consumer receives.
+/// What the generated kernels return and what composition is written in; not
+/// the type a consumer receives.
 /// \ingroup excgrid-kernel
 struct XcKernelValue {
     double exc = 0.0; ///< Energy density e(r).
@@ -193,9 +185,8 @@ struct PointResult {
     std::array<double, kComponentCapacity> first{}; ///< d exc / d x_i, by Component.
 };
 
-/// Folds a named kernel value into a schema result.
-///
-/// Slots the mask does not name are left at zero.
+/// Folds a named kernel value into a schema result; slots the mask does not name
+/// are left at zero.
 /// \param value The named per-point value.
 /// \param mask Which identifiers the result should carry.
 /// \param result The result to fill.
@@ -203,10 +194,8 @@ struct PointResult {
 void FoldIntoResult(const XcKernelValue& value, const ComponentMask& mask,
                     PointResult& result) noexcept;
 
-/// The second-derivative work for one point, contracted.
-///
-/// The matrix multiplied by the caller's right-hand side; the matrix itself
-/// does not cross here.
+/// The second-derivative work for one point, contracted: the matrix times the
+/// caller's right-hand side.
 /// \ingroup excgrid-kernel
 struct PointSecondDerivative {
     ComponentMask mask{}; ///< Which components the contraction is over.
@@ -224,16 +213,12 @@ struct PointSecondDerivativeMatrix {
     std::array<double, kSecondDerivativeCapacity * kSecondDerivativeCapacity> upper{};
 };
 
-/// LDA second-derivative tier: the materialised matrix over the two densities.
-///
-/// The matrix is the upper triangle, row-major over (rhoA, rhoB) - the pair the
-/// kernel reads, in identifier order.  It is left untouched at a point the
-/// kernel's own guards do not answer.
+/// LDA second-derivative tier: the upper triangle over (rhoA, rhoB), row-major.
+/// Left untouched at a point the kernel's own guards do not answer.
 /// \ingroup excgrid-kernel
 using LdaSecondDerivative = void (*)(double rhoA, double rhoB, PointSecondDerivativeMatrix& matrix);
 
-/// GGA second-derivative tier: the materialised matrix over the five components
-/// a GGA kernel reads, in identifier order.
+/// GGA second-derivative tier: the upper triangle over the five GGA components.
 /// \ingroup excgrid-kernel
 using GgaSecondDerivative = void (*)(double rhoA,
                                      double rhoB,
@@ -243,13 +228,7 @@ using GgaSecondDerivative = void (*)(double rhoA,
                                      PointSecondDerivativeMatrix& matrix);
 
 /// Which of a caller's components a functional's second-derivative tier does
-/// not span.
-///
-/// The tier answers for the components the FUNCTIONAL reads; a component the
-/// caller supplies that the functional does not read is not part of the
-/// request and is not reported.  A request naming one that the functional reads
-/// and the tier leaves out is the case this names, and it is the difference
-/// between "no tier" and "no tier for this component".
+/// not span: the components the functional reads and the tier leaves out.
 /// \param requested The caller's mask.
 /// \param required The components the functional reads.
 /// \param spanned The components its second-derivative tier covers.
@@ -263,13 +242,6 @@ using GgaSecondDerivative = void (*)(double rhoA,
 }
 
 /// The refusal a second-derivative request earns, or kOk.
-///
-/// Three answers, in this order: a functional shipping no tier refuses with
-/// kRefusedUnsupportedCapability; a request touching a component the functional
-/// reads and the tier does not span refuses with
-/// kRefusedSecondDerivativeCoverage; anything else is kOk.  The order is what
-/// keeps the two distinguishable: an uncovered component is only worth naming
-/// once there is a tier to be uncovered by.
 /// \param requested The caller's mask.
 /// \param required The components the functional reads.
 /// \param spanned The components its second-derivative tier covers.
@@ -310,12 +282,8 @@ public:
     /// \returns Its required mask.
     [[nodiscard]] virtual ComponentMask RequiredMask() const = 0;
 
-    /// The components this functional's second-derivative tier covers.
-    ///
-    /// The capability report.  An empty mask means no tier; a non-empty one
-    /// means the tier answers for exactly those components, so a caller can
-    /// tell a functional with no tier from one whose tier leaves the caller's
-    /// components out.  The default returns an empty mask.
+    /// The components this functional's second-derivative tier covers; an empty
+    /// mask means no tier.  The default returns an empty mask.
     /// \returns The spanned components.
     [[nodiscard]] virtual ComponentMask SecondDerivativeMask() const noexcept;
 
@@ -326,9 +294,8 @@ public:
     [[nodiscard]] virtual KernelStatus EvaluatePoint(const PointInputs& inputs,
                                                      PointResult& result) const = 0;
 
-    /// One per-point evaluation including a second-derivative contraction.
-    ///
-    /// The default refuses with kRefusedUnsupportedCapability.
+    /// One per-point evaluation including a second-derivative contraction; the
+    /// default refuses with kRefusedUnsupportedCapability.
     /// \param inputs The point's components.
     /// \param rightHandSide The vector to contract with, by active component.
     /// \param result Filled on kOk; untouched otherwise.
@@ -338,9 +305,8 @@ public:
         const PointInputs& inputs, std::span<const double> rightHandSide, PointResult& result,
         PointSecondDerivative& second) const;
 
-    /// One per-point evaluation materialising the second-derivative matrix.
-    ///
-    /// Debug path; the default refuses with kRefusedUnsupportedCapability.
+    /// One per-point evaluation materialising the second-derivative matrix; the
+    /// debug path, whose default refuses with kRefusedUnsupportedCapability.
     /// \param inputs The point's components.
     /// \param result Filled on kOk; untouched otherwise.
     /// \param matrix Filled on kOk; untouched otherwise.
@@ -349,10 +315,8 @@ public:
         const PointInputs& inputs, PointResult& result,
         PointSecondDerivativeMatrix& matrix) const;
 
-    /// The positional entry point, kept as a temporary adapter for consumers
-    /// that have not moved to EvaluatePoint.
-    ///
-    /// A refusal is reported as a zero-filled value with the status lost.
+    /// The positional adapter for consumers not yet on EvaluatePoint: a refusal
+    /// is reported as a zero-filled value with the status lost.
     /// \param rhoA The alpha-spin density.
     /// \param rhoB The beta-spin density.
     /// \param sigmaAa grad(rhoA) . grad(rhoA).

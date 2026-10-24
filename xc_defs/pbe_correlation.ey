@@ -1,6 +1,5 @@
 // excgrid codegen source: the Perdew-Burke-Ernzerhof 1996 GGA correlation
-// functional.  Fresh authorship; formula from the PBE paper
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// functional.  Formula from the PBE paper.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -13,8 +12,6 @@
 
     e := X'PbeCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
-    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // TierRational: the tier squares the gradient only through its radicand.
+    ExKernelGenerate("PbeCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierRational);
 ?>

@@ -47,46 +47,17 @@ namespace {
 }
 
 /// How far a rebuilt position may sit from the block's before the point is
-/// called a different point.
-///
-/// The build and this pass both evaluate R_atom + rho * n, but they are separate
-/// translation units and a compiler is free to contract that multiply-add in one
-/// and not in the other, so the two agree only to a rounding and never bit for
-/// bit.  The bound is relative as well as absolute because a point's own
-/// coordinates grow with the molecule's distance from the origin.
+/// called a different point.  Relative and absolute: separate translation units
+/// may contract R + rho*n differently.
 constexpr double kIdentityTolerance = 1e-12;
 
 /// How far this pass's weight may sit from the one the block carries before the
 /// block is called a different grid's.
-///
-/// The build and this pass compute q * W from the same quadrature and the same
-/// partition, so a weight that does not match to a rounding is not a rounding:
-/// the block's weights came from a geometry whose cells sit somewhere else.
-/// The bound is far above the few ulp the two translation units can differ by
-/// and far below the change any step a caller would take produces.
 constexpr double kWeightTolerance = 1e-10;
 
-/// Recovers the product-grid identity of a block point from its position.
-///
-/// The radial index is the radial point nearest the distance to the owning atom
-/// and the angular index is the node the direction is most nearly along; both
-/// are candidates rather than answers, so the position is rebuilt from them and
-/// the identity is returned only when the rebuild reproduces the point.  A block
-/// point that is not on this geometry's product grid - the state a build leaves
-/// when the point set moves under a finite-difference step - cannot reproduce
-/// it.
-///
-/// The search is over the whole node set, because a re-batched block orders its
-/// points by proximity and not by the order the build enumerated them, so no
-/// point's node says anything about its neighbour's.  The cost is therefore
-/// |A| alignments per point where the weight pass itself is O(N + |A|^2): it is
-/// the larger of the two only for a molecule small enough that neither is
-/// large.
-/// \param geometry The molecule.
-/// \param basis The quadrature half of the grid.
+/// Recovers the product-grid identity of a block point from its position; the
+/// identity is accepted only when rebuilding the position reproduces the point.
 /// \param nodes The angular nodes, flat, three per node.
-/// \param block The block.
-/// \param index Which of the block's points.
 /// \param out Receives the identity, when there is one.
 /// \returns Whether the point is one of this grid's.
 [[nodiscard]] bool RecoverIdentity(const Geometry& geometry,
@@ -168,9 +139,6 @@ struct BlockGridDerivativeProvider::State {
         trimWeight(threshold),
         order(depth),
         scratch(derivs::MakeDerivativeScratch(geometry, depth)) {
-        // The angular nodes are geometry-independent, so the identity search
-        // walks a flat copy of them once rather than the quadrature's own
-        // accessor per node.
         nodes.resize(3U * basis.angular.Size());
         for (std::size_t node = 0; node < basis.angular.Size(); ++node)
         {
@@ -234,18 +202,13 @@ DerivativeStatus BlockGridDerivativeProvider::Evaluate(const Block& block,
     const bool weights = AsksFor(request.parts, DerivativePart::kWeights);
     const bool second = request.order == DerivativeOrder::kSecond;
 
-    // The order the provider was built for decides what it can answer.  Asking
-    // past it is a refusal and never a buffer of zeros: a caller that did not
-    // build for the second order must not silently receive a Hessian-shaped
-    // array of nothing.
+    // Asking past the built order is a refusal, never a buffer of zeros.
     if (second && (state.order != derivs::DerivativeOrder::kSecond))
     {
         return DerivativeStatus::kRefusedSecondOrderUnavailable;
     }
 
-    // The request's framework is the caller's 3N, and it must be this
-    // geometry's: the arrays are indexed by nuclear coordinate, so a request
-    // for a different count cannot be filled at all.
+    // A request for a different 3N cannot be indexed into this geometry's arrays.
     if (request.nuclearCoordinateCount != width)
     {
         return DerivativeStatus::kRefusedBufferTooSmall;
@@ -261,8 +224,7 @@ DerivativeStatus BlockGridDerivativeProvider::Evaluate(const Block& block,
         return DerivativeStatus::kRefusedBufferTooSmall;
     }
 
-    // Every point's identity, before a single value is written.  The buffers
-    // therefore hold either a whole answer or none of one.
+    // Every identity first, before a value is written: the buffers hold all of the answer.
     if (weights)
     {
         state.identity.resize(block.pointCount);
@@ -282,9 +244,7 @@ DerivativeStatus BlockGridDerivativeProvider::Evaluate(const Block& block,
 
         if (coordinates)
         {
-            // A point is its owner's own quadrature point, so it is a rigid
-            // translate of that atom: the first derivative is the owner's own
-            // identity block and the second is identically zero.
+            // A rigid translate of its owner: the identity block, and a zero second derivative.
             derivs::EvaluatePointCoordinates(owner, atomCount, derivs::DerivativeOrder::kFirst,
                                              state.coordinates);
             std::copy(state.coordinates.first.begin(), state.coordinates.first.end(),
@@ -303,23 +263,14 @@ DerivativeStatus BlockGridDerivativeProvider::Evaluate(const Block& block,
                                         state.scratch, state.weight);
             const double carried = block.weights[index];
 
-            // The block's own weight is the grid's statement about this point,
-            // and the pass has just computed what this geometry's build would
-            // state instead.  A point of an atom that did not move is on both
-            // grids, so the position check above cannot see a partial move; the
-            // weight can, and this is where the two geometries part company.
+            // The position check cannot see a partial move of another atom; the weight can.
             if (std::abs(state.weight.value - carried) >
                 kWeightTolerance * std::max(std::abs(state.weight.value), std::abs(carried)))
             {
                 return DerivativeStatus::kRefusedUndifferentiableGrid;
             }
 
-            // The build keeps a point when its weight reaches the threshold and
-            // drops it otherwise, so a block carrying a point this geometry's
-            // build would have dropped is a block from a grid whose point set
-            // moved.  Its weights sum over a different set of points than any
-            // this geometry has, and no derivative of that sum describes this
-            // geometry.
+            // A point this geometry's build would have trimmed comes from a moved grid.
             if (std::abs(state.weight.value) < state.trimWeight)
             {
                 return DerivativeStatus::kRefusedUndifferentiableGrid;

@@ -1,20 +1,8 @@
 #!/usr/bin/env python3
 """Transcribes the D4 coordination-number element data into src/d4_cn_tables.inc.
 
-Equation 6 of the DFT-D4 model (Caldeweyher, Ehlert, Hansen, Neugebauer,
-Spicher, Bannwarth, Grimme, J. Chem. Phys. 150 (2019) 154122) consumes two
-element tables the paper cites but does not carry: the covalent radii of
-ref 48 (Pyykko and Atsumi) and the Pauling electronegativities of ref 47.
-Both live in the committed data file tools/data/d4_cn_element.txt, whose
-own header records where they were extracted from and under what terms.
-
-The data file carries the radii as published, in Angstrom; the .inc carries
-them both as published and multiplied by 4/3 (the counting convention of the
-earlier D3 method), which is the set the counting function scales by.
-
-The .inc this script writes is committed; this is a one-time transcription
-step (run again only when the source data changes), NOT a per-build codegen
-step.
+One-time transcription from tools/data/d4_cn_element.txt, not a per-build step.
+Radii are stored in Bohr, both as published and scaled by the D3 4/3 convention.
 
 Usage:  python tools/gen_d4_cn_tables.py            # writes src/d4_cn_tables.inc
         python tools/gen_d4_cn_tables.py --check    # verifies the committed file

@@ -1,7 +1,6 @@
-// excgrid codegen source: the Perdew-Wang 1991 GGA correlation functional
-// (the 1992 parametrization: the PW92 LDA piece + the H0/H1 gradient
-// terms).  Fresh authorship; formulas from the PW91/PW92 papers
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the Perdew-Wang 1991 GGA correlation functional, the
+// 1992 parametrization (the PW92 LDA piece + the H0/H1 gradient terms).
+// Formulas from the PW91/PW92 papers.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -14,8 +13,6 @@
 
     e := X'Pw91Correlation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
-    ExKernelGenerate("Pw91Correlation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // TierRational: the tier squares the gradient only through its radicand.
+    ExKernelGenerate("Pw91Correlation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierRational);
 ?>

@@ -1,17 +1,11 @@
 // excgrid codegen source: the Slater (Dirac) LDA exchange functional.
-// Fresh authorship; the formula is the published spin-scaled Dirac exchange
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py
-// (Yacas is a maintainer-only tool; the committed generated/ output is the
-// build input).
+// Formula from the published spin-scaled Dirac exchange.
 
 // Auto-generated file, do not modify
 #include "excgrid/kernel.hpp"
 
-// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits one excgrid::XcKernelValue function per LDA functional: the energy
-// density and its spin-density derivatives, with the exact one-spin-zero
-// limit branches (the generator's limit substitution supplies the limit
-// expressions).
+// The excgrid LDA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits one
+// XcKernelValue function per LDA functional, with its spin-zero limit branches.
 // It also emits the functional's SECOND-DERIVATIVE tier: one function filling
 // the contract's materialised matrix, from the same expression as the kernel.
 // The matrix is the contract's upper triangle, row-major over the two
@@ -43,9 +37,9 @@ XcKernelValue SlaterExchange(double rhoA, double rhoB) {
 
     if (rhoA >= eps && rhoB >= eps)
     {
-        const double C44 = 4. / 3.;
+        const double C49 = 4. / 3.;
 
-        result.exc = -0.9305257363491 * (std::pow(rhoA, C44) + std::pow(rhoB, C44));
+        result.exc = -0.9305257363491 * (std::pow(rhoA, C49) + std::pow(rhoB, C49));
     } else if (rhoA < eps)
     {
         result.exc = -0.9305257363491 * std::pow(rhoB, 4. / 3.);
@@ -56,12 +50,16 @@ XcKernelValue SlaterExchange(double rhoA, double rhoB) {
 
     if (rhoA >= eps)
     {
-        result.vrhoA = -3.7221029453964 * std::pow(rhoA, 1. / 3.) / 3.;
+        const double C49 = 4. / 3.;
+
+        result.vrhoA = -0.9305257363491 * C49 * std::pow(rhoA, C49 - 1);
     }
 
     if (rhoB >= eps)
     {
-        result.vrhoB = -3.7221029453964 * std::pow(rhoB, 1. / 3.) / 3.;
+        const double C49 = 4. / 3.;
+
+        result.vrhoB = -0.9305257363491 * C49 * std::pow(rhoB, C49 - 1);
     }
 
     return result;
@@ -77,11 +75,12 @@ void SlaterExchangeSecondDerivatives(double rhoA,
         return;
     }
 
-    matrix.upper[2] = -3.7221029453964 * std::pow(rhoB, -2. / 3.) / 9.;
+    const double C44 = 4. / 3.;
+    matrix.upper[0] = -0.9305257363491 * C44 * (C44 - 1) * std::pow(rhoA, C44 - 2);
 
-    matrix.upper[1] = 0;
+    matrix.upper[1] = 0.;
 
-    matrix.upper[0] = -3.7221029453964 * std::pow(rhoA, -2. / 3.) / 9.;
+    matrix.upper[2] = -0.9305257363491 * C44 * (C44 - 1) * std::pow(rhoB, C44 - 2);
 }
 
 } // namespace excgrid

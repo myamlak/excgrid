@@ -1,13 +1,5 @@
-// The D4 dispersion parameter surface.  The parameter values are the
-// published BJ-damping set for the DFT-D4 method (Caldeweyher, Ehlert,
-// Hansen, Neugebauer, Spicher, Bannwarth, Grimme, J. Chem. Phys. 150
-// (2019) 154122), which publishes them as Supplementary Material
-// S14-S21; the table below was extracted mechanically from the
-// distribution that carries the same table, every entry of which names
-// that paper as its source, so that no value passes through a
-// transcription by hand.  The EEQ element parameters are the paper's own
-// Supplementary Material Table A1 (S4-S6), transcribed the same way from
-// the committed data file.
+// The D4 dispersion parameter surface: Caldeweyher et al., J. Chem. Phys. 150
+// (2019) 154122, and its Supplementary Material.
 
 #include "d3_tables.inc"
 #include "d4_cn_tables.inc"
@@ -35,11 +27,8 @@ struct Preset {
     D4Parameters parameters; ///< Its published D4 parameters.
 };
 
-// The D4 default model is "bj-eeq-atm": Becke-Johnson damping over the
-// two-body (dipole-dipole and dipole-quadrupole) terms, EEQ charges, and
-// the Axilrod-Teller-Muto three-body term.  s6, s9 and the three-body
-// damping exponent alp are the defaults of that model; s8, a1 and a2 are
-// the fitted per-functional parameters.
+// The default model is "bj-eeq-atm": s6, s9 and alp are its defaults; s8, a1 and
+// a2 are the fitted per-functional parameters.
 constexpr Preset kPresets[] = {
     // name                 s6          s8          a1          a2     s9    alp
     {"am05", {1.00000000, 1.71885838, 0.47901431, 5.96771581, 1.0, 16.0}},
@@ -151,50 +140,33 @@ constexpr Preset kPresets[] = {
     {"xlyp", {1.00000000, 1.62972054, 0.11268673, 5.40786417, 1.0, 16.0}},
 };
 
-// The constants of the counting function, as published: the damping
-// steepness, and the scale, offset and divisor of the
-// electronegativity-difference factor.
+// The counting function's published constants: steepness, and the electronegativity
+// factor's scale, offset and divisor.
 constexpr double kCnSteepness = 7.5;
 constexpr double kCnEnScale = 4.1;
 constexpr double kCnEnOffset = 19.09;
 constexpr double kCnEnExponent = 254.56;
 
-// The global parameter of the charge-scaling function.  The model scales the
-// element-specific chemical hardness by the second of these before it enters
-// the exponential, so what multiplies the bracket's argument is their product
-// and not the hardness alone: the scaling of equation 2 is
-// exp[beta * (1 - exp(steepness * hardness * (1 - z_ref/z)))].  The paper
-// prints equation 2 with the hardness unmultiplied, and the model's own
-// published dynamic polarizabilities settle the product at twice the value
-// that reading gives - for a hydrogen carrying +0.1126 of charge the scaling
-// the published polarizability implies is 0.73993, the unmultiplied hardness
-// gives 0.86332, and the product gives 0.73997.  The reference weighting's
-// exponential likewise carries the model's own global of 6, which is the
-// value the paper prints for it.
+// Charge scaling, equation 2: exp[beta (1 - exp(k * h * (1 - z_ref/z)))], with
+// k = kChargeScalingSteepness and h the element hardness - the product, not h alone.
 constexpr double kChargeScalingBeta = 3.0;
 constexpr double kChargeScalingSteepness = 2.0;
 
 // The global parameter of the reference weighting function.
 constexpr double kReferenceWeightingBeta = 6.0;
 
-// The counting function's electronegativity-difference factor: the pair's
-// contribution is damped by how far apart the two elements sit on the
-// Pauling scale.
+// The counting function's electronegativity-difference factor on the Pauling scale.
 double ElectronegativityFactor(double electronegativityA, double electronegativityB) {
     const double difference = std::abs(electronegativityA - electronegativityB) + kCnEnOffset;
     return kCnEnScale * std::exp(-(difference * difference) / kCnEnExponent);
 }
 
-// The counting-function data of one atom of the geometry.
 const d4tables::CnElement& ElementOf(const Geometry& geometry, std::size_t index) {
     return d4tables::kCnElementTable[geometry.atoms[index].atomicNumber - 1];
 }
 
-// The elements whose reference data was computed in an effective core
-// potential, and the number of core electrons that potential absorbs.
-// The effective nuclear charge of such an element is its atomic number
-// less this core size; these four ranges are the whole of the model's
-// tabulation of it, and every element outside them is all-electron.
+// The elements whose reference data is ECP-based, with the core electrons the
+// potential absorbs; every element outside these ranges is all-electron.
 struct CoreRange {
     int first;
     int last;
@@ -220,8 +192,8 @@ int CoreElectronsOf(int atomicNumber) {
     return 0;
 }
 
-// Solve a dense square system in place by Gaussian elimination with partial
-// pivoting.  a is row-major n-by-n and is consumed; the solution is left in b.
+// Dense row-major n x n Gaussian elimination with partial pivoting; a is consumed,
+// the solution is left in b.
 bool SolveInPlace(std::vector<double>& a, std::vector<double>& b, std::size_t n) {
     for (std::size_t col = 0; col < n; ++col)
     {
@@ -285,15 +257,13 @@ bool SolveInPlace(std::vector<double>& a, std::vector<double>& b, std::size_t n)
     return true;
 }
 
-// The width parameter of the charge model's screened Coulomb kernel:
-// (a_i^2 + a_j^2)^(-1/2), over the published atomic radii.
+// The charge model's kernel width: (a_i^2 + a_j^2)^(-1/2).
 double ChargeWidth(double radiusA, double radiusB) {
     return 1.0 / std::sqrt(radiusA * radiusA + radiusB * radiusB);
 }
 
-// The charge model's coordination number: the counting function of equation
-// 6 without the electronegativity-difference factor, which the charge model
-// replaces with a square-root scaling of the atomic electronegativity.
+// The charge model's coordination number: equation 6 without the
+// electronegativity-difference factor.
 double ChargeCoordinationNumber(const Geometry& geometry, std::size_t a) {
     const double radiusA = d4tables::kCnElementTable[geometry.atoms[a].atomicNumber - 1]
                                .covalentRadiusD3;
@@ -324,11 +294,8 @@ double ChargeCoordinationNumber(const Geometry& geometry, std::size_t a) {
     return total;
 }
 
-// The electronegativity-equilibration partial charges: the constrained
-// minimum of the model's charge energy, which its Lagrangian turns into the
-// (N + 1) linear system of the Supplementary Material's equation 5.  The
-// constraint block is eliminated against two solves of the N-by-N kernel, so
-// no indefinite factorization of the bordered matrix is needed.
+// The EEQ partial charges: the (N + 1) system of equation 5, the constraint block
+// eliminated against two solves of the N-by-N kernel.
 std::vector<double> EeqCharges(const Geometry& geometry, double totalCharge) {
     const std::size_t n = geometry.atoms.size();
     std::vector<double> kernel(n * n, 0.0);
@@ -346,17 +313,7 @@ std::vector<double> EeqCharges(const Geometry& geometry, double totalCharge) {
 
             if (a == b)
             {
-                // The diagonal is the same screened interaction taken at zero
-                // separation, where erf(gamma r)/r tends to 2 gamma over the
-                // square root of pi.  A smaller diagonal leaves the
-                // charge-transfer direction of the kernel without a minimum,
-                // and the solution runs away.  The paper prints this element
-                // twice and disagrees with itself by that root of two - the
-                // energy expression of its equation 1 carries the limit
-                // written here, its equation 3 the smaller value - and the
-                // charges it records for its own reference systems are the
-                // ones this limit produces, so the limit is the reading the
-                // model is defined by.
+                // The zero-separation limit: erf(gamma r)/r -> 2 gamma / sqrt(pi).
                 const double width = ChargeWidth(elementA.radius, elementA.radius);
                 kernel[a * n + a] = elementA.hardness
                                     + 2.0 * width / std::sqrt(std::numbers::pi);
@@ -368,17 +325,12 @@ std::vector<double> EeqCharges(const Geometry& geometry, double totalCharge) {
             const double dz = geometry.atoms[a].position[2] - geometry.atoms[b].position[2];
             const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
 
-            // The kernel is the screened Coulomb interaction; atoms that
-            // coincide are not a physical configuration and contribute
-            // nothing rather than a division by zero.
             kernel[a * n + b] = r > 0.0
                                     ? std::erf(ChargeWidth(elementA.radius, elementB.radius) * r)
                                           / r
                                     : 0.0;
         }
 
-        // The right-hand side is the negated electronegativity, scaled by the
-        // square root of the charge model's coordination number.
         rhs[a] = -(elementA.electronegativity
                    - elementA.coordinationScale * std::sqrt(ChargeCoordinationNumber(geometry, a)));
     }
@@ -395,7 +347,6 @@ std::vector<double> EeqCharges(const Geometry& geometry, double totalCharge) {
 
     std::vector<double> inverted(n * n, 0.0);
 
-    // The second solve shares the factorized kernel.
     conserved = kernel;
 
     if (!SolveInPlace(conserved, constraint, n))
@@ -436,9 +387,8 @@ std::span<const d4tables::ElementReference> ElementReferences(int atomicNumber) 
             static_cast<std::size_t>(d4tables::kReferenceCount[index])};
 }
 
-// One atom's charge- and coordination-dependent dynamic polarizabilities: the
-// reference states of its element, each charge-scaled and then weighted by
-// the coordination-number difference of equation 8.
+// One atom's dynamic polarizabilities: its element's reference states, charge-scaled
+// and weighted by the coordination-number difference of equation 8.
 Result<std::vector<double>> AtomPolarizabilities(const Geometry& geometry, std::size_t a,
                                                  double coordinationNumber, double partialCharge,
                                                  std::span<const int> counts) {
@@ -482,14 +432,8 @@ Result<std::vector<double>> AtomPolarizabilities(const Geometry& geometry, std::
             return std::unexpected(scaling.error());
         }
 
-        // The reference state carries the polarizability of its whole
-        // reference MOLECULE, whose other atoms are the element it is named
-        // against.  Reducing it to this element's own atom is the model's
-        // partitioning: share the molecule between its m atoms of this
-        // element, then take back the n atoms of the other element, each
-        // carrying the polarizability it has in its own reference system.
-        // Where the data names no such system the share is zero and the
-        // molecule's value is already the atom's.
+        // The reference carries its whole molecule's polarizability; take back the
+        // x-element atoms' share, each in its own reference system.
         double neighbours = 0.0;
 
         if (references[k].xElement != 0 && references[k].xCount != 0.0
@@ -520,9 +464,7 @@ Result<std::vector<double>> AtomPolarizabilities(const Geometry& geometry, std::
     return alpha;
 }
 
-// The two-body dispersion energy: the pairwise sum of equations 18 to 21,
-// over the unordered pairs and once each.  Why it is not the doubled sum
-// stands with the line that returns it.
+// The two-body dispersion energy: equations 18 to 21 over the unordered pairs, once each.
 Result<double> TwoBodyEnergy(const Geometry& geometry, const D4Parameters& parameters,
                              std::span<const int> counts) {
     const std::size_t n = geometry.atoms.size();
@@ -600,8 +542,7 @@ Result<double> TwoBodyEnergy(const Geometry& geometry, const D4Parameters& param
                 return std::unexpected(c6.error());
             }
 
-            // The dipole-quadrupole coefficient of the earlier D3 scheme's
-            // recursive relation, which the model adopts for its R0.
+            // The D3 scheme's dipole-quadrupole relation, adopted for R0.
             const double c8 = 3.0 * (*c6) * d3tables::kR2R4[elementA] * d3tables::kR2R4[elementB];
 
             if (!(*c6 > 0.0))
@@ -621,18 +562,7 @@ Result<double> TwoBodyEnergy(const Geometry& geometry, const D4Parameters& param
         }
     }
 
-    // The sum over the pairs a < b is the whole of equation 18 and is not
-    // doubled.  Its notation is ambiguous between the unordered pairs and the
-    // ordered ones, and the model's own published data settles which it means:
-    // the entries of the published pair matrix are half of each pair's
-    // contribution, so that summing the matrix over every ordered pair of
-    // atoms - which is what its published total energy is - recovers the sum
-    // over the unordered pairs and no more.  A doubled sum therefore counts
-    // every pair twice.  There is a further check on the same convention in
-    // the arithmetic: with the polarizabilities the charge scaling above
-    // gives, the terms this loop accumulates are 1.96 times the published
-    // matrix's entries, uniformly over every element pair in the fixture -
-    // exactly the factor this line carried.
+    // Equation 18 sums the unordered pairs: this is the whole energy, never doubled.
     return -energy;
 }
 
@@ -802,8 +732,7 @@ Result<double> D4CasimirPolderC6(std::span<const double> alphaA,
         return std::unexpected(ErrorCode::kInvalidArgument);
     }
 
-    // The trapezium rule over the model's grid: each interval contributes
-    // its width times the sum of the products at its two ends.
+    // Trapezium rule over the model's frequency grid.
     double integral = 0.0;
 
     for (std::size_t j = 0; j + 1 < d4tables::kFrequencies; ++j)
@@ -841,10 +770,7 @@ Result<std::vector<double>> D4ReferenceWeights(double coordinationNumber,
         const double square = difference * difference;
         double sum = 0.0;
 
-        // Equation 8's sum runs over the Gaussian functions of this
-        // reference, each damped by the index itself, so a larger set
-        // contributes progressively narrower functions rather than a
-        // broader blend of the same width.
+        // Equation 8: sum_j exp(-beta j (CN - CN_ref)^2) over this reference's Gaussians.
         for (int j = 1; j <= gaussians; ++j)
         {
             sum += std::exp(-kReferenceWeightingBeta * static_cast<double>(j) * square);

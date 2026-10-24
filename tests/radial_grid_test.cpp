@@ -1,5 +1,3 @@
-// The MHL/Euler-Maclaurin radial quadrature tests: the mapping shape
-// and integral accuracy on a known radial function.
 
 #include "excgrid/grid.hpp"
 
@@ -9,8 +7,7 @@
 namespace {
 
 TEST(RadialGridTest, MappingShape) {
-    // r_i = alpha (q_i / (1 - q_i))^m with q_i = i / (N + 1); the
-    // outermost point is alpha * pointCount^m, innermost is smallest.
+    // r_i = alpha (q_i / (1 - q_i))^m with q_i = i / (N + 1).
     auto grid = excgrid::RadialGrid::Create(50, 0.5, 2);
 
     ASSERT_TRUE(grid.has_value());
@@ -26,8 +23,7 @@ TEST(RadialGridTest, MappingShape) {
 }
 
 TEST(RadialGridTest, IntegratesExponential) {
-    // int_0^inf r^2 exp(-2 r) dr = 1/4; the grid folds r^2 in on the
-    // consumer side, so the check sums w_i * r_i^2 * exp(-2 r_i).
+    // int_0^inf r^2 exp(-2r) dr = 1/4, summed as w_i r_i^2 exp(-2 r_i).
     auto grid = excgrid::RadialGrid::Create(75, 0.5, 2);
 
     ASSERT_TRUE(grid.has_value());

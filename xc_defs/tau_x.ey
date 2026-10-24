@@ -1,12 +1,6 @@
 // excgrid codegen source: the tau tier's exchange functional - the second-order
-// gradient expansion of exchange in the iso-orbital (Pauli) variables, the
-// library's first functional to read the kinetic-energy densities.  Fresh
-// authorship; the formula is the published expansion in its iso-orbital form
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py
-// (Yacas is a maintainer-only tool; the committed generated/ output is the
-// build input).  This is also the tier's worked example of the generator's
-// second-derivative emission: the kernel below is emitted together with the
-// functional's materialised second-derivative matrix.
+// gradient expansion of exchange in the iso-orbital (Pauli) variables.
+// Formula from the published expansion in its iso-orbital form.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"

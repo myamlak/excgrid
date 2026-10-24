@@ -1,21 +1,6 @@
-// The excgrid meta-GGA kernel skeleton (fresh authorship; BSD-3-Clause).
-// Emits, per meta-GGA functional, the order-1 kernel - the energy density, the
-// two spin-density derivatives, the three sigma derivatives and the two
-// kinetic-energy-density derivatives, the contract's reserved slots 5 and 6 -
-// and, beside it, the functional's SECOND-DERIVATIVE tier: one function filling
-// the contract's materialised matrix.
-//
-// The second-derivative function's argument list is the kernel's, and the matrix
-// it fills is the contract's upper triangle, row-major over the ACTIVE components
-// in identifier order.  Which components those are is the caller's mask, so the
-// order is pinned by the caller and not here: this skeleton emits the entries in
-// the identifier order of the seven collinear inputs it is generated over.
-//
-// No spin-edge branches: as in the GGA skeleton, the definitions' Tiny guards
-// keep every expression finite at the spin and gamma edges, and the density
-// prefactor carries the zero-density corner.
-// The banner and the kernel.hpp include are emitted by the calling .ey, which
-// always precedes this skeleton, so they are not repeated here.
+// The excgrid meta-GGA kernel skeleton (fresh authorship; BSD-3-Clause).  Emits the
+// order-1 kernel and the second-derivative tier, the contract's upper triangle over the
+// caller's mask; the Tiny guards keep every expression finite, so no edge branches.
 
 #include <cmath>
 #include <limits>

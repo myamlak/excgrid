@@ -1,17 +1,8 @@
 #!/usr/bin/env python3
 """Transcribes Table A1 of the DFT-D4 paper into src/d4_eeq_tables.inc.
 
-The committed data file tools/data/d4_eeq_a1.txt holds the published EEQ
-element parameters of the DFT-D4 model (Caldeweyher, Ehlert, Hansen,
-Neugebauer, Spicher, Bannwarth, Grimme, J. Chem. Phys. 150 (2019) 154122),
-as the paper's Supplementary Material Table A1 tabulates them for
-Z = 1..86: the atomic electronegativity EN, the element-dependent atomic
-hardness J, the element-specific scaling parameter kappa, and the atomic
-radius a.  The data file's own header records how it was extracted.
-
-The .inc this script writes is committed; this is a one-time transcription
-step (run again only when the source table changes), NOT a per-build codegen
-step.
+One-time transcription from tools/data/d4_eeq_a1.txt, not a per-build step
+(Caldeweyher et al., J. Chem. Phys. 150 (2019) 154122).
 
 Usage:  python tools/gen_d4_eeq.py            # writes src/d4_eeq_tables.inc
         python tools/gen_d4_eeq.py --check    # verifies the committed file

@@ -1,8 +1,5 @@
-// excgrid codegen source: the Perdew 1986 GGA correlation functional (the
-// gradient correction on the Perdew-Zunger LDA piece).  Transcribed from the
-// printed paper - J. P. Perdew, Phys. Rev. B 33, 8822 (1986) (docs/mainpage.md
-// references) - not from another tree.
-// Regenerate with tools/regenerate.py.
+// excgrid codegen source: the Perdew 1986 GGA correlation functional, the gradient
+// correction on the Perdew-Zunger LDA piece: J. P. Perdew, Phys. Rev. B 33, 8822 (1986).
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -13,20 +10,14 @@
     Use("excgrid_defs.ys");
     Use("excgrid_generate.ys");
 
-    // The PZ81 LDA piece this functional is defined on is PIECEWISE at
-    // rs = 1 (Perdew & Zunger, Phys. Rev. B 23, 5048 (1981)): a rational
-    // gamma/(1 + beta1 sqrt(rs) + beta2 rs) above, a logarithmic
-    // a ln rs + b + c rs ln rs + d rs below.  That is the boundary the paper
-    // prints, so this kernel carries the tree's only branch; the emitted
-    // shape and its contract are documented in
-    // `excgrid_gga_piecewise_skeleton.ey`.
+    // The PZ81 LDA piece is piecewise at rs = 1 (Perdew & Zunger, Phys. Rev. B 23,
+    // 5048 (1981)); this is the tree's only branch-carrying kernel.
     cond := X'Rs(rhoA + rhoB) >= 1.;
     eLow := X'P86CorrelationLow(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
     eHigh := X'P86CorrelationHigh(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
+    // TierGuard: both branches carry the total-gradient radical, guarded in order 1
+    // and in the tier so each answers the finite limit at zero gradient.
     ExPiecewiseKernelGenerate("P86Correlation", cond, eLow, eHigh,
-                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False});
+                              {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard});
 ?>

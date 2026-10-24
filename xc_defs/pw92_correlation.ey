@@ -1,6 +1,5 @@
-// excgrid codegen source: the PW92 LDA correlation functional
-// (Perdew-Wang 1992).  Fresh authorship; formula from the PW92 paper
-// (docs/mainpage.md references).  Regenerate with tools/regenerate.py.
+// excgrid codegen source: the PW92 LDA correlation functional (Perdew-Wang 1992).
+// Formula from the PW92 paper.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -13,8 +12,6 @@
 
     e := X'Pw92Correlation(rhoA, rhoB);
 
-    // Order 1 only: this form's symbolic second differentiation runs to tens of
-    // minutes, against seconds for the exchange forms, so it ships without a
-    // second-derivative tier.
-    ExKernelGenerate("Pw92Correlation", e, rhoA, rhoB, False);
+    // The LDA class has no reduced-gradient radical, so the tier needs no guard: True.
+    ExKernelGenerate("Pw92Correlation", e, rhoA, rhoB, True);
 ?>

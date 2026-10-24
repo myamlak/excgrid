@@ -11,24 +11,11 @@
 
 namespace excgrid {
 
-// The tau tier's reference functional.  Defined in src/meta_gga_reference.cpp
-// rather than built here from a kernel pointer, because its kernel is wider than
-// the two kernel types below: it reads the two kinetic-energy densities as well
-// as the three gradient invariants.  Declared out here, at namespace scope: a
-// declaration inside the anonymous namespace below would give the definition in
-// that other translation unit internal linkage and fail at link time.
-//
-// The registry publishes the GENERATED tau-tier kernel instead (kTauX below).
-// This hand-written reference stays the tier's independent route to the same
-// expansion, and tests/registry_test.cpp cross-checks the generated kernel
-// against it.
+// The tau tier's hand-written reference, defined in meta_gga_reference.cpp and
+// declared at namespace scope so its definition keeps external linkage.
 const XcFunctional& MetaGgaReferenceFunctional() noexcept;
 
-// The tau tier's generated kernel and its second-derivative tier, both emitted
-// from xc_defs/tau_x.ey into generated/tau_x.cpp.  Declared out here, at
-// namespace scope, for the same reason as the reference above: the tier's
-// kernel is wider than the two kernel types below, so the registry names it
-// directly rather than through a function pointer.
+// The tau tier's generated kernel and its second-derivative tier, from generated/tau_x.cpp.
 XcKernelValue TauXExchange(double rhoA,
                            double rhoB,
                            double sigmaAa,
@@ -46,14 +33,8 @@ void TauXExchangeSecondDerivatives(double rhoA,
                                    PointSecondDerivativeMatrix& matrix);
 
 namespace {
-// The components each generated second-derivative tier is emitted over: the
-// argument count of the kernel it sits beside, and the width of the matrix
-// packing its generated source fills.
-//
-// A tier spans a PREFIX of the identifier table - the components its kernel
-// reads, in identifier order - so the widths differ by family and the kernel
-// argument slot of a component is the identifier's own value.  That is what
-// lets a caller's mask be read onto any of them by counting.
+// The components each tier spans: a prefix of the identifier table, in identifier
+// order, so a component's kernel slot is its own identifier value.
 constexpr std::size_t kLdaTierComponents = 2;
 constexpr std::size_t kGgaTierComponents = 5;
 constexpr std::size_t kTauTierComponents = 7;
@@ -71,7 +52,6 @@ static_assert(static_cast<std::size_t>(Component::RhoA) == 0 &&
 static_assert(kTauTierComponents <= kSecondDerivativeCapacity,
               "the tau tier's packing is wider than the contract's second-derivative capacity");
 
-// The components a tier of the given width spans.
 [[nodiscard]] constexpr ComponentMask TierMask(std::size_t components) noexcept {
     ComponentMask mask;
 
@@ -83,26 +63,22 @@ static_assert(kTauTierComponents <= kSecondDerivativeCapacity,
     return mask;
 }
 
-// The contract's upper-triangle index over `active` components in identifier
-// order: entry (i, j), i <= j, at i*active - i*(i-1)/2 + (j-i).
+// The contract's upper-triangle index over `active` components: (i, j), i <= j,
+// at i*active - i*(i-1)/2 + (j-i).
 [[nodiscard]] constexpr std::size_t PackedIndex(std::size_t i,
                                                 std::size_t j,
                                                 std::size_t active) noexcept {
     return i * active - i * (i - 1) / 2 + (j - i);
 }
 
-// The caller's mask restricted to the components the generated tier reads, with
-// the kernel argument slot of each of its active components.
+// The caller's mask restricted to the tier's components, with each one's kernel argument slot.
 template <std::size_t Components> struct TierSlots {
     ComponentMask mask{}; ///< The intersection: what a result or matrix is over.
     std::size_t active = 0; ///< Its active-component count.
     std::array<std::size_t, Components> slot{}; ///< Kernel slot, per active component.
 };
 
-// Reads a caller's mask onto the generated kernel's argument order.  The
-// intersection is always a subsequence of the kernel's own components, in the
-// same relative order, so the packed positions of one are the packed positions
-// of the other once the dropped slots are counted out.
+// Reads a caller's mask onto the generated kernel's argument order.
 template <std::size_t Components>
 [[nodiscard]] constexpr TierSlots<Components> TierSlotsOf(const ComponentMask& caller) noexcept {
     TierSlots<Components> slots;
@@ -122,9 +98,7 @@ template <std::size_t Components>
     return slots;
 }
 
-// One entry of the generated tier's matrix, by kernel argument slots.  The
-// generated packing carries the upper triangle only, and a Hessian is
-// symmetric, so the pair is read at (min, max).
+// One entry of the generated tier's upper-triangle packing, read at (min, max).
 template <std::size_t Components>
 [[nodiscard]] constexpr double GeneratedEntry(const PointSecondDerivativeMatrix& matrix,
                                               std::size_t a,
@@ -132,20 +106,13 @@ template <std::size_t Components>
     return matrix.upper[PackedIndex(a < b ? a : b, a < b ? b : a, Components)];
 }
 
-// The contracted and the materialised entry points, written once over the slot
-// machinery above so that every tier in this file reconciles the generated
-// packing with the caller's mask the same way.
-//
-// The contraction is taken from the materialised matrix rather than from a
-// second generated emission, which is what makes the two entry points one
-// result: a tier cannot answer the two differently.
+// The contracted entry point, taken from the materialised matrix so that the two
+// entry points cannot disagree.
 template <std::size_t Components>
 [[nodiscard]] KernelStatus ContractFromMatrix(const TierSlots<Components>& slots,
                                               const PointSecondDerivativeMatrix& generated,
                                               std::span<const double> rightHandSide,
                                               PointSecondDerivative& second) noexcept {
-    // One value per active component per right-hand side has to fit the
-    // contract's array, and an empty active set has no layout to divide by.
     if (slots.active == 0 || rightHandSide.size() % slots.active != 0)
     {
         return KernelStatus::kRefusedUnsupportedCombination;
@@ -179,9 +146,7 @@ template <std::size_t Components>
     return KernelStatus::kOk;
 }
 
-// Re-packs a generated matrix from the kernel's argument order onto the
-// caller's mask.  Nothing of the caller's buffer survives, so an entry the tier
-// has no value for is a zero rather than a leftover.
+// Re-packs the generated matrix onto the caller's mask; an entry with no value is a zero.
 template <std::size_t Components>
 [[nodiscard]] constexpr PointSecondDerivativeMatrix RepackMatrix(
     const TierSlots<Components>& slots,
@@ -201,10 +166,7 @@ template <std::size_t Components>
     return matrix;
 }
 
-// Places a two-wide LDA tier's matrix in the five-wide packing a GGA term's
-// matrix is already in.  The gradient rows and columns it does not read stay
-// zero, which is what an LDA kernel contributes to a gradient-corrected
-// recipe's Hessian.
+// A two-wide LDA tier's matrix placed in the five-wide GGA packing; the rest stays zero.
 [[nodiscard]] constexpr PointSecondDerivativeMatrix WidenLdaMatrix(
     const PointSecondDerivativeMatrix& narrow) noexcept {
     PointSecondDerivativeMatrix wide;
@@ -221,12 +183,8 @@ template <std::size_t Components>
     return wide;
 }
 
-// A pure functional: one generated kernel, no exact-exchange fraction, and the
-// second-derivative tier the same generated source emits beside it.
-//
-// The tier is optional because a kernel the generator could not emit one for is
-// still a functional: it ships order-1 and refuses the second derivatives by
-// name, and SecondDerivativeMask() is what says so.
+// A pure functional: one generated kernel, no exact-exchange fraction, and its
+// optional second-derivative tier.
 class PureFunctional final : public XcFunctional {
 public:
     PureFunctional(std::string_view name,
@@ -278,9 +236,7 @@ public:
         return KernelStatus::kOk;
     }
 
-    /// The tier's span is the components the kernel reads, which for this
-    /// functional is a prefix of the identifier table - two for an LDA kernel,
-    /// five for a GGA one, matching the generated tier's own argument count.
+    /// The tier spans the kernel's own components: two for LDA, five for GGA.
     [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
         if (_usesGradient ? _ggaSecondDerivative == nullptr : _ldaSecondDerivative == nullptr)
         {
@@ -394,19 +350,8 @@ private:
     GgaSecondDerivative _ggaSecondDerivative;
 };
 
-// The tau tier: the generated kernel behind the registry's tau_x, and the
-// second-derivative tier the same generated source emits beside it.
-//
-// A meta-GGA reads two components a GGA does not, so it is neither of the two
-// kernel types above and is not built from one - the kernel is named directly.
-//
-// The generated matrix packs over the kernel's own seven argument slots; the
-// contract packs over the CALLER's mask.  The two are reconciled here rather
-// than by asking the caller for a particular mask: an input the caller leaves
-// out is not supplied, the contract reads it as zero, and its row and column
-// are consequently dropped.  A result or matrix therefore carries the
-// intersection of the caller's mask with the seven, which is what its own mask
-// field then says.
+// The tau tier: the generated tau_x kernel and its second-derivative tier, packed
+// over the kernel's seven argument slots and intersected with the caller's mask.
 class TauTierFunctional final : public XcFunctional {
 public:
     [[nodiscard]] bool UsesGradient() const override {
@@ -484,8 +429,7 @@ public:
     }
 
 private:
-    /// The generated kernel's value at the point; the caller's mask decides
-    /// which components arrive, and an unsupplied one arrives as zero.
+    /// The generated kernel's value at the point.
     [[nodiscard]] static XcKernelValue Value(const PointInputs& inputs) noexcept {
         return TauXExchange(inputs.Get(Component::RhoA),
                             inputs.Get(Component::RhoB),
@@ -510,52 +454,22 @@ private:
     }
 };
 
-// ---------------------------------------------------------------------------
-// The folding rule
-// ---------------------------------------------------------------------------
-//
-// THE RULE, checked below by the COMPILER for every hybrid of the registry and
-// again by the constructor that builds it:
-//
+// The folding rule, checked by the compiler for every recipe below:
 //     (LSDA-exchange weight) + (summed GGA-exchange weights) = 1 - exchangeFraction
-//
-// A published formula's coefficient can multiply one of two different things -
-// the CORRECTION a GGA adds to the LSDA exchange, or the FULL kernel that
-// already contains it - and the published number is different for each.  Every
-// kernel in this file is the FULL functional, so the weight belonging on
-// SlaterExchange is the published LSDA coefficient MINUS the GGA-exchange
-// coefficient, and what the exact-exchange fraction leaves of the exchange is
-// the sum the two must come to.  The HybridFunctional note below carries the
-// arithmetic and the measured 5.953 Ha of the defect this catches.
-//
-// Why the check lives here and not only in the suite: the registry's own tests
-// (tests/registry_test.cpp, RegistryFoldingGuard) check the same rule a second
-// time, numerically, from each entry's behaviour - but this file is compiled
-// into EVERY consumer that links excgrid, and the test suite defaults OFF for
-// them, so a broken recipe is a build failure rather than a test somebody has
-// to remember to run.
+// on FULL kernels, so a published LSDA coefficient is folded down by the GGA one.
 
 /// The role a recipe term's kernel plays.  It travels WITH the weight because
-/// the rule reads the two together: a function pointer does not say whether
-/// its kernel is an exchange kernel, and only an exchange kernel that already
-/// carries its own LSDA part can hide a correction-form coefficient.
+/// the rule reads the two together.
 enum class TermRole {
     kLdaExchange, ///< The LSDA exchange kernel - the base the GGA kernels contain.
     kGgaExchange, ///< A FULL GGA exchange kernel (contains its own LSDA part).
     kCorrelation, ///< Any correlation kernel: outside the folding rule.
 };
 
-/// The rule's tolerance.  Measured over the eight shipped hybrids on
-/// 2026-09-16: the weights are literal doubles, so the sum misses
-/// 1 - exchangeFraction by at most 1.11e-16 (b3lyp, b3pw91 and b3p86, whose
-/// 0.08 + 0.72 lands one ulp below 0.8), while the defect moves that same sum
-/// by 0.72.  1e-12 sits four orders above the noise and eleven below the
-/// defect.
+/// The rule's tolerance: four orders above the double noise, eleven below the defect.
 constexpr double kFoldingRuleTolerance = 1e-12;
 
-/// The DFT exchange a recipe's terms carry: the exchange roles, never a
-/// correlation one.
-/// \param terms The recipe's terms.
+/// The DFT exchange a recipe's terms carry: the exchange roles, never a correlation one.
 /// \returns The summed exchange weight.
 template <typename TermList> constexpr double DftExchangeWeight(const TermList& terms) noexcept {
     double dftExchange = 0.0;
@@ -571,12 +485,8 @@ template <typename TermList> constexpr double DftExchangeWeight(const TermList& 
     return dftExchange;
 }
 
-/// The folding rule, generic over the term list so that the terms the compiler
-/// checks and the terms the functional is built from are ONE list: a rule
-/// reading a list of its own would be a restatement of the recipe, not a check
-/// on it.
-/// \param terms The recipe's terms.
-/// \param exchangeFraction The exact-exchange fraction the recipe declares.
+/// The folding rule, over the one term list the compiler checks and the functional
+/// is built from.
 /// \returns True when the exchange partition closes.
 template <typename TermList>
 constexpr bool FoldingRuleHolds(const TermList& terms, double exchangeFraction) noexcept {
@@ -585,22 +495,13 @@ constexpr bool FoldingRuleHolds(const TermList& terms, double exchangeFraction) 
     return difference > -kFoldingRuleTolerance && difference < kFoldingRuleTolerance;
 }
 
-/// The construction-time half of the guard: an entry reaching a hybrid's
-/// constructor without its own static_assert is REFUSED rather than computed.
-/// A registry fault is not something a caller can recover from - a wrong
-/// coefficient still converges and still looks physical, which is how the
-/// defect behind this rule survived every self-consistency check the repo
-/// could run - so the refusal names the entry, prints the arithmetic and
-/// aborts.
-/// \param name The recipe's shipped name.
-/// \param exchangeFraction The exact-exchange fraction the recipe declares.
-/// \param terms The recipe's terms.
+/// The construction-time half of the guard: a recipe reaching a hybrid's constructor
+/// without its own static_assert is refused by name and aborted.
 template <typename TermList>
 [[noreturn]] void RefuseFoldedRecipe(std::string_view name,
                                      double exchangeFraction,
                                      const TermList& terms) noexcept {
-    // `stderr` is the C macro rather than std::stderr on purpose: MSVC defines
-    // it as a function-like macro, so the qualified spelling does not compile.
+    // The C `stderr` macro, not std::stderr: MSVC defines it as a function-like macro.
     std::fprintf(stderr,
                  "excgrid: the folding rule is violated by the hybrid '%.*s' - its DFT exchange "
                  "weights sum to %.17g, but a recipe declaring an exact-exchange fraction of "
@@ -615,39 +516,12 @@ template <typename TermList>
     std::abort();
 }
 
-// A hybrid: a weighted sum of component kernels plus the exact-exchange
-// fraction the consumer routes through its HF Fock path.  The recipes
-// are the published compositions (docs/kernel-api.md section 4); B3LYP
-// uses VWN5, the modern majority convention, per the VWN3/VWN5
-// landmine note.
-//
-// THE LDA-EXCHANGE WEIGHT IS NOT THE PUBLISHED ONE, and the arithmetic is
-// the reason.  The B3LYP family is published as
-//
-//     0.80 E_x^LSDA + 0.72 dE_x^B88,   dE_x^B88 = E_x^B88 - E_x^LSDA,
-//
-// so the published 0.72 multiplies the B88 CORRECTION.  Every kernel in
-// this file is the FULL functional instead: Becke88Exchange returns B88
-// including its LDA part (whole-SCF, it agrees with libxc's gga_x_b88 to
-// 2.8e-06).  That is not an accident of this file - it is the convention
-// the single-component names ship under, which is what makes `becke88`
-// on its own a usable functional.  Pairing a FULL kernel with the
-// published 0.72 therefore requires the Slater term folded in as
-// 0.80 - 0.72 = 0.08, which is how libxc writes the identical recipe
-// (libxc's B3LYP resolves to 0.08 LDA_X + 0.72 GGA_X_B88).  Shipping
-// 0.80 double-counted a whole extra 0.72 E_x^LSDA: measured at 5.953 Ha
-// on H2O/STO-3G against pyscf's b3lyp5, and reproduced to 3.5e-06 by
-// running pyscf with THIS file's weights (scf/tests/rks_convergence_
-// probe_test.cpp, HybridFamilyIsolatesTheOffendingTerm).
+// A hybrid: a weighted sum of kernels plus the exact-exchange fraction.  B3LYP is
+// published as 0.80 E_x^LSDA + 0.72 dE_x^B88, dE_x^B88 = E_x^B88 - E_x^LSDA; against
+// this file's FULL kernels that is 0.08 LDA_X + 0.72 GGA_X_B88.
 class HybridFunctional final : public XcFunctional {
 public:
-    /// One weighted kernel of a recipe.  The role travels WITH the weight: the
-    /// folding rule reads them together, and the constructor below refuses a
-    /// recipe whose exchange partition does not close.
-    ///
-    /// The second-derivative pointers default to null so a recipe states the
-    /// tier only where it has one; a recipe whose terms do not all carry theirs
-    /// publishes no tier at all rather than a partial sum.
+    /// One weighted kernel of a recipe, with its role and its second-derivative tier.
     struct Term {
         TermRole role;
         LdaKernel lda;
@@ -657,10 +531,6 @@ public:
         GgaSecondDerivative ggaSecondDerivative = nullptr;
     };
 
-    /// The terms arrive as an array rather than an initializer list so that
-    /// the very same object can be handed to the static_assert above each
-    /// registry entry, which is what makes the compile-time check and the
-    /// shipped recipe one fact instead of two.
     template <std::size_t N>
     HybridFunctional(std::string_view name,
                      double exchangeFraction,
@@ -716,8 +586,7 @@ public:
         return KernelStatus::kOk;
     }
 
-    /// A composed functional's tier is the weighted sum of its terms', so it
-    /// spans the recipe's width only when every term carries its own.
+    /// The weighted sum of the terms' tiers, spanning the recipe only when every term has one.
     [[nodiscard]] ComponentMask SecondDerivativeMask() const noexcept override {
         if (!TierIsComplete())
         {
@@ -785,15 +654,13 @@ public:
     }
 
 private:
-    /// The width of the packing the recipe's matrices live in: its GGA terms
-    /// are five-wide, and a recipe with none is two-wide.
+    /// The packing width: five for a GGA recipe, two for an LDA one.
     [[nodiscard]] std::size_t Width() const noexcept {
         return _usesGradient ? kGgaTierComponents : kLdaTierComponents;
     }
 
-    /// Whether every term carries the tier its role's width needs.  An LDA term
-    /// inside a GGA recipe contributes to the five-wide sum, so it needs its own
-    /// two-wide tier to place.
+    /// Whether every term carries the tier its width needs; an LDA term in a GGA
+    /// recipe needs its two-wide tier to place.
     [[nodiscard]] bool TierIsComplete() const noexcept {
         for (const Term& term : _terms)
         {
@@ -829,10 +696,7 @@ private:
         return value;
     }
 
-    /// The recipe's matrix, in the width's own packing.  An LDA term's
-    /// two-wide matrix is placed in the top-left of the five-wide one, the
-    /// dropped gradient rows and columns being the zeros a term that reads no
-    /// gradient contributes.
+    /// The recipe's matrix, in the width's own packing, an LDA term's widened.
     void FillGeneratedMatrix(const PointInputs& inputs,
                              PointSecondDerivativeMatrix& generated) const noexcept {
         const double rhoA = inputs.Get(Component::RhoA);
@@ -872,26 +736,21 @@ private:
     std::vector<Term> _terms;
 };
 
-// The shipped registry (name string -> functional).  The names are the
-// consumer-facing schema strings (never an enum - enums drift with repo
-// releases).
+// The shipped registry: name string to functional.
 const PureFunctional kSlater("slater", false, &SlaterExchange, nullptr, &SlaterExchangeSecondDerivatives);
-const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr, nullptr);
-const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr, nullptr);
-const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr, nullptr);
+const PureFunctional kVwn5("vwn5", false, &Vwn5Correlation, nullptr,
+                           &Vwn5CorrelationSecondDerivatives);
+const PureFunctional kVwn3("vwn3", false, &Vwn3Correlation, nullptr,
+                           &Vwn3CorrelationSecondDerivatives);
+const PureFunctional kPw92("pw92", false, &Pw92Correlation, nullptr,
+                           &Pw92CorrelationSecondDerivatives);
 
-// Every hybrid below is written as this three-step shape - a named constexpr
-// term list, the static_assert that the folding rule closes on it, and the
-// object built from that same list - so a recipe's terms exist once and the
-// compiler checks them.  The constructor refuses a list that reaches it
-// without an assert, so this is a shape to copy, not a convention to remember.
-//
-// Each term also names the second-derivative tier of its kernel, because a
-// composed functional's Hessian is the weighted sum of its terms' and a term
-// without one would make the sum a lie.
+// Each hybrid: a named term list, the folding static_assert on that list, and the
+// object built from it.
 constexpr std::array<HybridFunctional::Term, 2> kSvwnTerms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 1.0,
+     &Vwn5CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kSvwnTerms, 0.0),
               "svwn: the folding rule is violated - the DFT exchange weights must sum to "
@@ -900,7 +759,8 @@ const HybridFunctional kSvwn("svwn", 0.0, false, kSvwnTerms);
 
 constexpr std::array<HybridFunctional::Term, 2> kSpw92Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 1.0, &SlaterExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0, nullptr},
+    {TermRole::kCorrelation, &Pw92Correlation, nullptr, 1.0,
+     &Pw92CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kSpw92Terms, 0.0),
               "spw92: the folding rule is violated - the DFT exchange weights must sum to "
@@ -909,7 +769,8 @@ const HybridFunctional kSpw92("spw92", 0.0, false, kSpw92Terms);
 
 const PureFunctional kBecke88("becke88", true, nullptr, &Becke88Exchange, nullptr,
                              &Becke88ExchangeSecondDerivatives);
-const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange, nullptr, nullptr);
+const PureFunctional kPw91x("pw91", true, nullptr, &Pw91Exchange, nullptr,
+                            &Pw91ExchangeSecondDerivatives);
 const PureFunctional kPbe("pbe", true, nullptr, &PbeExchange, nullptr,
                          &PbeExchangeSecondDerivatives);
 const PureFunctional kRevPbe("revpbe", true, nullptr, &RevPbeExchange, nullptr,
@@ -919,26 +780,26 @@ const PureFunctional kRpbe("rpbe", true, nullptr, &RpbeExchange, nullptr,
 const PureFunctional kMPw91("mpw91", true, nullptr, &MPw91Exchange, nullptr,
                            &MPw91ExchangeSecondDerivatives);
 const PureFunctional kPbeSol("pbesol", true, nullptr, &PbeSolExchange, nullptr,
-                            nullptr);
+                            &PbeSolExchangeSecondDerivatives);
 
 const PureFunctional kLyp("lyp", true, nullptr, &LypCorrelation, nullptr,
-                         nullptr);
+                         &LypCorrelationSecondDerivatives);
 const PureFunctional kPbeC("pbe_c", true, nullptr, &PbeCorrelation, nullptr,
-                          nullptr);
+                          &PbeCorrelationSecondDerivatives);
 const PureFunctional kPw91c("pw91_c", true, nullptr, &Pw91Correlation, nullptr,
-                           nullptr);
+                           &Pw91CorrelationSecondDerivatives);
 const PureFunctional kP86("p86", true, nullptr, &P86Correlation, nullptr,
-                         nullptr);
+                         &P86CorrelationSecondDerivatives);
 
-// 0.08, not the published 0.80: the Slater term is folded in against a
-// FULL B88 kernel - see the HybridFunctional note above for the arithmetic.
+// 0.08, not the published 0.80: the Slater weight folded against a FULL B88 kernel.
 constexpr std::array<HybridFunctional::Term, 4> kB3LypTerms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &LypCorrelation, 0.81, nullptr,
-     nullptr},
+     &LypCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3LypTerms, 0.20),
               "b3lyp: the folding rule is violated - the DFT exchange weights must sum to "
@@ -948,7 +809,7 @@ const HybridFunctional kB3Lyp("b3lyp", 0.20, true, kB3LypTerms);
 constexpr std::array<HybridFunctional::Term, 2> kPbe0Terms = {{
     {TermRole::kGgaExchange, nullptr, &PbeExchange, 0.75, nullptr, &PbeExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &PbeCorrelation, 1.0, nullptr,
-     nullptr},
+     &PbeCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kPbe0Terms, 0.25),
               "pbe0: the folding rule is violated - the DFT exchange weights must sum to "
@@ -959,9 +820,10 @@ constexpr std::array<HybridFunctional::Term, 4> kB3Pw91Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &Pw91Correlation, 0.81, nullptr,
-     nullptr},
+     &Pw91CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3Pw91Terms, 0.20),
               "b3pw91: the folding rule is violated - the DFT exchange weights must sum to "
@@ -972,51 +834,42 @@ constexpr std::array<HybridFunctional::Term, 2> kMPw1Pw91Terms = {{
     {TermRole::kGgaExchange, nullptr, &MPw91Exchange, 0.75, nullptr,
      &MPw91ExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &Pw91Correlation, 1.0, nullptr,
-     nullptr},
+     &Pw91CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kMPw1Pw91Terms, 0.25),
               "mpw1pw91: the folding rule is violated - the DFT exchange weights must sum to "
               "1 - exchangeFraction, with the LSDA weight FOLDED against the full GGA kernels");
 const HybridFunctional kMPw1Pw91("mpw1pw91", 0.25, true, kMPw1Pw91Terms);
 
-// The published BHandHLYP is 0.50 HF + 0.50 E_x^LSDA + 0.50 dE_x^B88 +
-// E_c^LYP.  Against a FULL B88 the two LSDA terms cancel outright, so the
-// exchange legs are 0.50 becke88 and nothing else - which is what libxc's
-// BHandHLYP resolves to (measured identical to `0.5*HF + 0.5*B88 + LYP`).
+// BHandHLYP: 0.50 HF + 0.50 E_x^LSDA + 0.50 dE_x^B88 + E_c^LYP; the LSDA terms
+// cancel against a FULL B88, leaving 0.50 becke88.
 constexpr std::array<HybridFunctional::Term, 2> kBHandHLypTerms = {{
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.50, nullptr,
      &Becke88ExchangeSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &LypCorrelation, 1.0, nullptr,
-     nullptr},
+     &LypCorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kBHandHLypTerms, 0.50),
               "bhandhlyp: the folding rule is violated - the DFT exchange weights must sum to "
               "1 - exchangeFraction, with the LSDA weight FOLDED against the full GGA kernels");
 const HybridFunctional kBHandHLyp("bhandhlyp", 0.50, true, kBHandHLypTerms);
 
-// b3p86 carries a NAMED OPEN DEFECT of its own - an unattributed 0.146 Ha
-// residual against libxc 403, one the folding rule cannot see and does
-// not speak to.
 constexpr std::array<HybridFunctional::Term, 4> kB3P86Terms = {{
     {TermRole::kLdaExchange, &SlaterExchange, nullptr, 0.08, &SlaterExchangeSecondDerivatives},
     {TermRole::kGgaExchange, nullptr, &Becke88Exchange, 0.72, nullptr,
      &Becke88ExchangeSecondDerivatives},
-    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19, nullptr},
+    {TermRole::kCorrelation, &Vwn5Correlation, nullptr, 0.19,
+     &Vwn5CorrelationSecondDerivatives},
     {TermRole::kCorrelation, nullptr, &P86Correlation, 0.81, nullptr,
-     nullptr},
+     &P86CorrelationSecondDerivatives},
 }};
 static_assert(FoldingRuleHolds(kB3P86Terms, 0.20),
               "b3p86: the folding rule is violated - the DFT exchange weights must sum to "
               "1 - exchangeFraction, with the LSDA weight FOLDED against the full GGA kernels");
+// Known open defect: the b3p86 composition leaves a 0.146 Ha residual against libxc 403.
 const HybridFunctional kB3P86("b3p86", 0.20, true, kB3P86Terms);
 
-// The tau tier: the generator's first tau-reading kernel, and the only entry
-// here that reads the kinetic-energy densities.  It is the second-order gradient
-// expansion of exchange in the iso-orbital variables, emitted from
-// xc_defs/tau_x.ey; its exact conditions and its finite-difference checks live
-// with it (tests/meta_gga_reference_test.cpp), and its second-derivative tier
-// with the registry (tests/registry_test.cpp).  The hand-written functional that
-// proved the tau slot (src/meta_gga_reference.cpp) stays reachable beside it.
+// The tau tier: the only entry here that reads the kinetic-energy densities.
 const TauTierFunctional kTauX;
 
 const std::array<const XcFunctional*, 24> kRegistry = {

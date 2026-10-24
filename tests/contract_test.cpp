@@ -31,8 +31,6 @@ using excgrid::XcFunctional;
 
 constexpr std::uint8_t kComponentCount = 32;
 
-// A functional that publishes a known value, so the shape of the seam can be
-// tested without depending on any generated kernel.
 class StubFunctional final : public XcFunctional {
 public:
     [[nodiscard]] bool UsesGradient() const override { return false; }
@@ -65,9 +63,6 @@ std::vector<Component> AllComponents() {
     return ids;
 }
 
-// A functional whose second-derivative tier spans less than it reads: it reads
-// both densities, and answers on the alpha one alone.  This is the shape the
-// finer refusal names, and no shipped functional has it yet.
 class PartialTierFunctional final : public XcFunctional {
 public:
     [[nodiscard]] bool UsesGradient() const override { return false; }
@@ -115,8 +110,6 @@ public:
 
 } // namespace
 
-// The table is the schema: an entry's position must be its identifier, and every
-// slot the capacity promises must have one.
 TEST(ContractTest, TheTableCoversTheWholeCapacity) {
     const auto table = excgrid::ComponentTable();
     ASSERT_EQ(table.size(), kComponentCapacity);
@@ -128,9 +121,6 @@ TEST(ContractTest, TheTableCoversTheWholeCapacity) {
     }
 }
 
-// Every identifier carries a name and a unit, and the two unassigned spares are
-// the only ones without a unit.  A unit that is missing for an assigned slot is
-// a value that cannot be interpreted.
 TEST(ContractTest, EveryAssignedIdentifierStatesItsUnit) {
     for (const Component id : AllComponents()) {
         const ComponentInfo& info = Describe(id);
@@ -142,8 +132,6 @@ TEST(ContractTest, EveryAssignedIdentifierStatesItsUnit) {
     }
 }
 
-// The seven that arrived first keep the positions they arrived in.  A reorder
-// would be a major change, and this is what would catch one.
 TEST(ContractTest, TheActiveIdentifiersKeepTheirPositions) {
     EXPECT_EQ(IndexOf(Component::RhoA), 0U);
     EXPECT_EQ(IndexOf(Component::RhoB), 1U);
@@ -158,8 +146,6 @@ TEST(ContractTest, TheActiveIdentifiersKeepTheirPositions) {
     }
 }
 
-// The active count is what the mask says, not the capacity.  Everything that
-// sizes storage reads this, so it is asserted directly.
 TEST(ContractTest, TheActiveCountFollowsTheMask) {
     EXPECT_EQ(ComponentMask{}.ActiveCount(), 0U);
     EXPECT_EQ(ComponentMask::Collinear().ActiveCount(), 7U);
@@ -172,8 +158,6 @@ TEST(ContractTest, TheActiveCountFollowsTheMask) {
     EXPECT_EQ(one.ActiveCount(), 0U);
 }
 
-// A component outside the mask reads zero, and that zero is the contract's whole
-// meaning: it is the only place a zero is the right answer.
 TEST(ContractTest, AnAbsentComponentReadsZeroAndAMaskedOneIsKept) {
     PointInputs inputs;
     inputs.Set(Component::RhoA, 0.5);
@@ -185,8 +169,6 @@ TEST(ContractTest, AnAbsentComponentReadsZeroAndAMaskedOneIsKept) {
     EXPECT_FALSE(inputs.mask.Test(Component::RhoB));
 }
 
-// The result carries the mask it answered for, and a slot outside it is left at
-// zero rather than at whatever a kernel happened to compute.
 TEST(ContractTest, TheResultCarriesTheVersionAndTheMask) {
     const StubFunctional functional;
 
@@ -205,8 +187,6 @@ TEST(ContractTest, TheResultCarriesTheVersionAndTheMask) {
     EXPECT_DOUBLE_EQ(result.first[IndexOf(Component::TauA)], 0.0);
 }
 
-// Composition is componentwise, so a weighted sum of two functionals is the
-// functional of the sum.
 TEST(ContractTest, CompositionIsComponentwise) {
     excgrid::XcKernelValue a;
     a.exc = 1.0;
@@ -229,9 +209,6 @@ TEST(ContractTest, CompositionIsComponentwise) {
     EXPECT_DOUBLE_EQ(scaled.vrhoA, 3.5);
 }
 
-// A functional with no second-derivative tier refuses by name.  It does not
-// return zeros, because a zero here would be carried into a Hessian as if it
-// were an answer.
 TEST(ContractTest, AnAbsentSecondDerivativeTierIsRefusedByName) {
     const StubFunctional functional;
 
@@ -251,8 +228,6 @@ TEST(ContractTest, AnAbsentSecondDerivativeTierIsRefusedByName) {
               KernelStatus::kRefusedUnsupportedCapability);
 }
 
-// Every refusal has its own name, and the names differ, so a caller can say
-// which one it hit.
 TEST(ContractTest, EachRefusalHasItsOwnName) {
     const std::vector<KernelStatus> refusals{
         KernelStatus::kRefusedUnsupportedCapability,
@@ -275,9 +250,6 @@ TEST(ContractTest, EachRefusalHasItsOwnName) {
     EXPECT_EQ(std::string(excgrid::DescribeStatus(KernelStatus::kOk)), "ok");
 }
 
-// The finer grain: a caller that has a tier on a functional still has to be able
-// to tell "there is no tier" from "the tier does not reach the component you
-// asked about", and the two are separate statuses with separate names.
 TEST(ContractTest, ATierThatDoesNotSpanTheRequestSaysSo) {
     const PartialTierFunctional partial;
 
@@ -293,7 +265,6 @@ TEST(ContractTest, ATierThatDoesNotSpanTheRequestSaysSo) {
     EXPECT_NE(KernelStatus::kRefusedSecondDerivativeCoverage,
               KernelStatus::kRefusedUnsupportedCapability);
 
-    // The same functional answers when the request stays inside what it spans.
     PointInputs alphaOnly;
     alphaOnly.Set(Component::RhoA, 0.4);
 
@@ -301,16 +272,11 @@ TEST(ContractTest, ATierThatDoesNotSpanTheRequestSaysSo) {
     EXPECT_EQ(matrix.mask.bits, ComponentMask{}.bits | (1U << 0U));
 }
 
-// The second-derivative capacity is smaller than the input capacity, and the
-// difference is the contract rather than an implementation detail.
 TEST(ContractTest, TheSecondDerivativeCapacityIsTheSmallerOne) {
     EXPECT_LT(kSecondDerivativeCapacity, kComponentCapacity);
     EXPECT_EQ(kSecondDerivativeCapacity, 16U);
 }
 
-// The shipped functionals still answer, through the schema, with the values the
-// positional adapter reports.  This is the adapter pin: it is what fails if the
-// reseating changed a semantic rather than adding a field.
 TEST(ContractTest, TheShippedFunctionalsAgreeWithThePositionalAdapter) {
     const std::span<const std::string_view> names = excgrid::FunctionalNames();
     ASSERT_FALSE(names.empty());
@@ -320,9 +286,7 @@ TEST(ContractTest, TheShippedFunctionalsAgreeWithThePositionalAdapter) {
         const XcFunctional* functional = excgrid::FindFunctional(name);
         ASSERT_NE(functional, nullptr) << name;
 
-        // The positional adapter cannot supply the kinetic-energy density, so
-        // the two surfaces are comparable only for a functional that does not
-        // read it.
+        // The positional adapter cannot supply tau, so skip functionals that read it.
         if (functional->RequiredMask().Test(Component::TauA)) {
             continue;
         }
@@ -355,8 +319,6 @@ TEST(ContractTest, TheShippedFunctionalsAgreeWithThePositionalAdapter) {
     EXPECT_GT(compared, 0U) << "no shipped functional was comparable through the adapter";
 }
 
-// A functional that reads the gradient says so, and the shipped registry agrees
-// with its own kernels.
 TEST(ContractTest, TheRequiredMaskMatchesWhatTheFunctionalReads) {
     for (const std::string_view name : excgrid::FunctionalNames()) {
         const XcFunctional* functional = excgrid::FindFunctional(name);
@@ -367,8 +329,7 @@ TEST(ContractTest, TheRequiredMaskMatchesWhatTheFunctionalReads) {
         EXPECT_TRUE(mask.Test(Component::RhoB)) << name;
         EXPECT_EQ(mask.Test(Component::SigmaAa), functional->UsesGradient()) << name;
 
-        // The spin channels of a quantity arrive together, so a functional
-        // cannot require one and not the other.
+        // Spin channels of a quantity arrive together: a functional cannot require one alone.
         EXPECT_EQ(mask.Test(Component::TauA), mask.Test(Component::TauB)) << name;
     }
 }

@@ -1,15 +1,3 @@
-// The grid's derivatives as a CONSUMER sees them: through the block-indexed
-// interface, over the blocks a build hands out.
-//
-// The computation behind the interface is checked against fresh builds at
-// displaced geometries - the same channel the derivative pass is checked on -
-// and against the pass's own routines called directly, which is what says the
-// interface adds nothing of its own to the numbers.
-//
-// The refusals are checked as refusals: the status the caller gets, and the
-// buffers the caller is left with.  A zero where a second derivative was asked
-// for is the failure the interface exists to prevent, so the tests here assert
-// that the refusal happens and that nothing was written in its place.
 
 #include "../src/block_grid_derivatives.hpp"
 #include "../src/grid_derivs.hpp"
@@ -56,20 +44,13 @@ using excgrid::derivs::PointId;
 using excgrid::derivs::PointPosition;
 using excgrid::derivs::PointWeightDerivatives;
 
-// The step the consumer's finite differences run at.  A displacement of this
-// size leaves the product grid's point set alone - the switch stays on its
-// plateau at every point and every atom pair - so two builds separated by it
-// carry the same points and their difference is a difference of one smooth
-// function.
+// Leaves the product grid's point set unchanged: every switch stays on its plateau.
 constexpr double kStep = 1e-5;
 
-// The step the moved-grid refusals are probed with: five orders of magnitude
-// past the point where a point's position is recognisably not this grid's.
+// Wide enough to move a point recognisably off this grid.
 constexpr double kWideStep = 1e-2;
 
-// A three-atom molecule with no symmetry.  The jitter keeps a check from
-// passing because two directions happen to be equal, and the two hydrogens
-// differ enough that no cell is at a plateau by accident.
+// Three atoms, no symmetry: the jitter keeps directions and cells from coinciding.
 [[nodiscard]] Geometry Triatomic() {
     Geometry geometry;
     geometry.atoms.push_back({8, {0.0, 0.0, 0.0}});
@@ -78,11 +59,7 @@ constexpr double kWideStep = 1e-2;
     return geometry;
 }
 
-// Small quadrature counts, so a block walk is a handful of blocks and a
-// (3N)^2 buffer stays trivial.  The trim is off: the build then keeps every
-// product-grid point, so two builds of the same molecule carry exactly the same
-// points and a difference over them is a difference of the weights and
-// positions alone.
+// Trim off: two builds carry the same points, so their difference is weights and positions alone.
 [[nodiscard]] GridParams BlockParams() {
     GridParams params;
     params.radialPoints = 24;
@@ -93,8 +70,6 @@ constexpr double kWideStep = 1e-2;
     return params;
 }
 
-// The same build at the shipped threshold, so the pass drops the points whose
-// weight is exactly zero.
 [[nodiscard]] GridParams TrimmedParams() {
     GridParams params = BlockParams();
     params.trimWeight = 1e-15;
@@ -110,7 +85,6 @@ constexpr double kWideStep = 1e-2;
     return moved;
 }
 
-// Both parts at once: DerivativePart names one bit each.
 [[nodiscard]] DerivativePart BothParts() noexcept {
     return static_cast<DerivativePart>(static_cast<std::uint8_t>(DerivativePart::kCoordinates) |
                                        static_cast<std::uint8_t>(DerivativePart::kWeights));
@@ -126,18 +100,14 @@ constexpr double kWideStep = 1e-2;
     return request;
 }
 
-// The caller's arrays for one block, sized by SizeOf and filled with a
-// sentinel, so that a refusal can be told from an answer of zeros by reading
-// the buffers rather than by trusting the status.
+// Sentinel-filled, so a refusal is told from an answer of zeros by the buffers.
 struct Buffers {
     std::vector<double> positionFirst;
     std::vector<double> weightFirst;
     std::vector<double> positionSecond;
     std::vector<double> weightSecond;
 
-    // The spans the interface is handed, into this object's own arrays.  Taken
-    // after the object is in its final place: a span into a vector that is then
-    // moved would point at freed storage.
+    // Spans taken after the object is final: a moved vector would leave them dangling.
     [[nodiscard]] BlockDerivatives View(const Block& block) {
         BlockDerivatives view;
         view.positionFirst = positionFirst;
@@ -172,19 +142,7 @@ struct Buffers {
     return buffers;
 }
 
-// The product-grid identity of a block point, recovered from the point itself.
-//
-// A block carries its points, its weights and its owning atoms, and nothing
-// that names which radial point and which angular node each came from, so this
-// is the reconstruction any consumer of the interface has to make as well: the
-// radial point nearest the distance to the owning atom, the angular node the
-// direction is most nearly along, and then the rebuild that turns the pair into
-// an answer.
-//
-// The margins are asserted rather than assumed.  A fixture in which the nearest
-// radial point or the best-aligned node were ambiguous would make every
-// comparison below pass for the wrong reason, which is a failure mode a
-// tolerance cannot see.
+// A block carries no point identity: recover it by nearest radial point and best-aligned node.
 [[nodiscard]] PointId Identify(const Geometry& geometry,
                                const GridBasis& basis,
                                const Block& block,
@@ -252,16 +210,12 @@ struct Buffers {
     return geometry.atoms.size() * basis.radial.Size() * basis.angular.Size();
 }
 
-// The product grid's own enumeration order: atom, then radial point, then
-// angular node.  The build re-batches its blocks away from this order, so the
-// order is a name for a point that does not depend on which block it landed in.
+// The product-grid enumeration order: a point's name independent of its block.
 [[nodiscard]] std::size_t FlatIndex(const GridBasis& basis, const PointId& id) {
     return (id.atom * basis.radial.Size() + id.radial) * basis.angular.Size() + id.angular;
 }
 
-// The consumer's per-point field.  Broad enough that the outer shells still
-// carry it, and centred away from the origin so that no symmetry of the fixture
-// can cancel the total it is integrated to.
+// Broad enough to reach outer shells, and off-origin so no symmetry cancels the integral.
 constexpr double kFieldScale = 0.02;
 constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
 
@@ -281,8 +235,6 @@ constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
             -2.0 * kFieldScale * (point[2] - kFieldCenter[2]) * value};
 }
 
-// The consumer's quantity: sum over the grid's points of w_g f(x_g), taken on
-// the weights the build hands out rather than on any formula beside them.
 [[nodiscard]] double QuadratureTotal(const BlockGrid& grid) {
     double total = 0.0;
 
@@ -297,9 +249,7 @@ constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
     return total;
 }
 
-// The magnitude of the consumer's quantity, taken over the terms that make it
-// up rather than over their sum: a grid's weights are not all of one sign, so
-// the sum can cancel and it is the terms that fix how finely it can be read.
+// Sum of |terms|, not |sum|: weights change sign, so the sum can cancel.
 [[nodiscard]] double QuadratureMagnitude(const BlockGrid& grid) {
     double total = 0.0;
 
@@ -325,8 +275,6 @@ constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
     return largest;
 }
 
-// A number in scientific notation, which is what a measured figure wants:
-// std::to_string would round the small ones to zero and report nothing.
 [[nodiscard]] std::string Scientific(double value) {
     std::ostringstream text;
     text << std::scientific << std::setprecision(3) << value;
@@ -334,10 +282,7 @@ constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
     return text.str();
 }
 
-// The same total's derivative, assembled entirely from the interface: the
-// weight derivative times the field plus the field's own gradient carried by
-// the point's motion.  The provider is taken by its base reference, because a
-// consumer holds a GridDerivativeProvider and not this library's own type.
+// d(sum w f)/dR = sum (dw/dR f + w grad f . dx/dR).
 [[nodiscard]] std::optional<std::vector<double>> InterfaceGradient(
     const Geometry& geometry,
     const GridDerivativeProvider& provider,
@@ -381,9 +326,7 @@ constexpr std::array<double, 3> kFieldCenter = {0.7, -0.3, 0.4};
 
 } // namespace
 
-// The interface answers the question the pass answers.  The comparison is
-// bit for bit, because both sides call the same routine with the same identity:
-// a difference here is the interface introducing one, and nothing else.
+// Bit for bit: both sides call the same routine with the same identity.
 TEST(GridDerivativeProviderTest, FirstOrderAgreesWithTheDirectComputation) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -414,9 +357,7 @@ TEST(GridDerivativeProviderTest, FirstOrderAgreesWithTheDirectComputation) {
             const PointId id = Identify(geometry, *basis, block, index);
             EvaluatePointWeight(geometry, *basis, id, scratch, reference);
 
-            // A point is a rigid translate of its owning atom, so the
-            // coordinate derivative is the owner's own identity block and
-            // nothing else.
+            // A point rigidly translates with its owner: the coordinate derivative is the owner's identity block.
             const std::size_t owner = block.atomIndex[index];
             const double* position = buffers.positionFirst.data() + index * 3U * width;
             for (std::size_t row = 0; row < 3; ++row)
@@ -436,10 +377,7 @@ TEST(GridDerivativeProviderTest, FirstOrderAgreesWithTheDirectComputation) {
                     << "coordinate " << column << " of point " << index;
             }
 
-            // The value the pass produces is the weight the build handed out,
-            // and the build is a different translation unit: it is the same
-            // expression over the same point, so the two agree to a rounding
-            // and not necessarily bit for bit.
+            // Same expression in a different translation unit: equal to a rounding, not bit for bit.
             EXPECT_NEAR(reference.value, block.weights[index],
                         1e-12 * (1.0 + std::abs(block.weights[index])))
                 << "point " << index;
@@ -451,9 +389,7 @@ TEST(GridDerivativeProviderTest, FirstOrderAgreesWithTheDirectComputation) {
     EXPECT_EQ(visited, FlatCount(geometry, *basis));
 }
 
-// The second order, the same way.  The coordinate half is identically zero and
-// the weight half is the pass's own matrix, mirrored rather than recomputed, so
-// the comparison is exact on both.
+// Coordinate half is identically zero; the weight half is the pass's matrix, mirrored.
 TEST(GridDerivativeProviderTest, SecondOrderAgreesWithTheDirectComputation) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -503,9 +439,6 @@ TEST(GridDerivativeProviderTest, SecondOrderAgreesWithTheDirectComputation) {
     EXPECT_EQ(visited, grid->TotalPointCount());
 }
 
-// A consumer's own call, through the base class, against a difference of the
-// build it built: the interface is usable, and what it is usable for agrees
-// with the geometry it describes.
 TEST(GridDerivativeProviderTest, ConsumerAssemblesTheTotalDerivative) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -520,15 +453,10 @@ TEST(GridDerivativeProviderTest, ConsumerAssemblesTheTotalDerivative) {
     const std::optional<std::vector<double>> analytic = InterfaceGradient(geometry, interface, *grid);
     ASSERT_TRUE(analytic.has_value());
 
-    // A total that is not small: a gradient of zero would compare well against
-    // any difference and prove nothing.
+    // A non-zero gradient, or the difference would compare well against anything.
     EXPECT_GT(Magnitude(*analytic), 1e-3);
 
-    // Two steps per coordinate, combined into the estimate that cancels the
-    // difference's own h^2 term.  What is left is the difference's rounding,
-    // which for a sum of this size over a step this small is the resolution of
-    // the comparison: the bound below is that rounding and not a magnitude
-    // picked to fit.
+    // Bound is the difference's rounding: 300 eps * terms / kStep.
     const double terms = QuadratureMagnitude(*grid);
     ASSERT_GT(terms, 1e-3);
     const double resolution = 300.0 * std::numeric_limits<double>::epsilon() * terms / kStep;
@@ -558,18 +486,12 @@ TEST(GridDerivativeProviderTest, ConsumerAssemblesTheTotalDerivative) {
         }
     }
 
-    // The measured numbers, so that a reader of a red run knows how far the two
-    // sides were apart and not only that they were.
     RecordProperty("worst_error", Scientific(worst));
     RecordProperty("resolution", Scientific(resolution));
     RecordProperty("gradient_magnitude", Scientific(Magnitude(*analytic)));
     RecordProperty("term_magnitude", Scientific(terms));
 }
 
-// The build's trim and its re-batching, seen from the interface.  Every point
-// the build kept is one this construction differentiates, the kept points are
-// exactly the product grid's points that survived the trim - each of them once,
-// wherever the re-batching put them - and the trim really did drop some.
 TEST(GridDerivativeProviderTest, TrimmedRebatchedBlocksKeepTheirPoints) {
     const Geometry geometry = Triatomic();
     const GridParams untrimmed = BlockParams();
@@ -582,8 +504,6 @@ TEST(GridDerivativeProviderTest, TrimmedRebatchedBlocksKeepTheirPoints) {
     const excgrid::Result<BlockGrid> kept = BlockGrid::Create(geometry, trimmed);
     ASSERT_TRUE(kept.has_value());
 
-    // The premise, as the pass measured it: the trim removes the points whose
-    // weight is exactly zero, and nothing else.
     std::size_t zeroWeighted = 0;
     for (const Block& block : full->Blocks())
     {
@@ -612,8 +532,6 @@ TEST(GridDerivativeProviderTest, TrimmedRebatchedBlocksKeepTheirPoints) {
     {
         Buffers buffers = MakeBuffers(block, request);
 
-        // The trim has not made the grid's own points undifferentiable: every
-        // block the build kept is answered, none of them refused.
         ASSERT_EQ(provider->Evaluate(block, request, buffers.View(block)), DerivativeStatus::kOk);
 
         std::size_t previous = flat;
@@ -642,15 +560,10 @@ TEST(GridDerivativeProviderTest, TrimmedRebatchedBlocksKeepTheirPoints) {
     EXPECT_EQ(visited, kept->TotalPointCount());
     EXPECT_LT(visited, flat);
 
-    // The blocks are re-batched, not enumerated: without this the identity
-    // recovery above would be reading points out of the order they were built
-    // in, and would prove nothing about a re-batched block.
+    // The fixture must actually re-batch, or the identity recovery proves nothing.
     EXPECT_GT(reordered, 0u);
 }
 
-// The order the provider was not built for is refused by name, and the caller's
-// arrays are left holding the sentinel: the refusal is not answered with zeros,
-// which is the failure this interface exists to prevent.
 TEST(GridDerivativeProviderTest, SecondOrderIsRefusedByNameAndLeavesTheBuffersAlone) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -662,8 +575,6 @@ TEST(GridDerivativeProviderTest, SecondOrderIsRefusedByNameAndLeavesTheBuffersAl
     ASSERT_TRUE(provider.has_value());
     ASSERT_EQ(provider->MaxOrder(), DerivativeOrder::kFirst);
 
-    // A request sized exactly as the contract says to size one: a caller that
-    // asked for the second order and got silence would be reading these.
     const DerivativeRequest request = MakeRequest(geometry, BothParts(), DerivativeOrder::kSecond);
     const double sentinel = -1234.5;
 
@@ -677,7 +588,6 @@ TEST(GridDerivativeProviderTest, SecondOrderIsRefusedByNameAndLeavesTheBuffersAl
         EXPECT_TRUE(buffers.AllHold(sentinel));
     }
 
-    // The same block, at the order the provider does supply, is answered.
     const DerivativeRequest first = MakeRequest(geometry, BothParts(), DerivativeOrder::kFirst);
     const Block& block = grid->Blocks().front();
     Buffers buffers = MakeBuffers(block, first, sentinel);
@@ -685,11 +595,7 @@ TEST(GridDerivativeProviderTest, SecondOrderIsRefusedByNameAndLeavesTheBuffersAl
     EXPECT_FALSE(buffers.AllHold(sentinel));
 }
 
-// A block from another geometry is refused rather than differentiated.  The
-// points of an atom that did not move are on both grids and a point on the
-// switch's plateau does not feel the moved atom either, so the count of
-// refusals is what the fixture gives - but a swept coordinate moves its own
-// atom's whole sub-grid, and that sub-grid is somewhere in every sweep.
+// A swept coordinate moves its own atom's whole sub-grid, so some block is always refused.
 TEST(GridDerivativeProviderTest, MovedGridIsRefusedByName) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -725,12 +631,7 @@ TEST(GridDerivativeProviderTest, MovedGridIsRefusedByName) {
                         ++refusedHere;
                     } else
                     {
-                        // A block can survive: a point owned by an atom that did
-                        // not move, and far enough from the one that did, is on
-                        // both grids with the weight the block carries, so there
-                        // is nothing about it to refuse.  What cannot survive is
-                        // the sweep - the atom that moved has a sub-grid of its
-                        // own, and it is in some block.
+                        // Points far from the moved atom are on both grids unchanged; the moved atom's sub-grid is always somewhere.
                         EXPECT_EQ(status, DerivativeStatus::kOk);
                     }
                 }
@@ -746,16 +647,10 @@ TEST(GridDerivativeProviderTest, MovedGridIsRefusedByName) {
     EXPECT_GT(refusals, 0u);
 }
 
-// A block carrying a point this geometry's build would have trimmed is refused
-// by name too.  The two builds here differ only in the threshold, so every
-// point is on the grid and every position matches: what is refused is the point
-// set, which is the condition the status names.
+// Same molecule, same positions; only the point set differs, which is what the refusal names.
 TEST(GridDerivativeProviderTest, TrimmedPointIsRefusedByName) {
     const Geometry geometry = Triatomic();
 
-    // The grid as it would be built with the trim off, and a provider for the
-    // same molecule with the shipped threshold.  The point sets differ and
-    // nothing else does.
     const excgrid::Result<BlockGrid> loose = BlockGrid::Create(geometry, BlockParams());
     ASSERT_TRUE(loose.has_value());
     const excgrid::Result<BlockGridDerivativeProvider> provider =
@@ -796,15 +691,12 @@ TEST(GridDerivativeProviderTest, TrimmedPointIsRefusedByName) {
         expectedRefused += unthresholded;
     }
 
-    // The fixture has to contain the case, and the pass has to have found it.
     EXPECT_GT(expectedRefused, 0u);
     EXPECT_EQ(refusedPoints, expectedRefused);
     EXPECT_GT(refusedBlocks, 0u);
 }
 
-// A request whose frame is not this geometry's cannot be filled at all: the
-// arrays are indexed by nuclear coordinate, and the wrong count is not a
-// smaller answer.
+// Arrays are indexed by nuclear coordinate; the wrong count is not a smaller answer.
 TEST(GridDerivativeProviderTest, WrongFrameAndShortBuffersAreRefusedByName) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -818,7 +710,6 @@ TEST(GridDerivativeProviderTest, WrongFrameAndShortBuffersAreRefusedByName) {
     const double sentinel = -1234.5;
     const Block& block = grid->Blocks().front();
 
-    // A frame one coordinate short.
     DerivativeRequest wrongFrame = MakeRequest(geometry, BothParts(), DerivativeOrder::kFirst);
     --wrongFrame.nuclearCoordinateCount;
     {
@@ -828,7 +719,6 @@ TEST(GridDerivativeProviderTest, WrongFrameAndShortBuffersAreRefusedByName) {
         EXPECT_TRUE(buffers.AllHold(sentinel));
     }
 
-    // Right frame, buffers one element short of what SizeOf asks for.
     const DerivativeRequest request = MakeRequest(geometry, BothParts(), DerivativeOrder::kFirst);
     {
         Buffers buffers = MakeBuffers(block, request, sentinel);
@@ -840,13 +730,7 @@ TEST(GridDerivativeProviderTest, WrongFrameAndShortBuffersAreRefusedByName) {
     }
 }
 
-// A consumer reaches the provider through the public header and nothing else.
-//
-// Every construction above goes through the library's own internal header,
-// which a consumer cannot include, so none of them shows that the seam is open
-// at all - a provider can be perfectly tested and still be unobtainable.  This
-// builds one the way a consumer would, from the public declaration alone, and
-// checks that what comes back answers.
+// Built the way a consumer would: from the public declaration alone.
 TEST(GridDerivativeProviderTest, AConsumerBuildsOneThroughThePublicHeader) {
     const Geometry geometry = Triatomic();
     const GridParams params = BlockParams();
@@ -858,8 +742,6 @@ TEST(GridDerivativeProviderTest, AConsumerBuildsOneThroughThePublicHeader) {
     const GridDerivativeProvider& provider = **built;
     EXPECT_EQ(provider.MaxOrder(), DerivativeOrder::kFirst);
 
-    // The order asked for is the order answered, so the depth reaches the
-    // provider rather than defaulting.
     excgrid::Result<std::unique_ptr<GridDerivativeProvider>> deeper =
         excgrid::CreateGridDerivativeProvider(geometry, params, DerivativeOrder::kSecond);
     ASSERT_TRUE(deeper.has_value());

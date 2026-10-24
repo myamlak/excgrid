@@ -1,5 +1,3 @@
-// The Lebedev angular quadrature tests: the normalization (sum w = 4 pi)
-// and the moment exactness the tables are certified for.
 
 #include "excgrid/grid.hpp"
 
@@ -11,7 +9,6 @@ namespace {
 constexpr double kPi = 3.14159265358979323846;
 
 TEST(AngularGridTest, Normalization) {
-    // Every shipped size sums its weights to 4 pi.
     for (std::size_t size : excgrid::AngularGrid::kAvailableSizes)
     {
         auto grid = excgrid::AngularGrid::Create(size);
@@ -29,9 +26,7 @@ TEST(AngularGridTest, Normalization) {
 }
 
 TEST(AngularGridTest, MomentExactness) {
-    // The odd monomials and low even moments integrate exactly on every
-    // size's certified degree: int x dOmega = 0, int x^2 dOmega = 4pi/3,
-    // int x^2 y^2 dOmega = 4pi/15, int x^4 dOmega = 4pi/5.
+    // Moment exactness: <x> = 0, <x^2> = 4pi/3, <x^2 y^2> = 4pi/15, <x^4> = 4pi/5.
     for (std::size_t size : excgrid::AngularGrid::kAvailableSizes)
     {
         auto grid = excgrid::AngularGrid::Create(size);
@@ -53,10 +48,6 @@ TEST(AngularGridTest, MomentExactness) {
             mX4 += w * p[0] * p[0] * p[0] * p[0];
         }
 
-        // The odd/even moment checks apply within the certified degree:
-        // x^2 y^2 and x^4 are degree-4 moments (the smallest shipped
-        // size, 6, is degree 3 - its x^2 y^2 is identically zero on the
-        // axis nodes).
         EXPECT_NEAR(mX, 0.0, 1e-12) << "size " << size;
         EXPECT_NEAR(mX2, 4.0 * kPi / 3.0, 1e-12) << "size " << size;
 

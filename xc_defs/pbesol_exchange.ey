@@ -1,8 +1,6 @@
-// excgrid codegen source: the PBEsol GGA exchange functional (the PBE
-// exchange form with mu = 10/81).  The formula is sourced from the PBEsol
-// paper - J. P. Perdew et al., Phys. Rev. Lett. 100 (2008) 136406, listed
-// with the other functional citations in docs/mainpage.md.  Regenerate
-// with tools/regenerate.py.
+// excgrid codegen source: the PBEsol GGA exchange functional (the PBE exchange
+// form with mu = 10/81).
+// J. P. Perdew et al., Phys. Rev. Lett. 100 (2008) 136406.
 
 // <? WriteString("Auto-generated file, do not modify"); ?>
 #include "excgrid/kernel.hpp"
@@ -15,13 +13,7 @@
 
     e := X'PbeSolExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
-    // Order 1 only.  The enhancement's mu crosses as the division 10/81 rather
-    // than as a single decimal, and the second differentiation of that shape
-    // leaves the shared Sqrt(sigma) uncancelled in the two sigma-sigma entries,
-    // where the generator's cancellation reaches only a division at the top of
-    // the tree.  The kernel is finite at a zero gradient, so a tier that is not
-    // would be a hole at a point the kernel answers; the same form with mu as a
-    // decimal cancels cleanly, which is why the three other PBE-shaped exchanges
-    // carry a tier.
-    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, False);
+    // mu crosses as the rational 10/81, so the outer sigma-sigma derivative hides a
+    // Sqrt(sigma) quotient inside a numerator sum: TierCancelSum cancels there.
+    ExKernelGenerate("PbeSolExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierCancelSum);
 ?>

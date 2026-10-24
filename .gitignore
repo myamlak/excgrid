@@ -12,3 +12,7 @@ __pycache__/
 # already covers it; this line is kept for the older layout (a checkout of an
 # earlier revision still writes docs/html/) so a stale run cannot be staged.
 /docs/html/
+
+# Local build and lane state
+/_adbuild/
+/.claude/
