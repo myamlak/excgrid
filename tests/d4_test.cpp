@@ -5,6 +5,7 @@
 #include <gtest/gtest.h>
 
 #include <algorithm>
+#include <array>
 #include <cmath>
 
 #include <numbers>
@@ -737,4 +738,65 @@ TEST(D4Test, PartialChargesRefuseWhatTheTableDoesNotCover) {
     auto none = excgrid::D4PartialCharges(empty, 0.0);
     ASSERT_TRUE(none.has_value());
     EXPECT_TRUE(none->empty());
+}
+
+TEST(D4Test, TheTwoBodyPairsReproduceTheEnergy) {
+    const excgrid::Geometry geometry = CaffeineGeometry();
+    const auto parameters = *excgrid::D4Preset("b3lyp");
+    const std::vector<int> counts(excgrid::kD4ReferenceStateCount, 1);
+
+    auto pairs = excgrid::D4TwoBodyPairs(geometry, parameters, counts);
+    ASSERT_TRUE(pairs.has_value());
+
+    // Every unordered pair of caffeine's 24 atoms is counted: no coincident
+    // atom and no non-positive C6.
+    EXPECT_EQ(pairs->size(), 24u * 23u / 2u);
+
+    double summed = 0.0;
+
+    for (const excgrid::D4TwoBodyPair& pair : *pairs)
+    {
+        EXPECT_LT(pair.first, pair.second);
+        EXPECT_GT(pair.c6, 0.0);
+        EXPECT_GT(pair.radius, 0.0);
+
+        const std::array<double, 3>& a = geometry.atoms[pair.first].position;
+        const std::array<double, 3>& b = geometry.atoms[pair.second].position;
+        const double dx = a[0] - b[0];
+        const double dy = a[1] - b[1];
+        const double dz = a[2] - b[2];
+        const double r = std::sqrt(dx * dx + dy * dy + dz * dz);
+        ASSERT_GT(r, 0.0);
+
+        const double r6 = std::pow(r, 6.0);
+        const double r8 = r6 * r * r;
+        const double damped6 = std::pow(pair.radius, 6.0);
+        const double damped8 = damped6 * pair.radius * pair.radius;
+        summed += parameters.s6 * pair.c6 / (r6 + damped6)
+                  + parameters.s8 * pair.c8 / (r8 + damped8);
+    }
+
+    auto reference = excgrid::D4TwoBodyEnergy(geometry, parameters, counts);
+    ASSERT_TRUE(reference.has_value());
+    EXPECT_DOUBLE_EQ(-summed, *reference);
+}
+
+TEST(D4Test, TheTwoBodyPairsAndTheShippedDefaultAgree) {
+    const excgrid::Geometry geometry = CaffeineGeometry();
+    const auto parameters = *excgrid::D4Preset("pbe");
+
+    auto pairs = excgrid::D4TwoBodyPairs(geometry, parameters);
+    ASSERT_TRUE(pairs.has_value());
+
+    excgrid::Geometry oneAtom;
+    oneAtom.atoms.push_back({6, {0.0, 0.0, 0.0}});
+    auto none = excgrid::D4TwoBodyPairs(oneAtom, parameters);
+    ASSERT_TRUE(none.has_value());
+    EXPECT_TRUE(none->empty());
+
+    excgrid::Geometry beyond;
+    beyond.atoms.push_back({87, {0.0, 0.0, 0.0}});
+    beyond.atoms.push_back({1, {0.0, 0.0, 1.0}});
+    EXPECT_EQ(excgrid::D4TwoBodyPairs(beyond, parameters).error(),
+              excgrid::ErrorCode::kUnsupported);
 }
