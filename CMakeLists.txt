@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 # Standalone boundary: no PCH, and no foreign targets, paths or types.
 
-project(excgrid VERSION 0.4.0 LANGUAGES CXX)
+project(excgrid VERSION 0.5.0 LANGUAGES CXX)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(EXCGRID_TOP_LEVEL ON)
