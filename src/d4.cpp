@@ -465,8 +465,11 @@ Result<std::vector<double>> AtomPolarizabilities(const Geometry& geometry, std::
 }
 
 // The two-body dispersion energy: equations 18 to 21 over the unordered pairs, once each.
+// The sink receives every counted pair before its term accumulates, so a coefficient
+// consumer and the energy cannot disagree about which pairs the energy sums.
+template <typename PairSink>
 Result<double> TwoBodyEnergy(const Geometry& geometry, const D4Parameters& parameters,
-                             std::span<const int> counts) {
+                             std::span<const int> counts, PairSink&& sink) {
     const std::size_t n = geometry.atoms.size();
 
     for (const Atom& atom : geometry.atoms)
@@ -556,6 +559,8 @@ Result<double> TwoBodyEnergy(const Geometry& geometry, const D4Parameters& param
             const double r8 = r6 * r * r;
             const double damped6 = std::pow(damped, 6.0);
             const double damped8 = damped6 * damped * damped;
+
+            sink(a, b, *c6, c8, damped);
 
             energy += parameters.s6 * (*c6) / (r6 + damped6)
                       + parameters.s8 * c8 / (r8 + damped8);
@@ -796,13 +801,43 @@ Result<std::vector<double>> D4ReferenceWeights(double coordinationNumber,
 static_assert(kD4ReferenceStateCount == std::size(d4tables::kElementReference),
               "the published reference count and the table disagree");
 
+namespace {
+
+// The energy path's sink: the pairs are summed, not kept.
+void DiscardPair(std::size_t, std::size_t, double, double, double) {}
+
+} // namespace
+
 Result<double> D4TwoBodyEnergy(const Geometry& geometry, const D4Parameters& parameters) {
-    return TwoBodyEnergy(geometry, parameters, d4tables::kReferenceGaussianCount);
+    return TwoBodyEnergy(geometry, parameters, d4tables::kReferenceGaussianCount, DiscardPair);
 }
 
 Result<double> D4TwoBodyEnergy(const Geometry& geometry, const D4Parameters& parameters,
                                std::span<const int> gaussianCounts) {
-    return TwoBodyEnergy(geometry, parameters, gaussianCounts);
+    return TwoBodyEnergy(geometry, parameters, gaussianCounts, DiscardPair);
+}
+
+Result<std::vector<D4TwoBodyPair>> D4TwoBodyPairs(const Geometry& geometry,
+                                                  const D4Parameters& parameters) {
+    return D4TwoBodyPairs(geometry, parameters, d4tables::kReferenceGaussianCount);
+}
+
+Result<std::vector<D4TwoBodyPair>> D4TwoBodyPairs(const Geometry& geometry,
+                                                  const D4Parameters& parameters,
+                                                  std::span<const int> gaussianCounts) {
+    std::vector<D4TwoBodyPair> pairs;
+    auto energy = TwoBodyEnergy(
+        geometry, parameters, gaussianCounts,
+        [&pairs](std::size_t first, std::size_t second, double c6, double c8, double damped) {
+            pairs.push_back(D4TwoBodyPair{first, second, c6, c8, damped});
+        });
+
+    if (!energy.has_value())
+    {
+        return std::unexpected(energy.error());
+    }
+
+    return pairs;
 }
 
 Result<DispersionModel> DispersionModelFromKey(std::string_view key) {    // The two corrections this library ships.  D3 is the zero-damping

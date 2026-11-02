@@ -3,6 +3,7 @@
 #include "excgrid/error.hpp"
 #include "excgrid/geometry.hpp"
 
+#include <cstddef>
 #include <span>
 #include <string_view>
 #include <vector>
@@ -192,6 +193,52 @@ inline constexpr int kD4ReferenceStateCount = 261;
 /// \ingroup excgrid-d4
 Result<double> D4TwoBodyEnergy(const Geometry& geometry, const D4Parameters& parameters,
                                std::span<const int> gaussianCounts);
+
+/// One unordered atom pair of a D4 two-body energy, with the pair's
+/// coefficients evaluated at the geometry they were read from.
+///
+/// The coefficients are functions of the geometry through the coordination
+/// numbers and the electronegativity-equilibration charges. A caller that
+/// differentiates through the interatomic distances alone - the frozen-charge
+/// tier - holds them fixed; the damping radius is a function of the two
+/// elements only and is returned alongside them.
+/// \ingroup excgrid-d4
+struct D4TwoBodyPair {
+    std::size_t first = 0;  ///< The lower atom index, in the geometry's order.
+    std::size_t second = 0; ///< The higher atom index, in the geometry's order.
+    double c6 = 0.0;        ///< The C6 coefficient, energy times Bohr^6.
+    double c8 = 0.0;        ///< The C8 coefficient, energy times Bohr^8.
+    double radius = 0.0;    ///< The Becke-Johnson damping radius a1 R0 + a2, Bohr.
+};
+
+/// The two-body terms of a geometry's D4 energy, one per counted pair, in the
+/// order the energy sums them.
+///
+/// The list is exactly the set D4TwoBodyEnergy accumulates: a coincident pair
+/// and a pair whose C6 is not positive are omitted, so a caller reproduces the
+/// energy from the list without a second rule.
+/// \param geometry The molecule, its positions in Bohr.
+/// \param parameters The functional's parameter set (it supplies a1 and a2
+/// through the damping radius; s6 and s8 do not enter the list).
+/// \returns The pairs, or kUnsupported for an element above the reference
+/// data's range.
+/// \ingroup excgrid-d4
+Result<std::vector<D4TwoBodyPair>> D4TwoBodyPairs(const Geometry& geometry,
+                                                  const D4Parameters& parameters);
+
+/// The D4 two-body pairs, with equation 8's Gaussian counts supplied by the
+/// caller, as the energy overload of the same name.
+/// \param geometry The molecule, its positions in Bohr.
+/// \param parameters The functional's parameter set.
+/// \param gaussianCounts One count per reference state, in the reference
+/// table's order (increasing atomic number, then the source's reference order).
+/// \returns The pairs, or kUnsupported for an element above the reference
+/// data's range, or kInvalidArgument unless gaussianCounts holds exactly
+/// kD4ReferenceStateCount entries.
+/// \ingroup excgrid-d4
+Result<std::vector<D4TwoBodyPair>> D4TwoBodyPairs(const Geometry& geometry,
+                                                  const D4Parameters& parameters,
+                                                  std::span<const int> gaussianCounts);
 
 /// The dispersion correction a method key selects.
 /// \ingroup excgrid-d4
