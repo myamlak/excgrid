@@ -101,6 +101,18 @@ private:
     std::size_t _offset;
 };
 
+/// A caller-supplied angular rule: unit-sphere nodes with one weight each.
+///
+/// The rule is consumed exactly as given - no closure, no degree assumption -
+/// so a rule built elsewhere (for example a symmetry-adapted union of
+/// point-group orbits) crosses this boundary without excgrid knowing point
+/// groups. The spans must outlive the call.
+/// \ingroup excgrid-grid
+struct AngularRuleView {
+    std::span<const std::array<double, 3>> points; ///< Unit-sphere nodes.
+    std::span<const double> weights; ///< One weight per node; they sum to 4 pi.
+};
+
 /// The molecular grid build parameters.
 /// \ingroup excgrid-grid
 struct GridParams {
@@ -136,6 +148,22 @@ public:
     /// \returns The grid, or an Error from the underlying quadratures.
     static Result<BlockGrid> Create(const Geometry& geometry, const GridParams& params = {});
 
+    /// Builds the grid from a caller-supplied angular rule.
+    ///
+    /// The radial quadrature, the Becke partition, the weight trim and the
+    /// spatial re-batching are those of the Lebedev overload; only the
+    /// angular source differs, and its own size replaces
+    /// GridParams::angularPoints.
+    /// \param geometry The molecule whose atoms center the sub-grids.
+    /// \param params The build parameters (angularPoints is unused).
+    /// \param rule The angular nodes and weights; the spans must outlive
+    ///        the call.
+    /// \returns The grid, or kInvalidArgument for an invalid radial
+    ///          parameter or an empty or size-mismatched rule.
+    static Result<BlockGrid> Create(const Geometry& geometry,
+                                    const GridParams& params,
+                                    const AngularRuleView& rule);
+
     /// The number of blocks.
     /// \returns The block count.
     [[nodiscard]] std::size_t BlockCount() const noexcept {
@@ -156,6 +184,14 @@ public:
 
 private:
     BlockGrid(std::vector<Block> blocks, std::size_t totalPoints) noexcept;
+
+    // The build loop shared by both factories, so the radial quadrature, the
+    // partition and the re-batching cannot drift between them.
+    static Result<BlockGrid> Build(const Geometry& geometry,
+                                   const GridParams& params,
+                                   const RadialGrid& radial,
+                                   std::span<const std::array<double, 3>> nodes,
+                                   std::span<const double> nodeWeights);
 
     std::vector<Block> _blocks;
     std::size_t _totalPoints;

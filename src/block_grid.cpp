@@ -283,6 +283,41 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
         return std::unexpected(angular.error());
     }
 
+    std::vector<std::array<double, 3>> nodes(angular->Size());
+    std::vector<double> weights(angular->Size());
+
+    for (std::size_t t = 0; t < angular->Size(); ++t)
+    {
+        nodes[t] = angular->Point(t);
+        weights[t] = angular->Weight(t);
+    }
+
+    return Build(geometry, params, *radial, nodes, weights);
+}
+
+Result<BlockGrid> BlockGrid::Create(const Geometry& geometry,
+                                    const GridParams& params,
+                                    const AngularRuleView& rule) {
+    auto radial = RadialGrid::Create(params.radialPoints, params.alpha, params.radialExponent);
+
+    if (!radial)
+    {
+        return std::unexpected(radial.error());
+    }
+
+    if (rule.points.empty() || rule.points.size() != rule.weights.size())
+    {
+        return std::unexpected(ErrorCode::kInvalidArgument);
+    }
+
+    return Build(geometry, params, *radial, rule.points, rule.weights);
+}
+
+Result<BlockGrid> BlockGrid::Build(const Geometry& geometry,
+                                   const GridParams& params,
+                                   const RadialGrid& radial,
+                                   std::span<const std::array<double, 3>> nodes,
+                                   std::span<const double> nodeWeights) {
     std::vector<GridPoint> kept;
     PartitionScratch scratch = MakePartitionScratch(geometry);
 
@@ -290,20 +325,20 @@ Result<BlockGrid> BlockGrid::Create(const Geometry& geometry, const GridParams& 
     {
         const std::array<double, 3>& center = geometry.atoms[a].position;
 
-        for (std::size_t r = 0; r < radial->Size(); ++r)
+        for (std::size_t r = 0; r < radial.Size(); ++r)
         {
-            const double radius = radial->Points()[r];
-            const double radialWeight = radial->Weights()[r] * radius * radius;
+            const double radius = radial.Points()[r];
+            const double radialWeight = radial.Weights()[r] * radius * radius;
 
             BuildShellWindow(geometry, a, radius, scratch.windowMargin, scratch.window);
 
-            for (std::size_t t = 0; t < angular->Size(); ++t)
+            for (std::size_t t = 0; t < nodes.size(); ++t)
             {
-                const std::array<double, 3> node = angular->Point(t);
+                const std::array<double, 3>& node = nodes[t];
                 const std::array<double, 3> position = {center[0] + radius * node[0],
                                                         center[1] + radius * node[1],
                                                         center[2] + radius * node[2]};
-                const double weight = (radialWeight * angular->Weight(t)) *
+                const double weight = (radialWeight * nodeWeights[t]) *
                                       OwnerPartitionWeight(position, geometry, scratch, a);
 
                 if (std::abs(weight) >= params.trimWeight)
