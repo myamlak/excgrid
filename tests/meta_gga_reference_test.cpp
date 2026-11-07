@@ -10,6 +10,7 @@
 #include <limits>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 // At namespace scope: a declaration in the anonymous namespace would not bind to the library's definition.
 namespace excgrid {
@@ -355,21 +356,29 @@ TEST_F(MetaGgaReferenceTest, TheRegistryResolvesTheReferenceAndRequiresTau) {
     EXPECT_TRUE(Reference().UsesGradient());
     EXPECT_DOUBLE_EQ(Reference().ExchangeFraction(), 0.0);
 
+    // The tau tier is exactly the reference and the two TPSS halves; every other
+    // entry must stay free of the kinetic-energy densities.
+    std::vector<std::string_view> tauTier;
     int checked = 0;
 
     for (const std::string_view name : excgrid::FunctionalNames())
     {
-        if (name == kReferenceName)
+        const XcFunctional* functional = excgrid::FindFunctional(name);
+        ASSERT_NE(functional, nullptr) << name;
+
+        if (functional->RequiredMask().Test(Component::TauA) ||
+            functional->RequiredMask().Test(Component::TauB))
         {
+            tauTier.push_back(name);
             continue;
         }
 
-        const XcFunctional* functional = excgrid::FindFunctional(name);
-        ASSERT_NE(functional, nullptr) << name;
         EXPECT_FALSE(functional->RequiredMask().Test(Component::TauA)) << name;
         EXPECT_FALSE(functional->RequiredMask().Test(Component::TauB)) << name;
         ++checked;
     }
+
+    EXPECT_EQ(tauTier, (std::vector<std::string_view>{kReferenceName, "tpss_x", "tpss_c"}));
 
     EXPECT_GT(checked, 0) << "no shipped LDA/GGA functional was examined";
 }

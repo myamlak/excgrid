@@ -2,13 +2,13 @@
   "note": "Codegen input hashes for the freshness gate. Written by tools/regenerate.py after a successful regeneration, checked by tools/check_freshness.py at commit time. This proves the sources are unchanged since the blessing; it does NOT prove the committed generated code matches them - that is what `python tools/regenerate.py --check` proves, which costs a full Yacas expansion and is therefore a deliberate run, not a hook.",
   "sources": {
     "becke88_exchange.ey": "b03b8ced6c1104d55fe228b7f32c4e7cfd2f05bf02d6fd8fdec931045bb11a77",
-    "excgrid_cpp_form.ys": "0ae3b39c3843a2bbf1facbbf547da672c2a8a4d599df1d6dcee66eccf6f5a301",
-    "excgrid_defs.ys": "d380836567f5543a8aed56307e946f8cdc37b9fdf1749779e18e5dcc01141f8d",
-    "excgrid_generate.ys": "4008de31aeba93e5f50013a0fea4fd47e5f382be42bc1af17768b1231925207c",
+    "excgrid_cpp_form.ys": "39221f31de6e069fb42d468eb6f14cc7e36a63de0d5272bba691a9b754844d30",
+    "excgrid_defs.ys": "a05212b56e488a6186378d014ad7ebc1515e6e90711669b2a3038880fe2bb019",
+    "excgrid_generate.ys": "9c42d99e5c4ad1daf28e30432f010c8c066c9c33eb611602e0af1f3c3e2ded5f",
     "excgrid_gga_piecewise_skeleton.ey": "9f1a16c6787bdd33638db0f31179f91afe53edacde99526da1cf145d97a794d9",
     "excgrid_gga_skeleton.ey": "b114ef18aafd75285441dfc9985d42fa3395e343fe212de49dbb14af288e16bc",
     "excgrid_lda_skeleton.ey": "e56bab1c33200802e862d75700b149ea241eaed285309313be7debdad015cee7",
-    "excgrid_meta_gga_skeleton.ey": "e605cbdd09b0fa67776297236d2627ec9e9522efe2f281b7bd38ca5e49f1a9f3",
+    "excgrid_meta_gga_skeleton.ey": "8130057713257166f55c0f4f9a418498363a02f28963429a66f8e601636c3b69",
     "lyp_correlation.ey": "8e81d2700c7d4b00e84f6327f7bba5f1cae3af890f1acfd570b97c1f8b46f567",
     "mpw91_exchange.ey": "3d0e4d50aa175dd03d8f0930bf7110bbf34be520a450072ddbcb7a29599acd79",
     "p86_correlation.ey": "a30f5391520cfbd481722714d5181646f65c66aa913a9ce92eb4b1f12d545047",
@@ -22,6 +22,8 @@
     "rpbe_exchange.ey": "396ae6711ed2354c5933b2dfb49960a68e35a5d7a1c8472ddb349d6040946c22",
     "slater_exchange.ey": "c0ea9fdcfa78cae37277767d50417e43fdb6be479885cb1f2e0b5143747a190f",
     "tau_x.ey": "b8fe202f7418b683ec4d5b10145779a6c1a7017093b9395f784c9780b9f1c8dc",
+    "tpss_correlation.ey": "bab15ca663b28fd9ddf2891928d72e4fb13674c7acda8e1d33a1b1fc730c8d97",
+    "tpss_exchange.ey": "4668f79dfee307bb5fec72f55ef7034f2134c11f29d9a9953ce746801f37192a",
     "vwn3_correlation.ey": "f54e99842a04d28621acb5391ae536a4e0675648d1f14ae1cc5dc494c46180e7",
     "vwn5_correlation.ey": "ae0da4b3b86ed584842a554b0e4bafd46de1db92483cdd013a49dee9d0529863"
   }

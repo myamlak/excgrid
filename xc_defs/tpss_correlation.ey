@@ -1,0 +1,26 @@
+// excgrid codegen source: the Tao-Perdew-Staroverov-Scuseria 2003 meta-GGA correlation.
+// Formula from the paper's eqs. (12)-(14).
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    // The correlation nests deeper than yacas's default evaluation stack (the default run
+    // stops with "Max evaluation stack depth reached" in 4 s).  The bound is stack depth,
+    // not time; it changes no value.
+    MaxEvalDepth(1000000);
+
+    e := X'TpssCorrelation(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, tauA, tauB);
+
+    // TierRational: the PBE gradient enters through square roots of the sigma total, and
+    // the tier reduces Sqrt(tag)^2 to tag, so the second derivative is rational in sigma
+    // and finite at an exactly zero gradient.  A shifted radicand would not do: the second
+    // derivative of sqrt(u + 1e-300) at u = 0 is of order 1e449.
+    ExKernelGenerate("TpssCorrelation", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, tauA, tauB,
+                     TierRational);
+?>

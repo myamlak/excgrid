@@ -52,6 +52,8 @@ FUNCTIONALS = [
     ("pw91_correlation.ey", "pw91_correlation.cpp"),
     ("p86_correlation.ey", "p86_correlation.cpp"),
     ("tau_x.ey", "tau_x.cpp"),
+    ("tpss_exchange.ey", "tpss_exchange.cpp"),
+    ("tpss_correlation.ey", "tpss_correlation.cpp"),
 ]
 
 ROOT = Path(__file__).resolve().parent.parent

@@ -629,7 +629,12 @@ ExPiecewiseKernelGenerate(fname, cond, eLow, eHigh, args) := [
 100 # ExKernelGenerate(fname_IsString, e_IsFunction,
                      {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom,
                       ta_IsAtom, tb_IsAtom}) <--
-    ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb);
+    ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb, True);
+
+100 # ExKernelGenerate(fname_IsString, e_IsFunction,
+                     {ra_IsAtom, rb_IsAtom, gaa_IsAtom, gab_IsAtom, gbb_IsAtom,
+                      ta_IsAtom, tb_IsAtom, tier_IsAtom}) <--
+    ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb, tier);
 
 // The contract's upper-triangle index: entry (i, j), i <= j, of an `active` square matrix
 // sits at i*active - i*(i-1)/2 + (j-i).
@@ -1328,14 +1333,27 @@ ExLdaGenerate(fname, e, ra, rb, tier) := [
     PatchLoad("excgrid_lda_skeleton.ey");
 ];
 
-// The meta-GGA straight-line kernel on the program representation.
-ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
-    Local(P, Pd, ecsl, eexpr, r);
+// The meta-GGA straight-line kernel on the program representation.  The same sigma-edge
+// machinery as the GGA path: the sigma first derivatives cancel the removable radical and
+// shift the radicand the cancellation cannot reach, and TierGuard carries the shift into
+// the tier before the second differentiation.
+ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb, tier) := [
+    Local(P, Pd, ecsl, eexpr, r, etier, gp);
 
-    asecondDerivativeEntries :=
-        ExSecondDerivativeEntries(e, {ra, rb, gaa, gab, gbb, ta, tb}, {}, True);
+    asecondDerivativeEntries := {};
+    atierNeedsGuard := (tier = TierGuard);
+    If (Not (tier = False),
+        [
+            etier := e;
+            If (tier = TierGuard, etier := ExGuardSigmaRadicals(e, {gaa, gab, gbb}, {}));
+            asecondDerivativeEntries :=
+                ExSecondDerivativeEntries(etier, {ra, rb, gaa, gab, gbb, ta, tb},
+                                          {gaa, gab, gbb}, tier);
+        ]);
 
     {eexpr, ecsl} := CSE(e);
+    gp := ExProgramGuardSigma(ecsl, eexpr, {gaa, gab, gbb});
+    ecsl := gp[1]; eexpr := gp[2];
     P := {eexpr, ecsl};
     Pd := ExProgramInlineRadicals(P);
 
@@ -1343,11 +1361,11 @@ ExMetaGgaGenerate(fname, e, ra, rb, gaa, gab, gbb, ta, tb) := [
     deDra := r[1]; adeDracsl := ExAssignments(r[2]);
     r := ExFirstDerivOutput(Pd, rb, DensityPower, rb, {ra}, {});
     deDrb := r[1]; adeDrbcsl := ExAssignments(r[2]);
-    r := ExFirstDerivOutput(Pd, gaa, CancelRadical, gaa, {}, {});
+    r := ExFirstDerivOutput(Pd, gaa, GuardSigma, gaa, {gab, gbb}, {});
     deGaa := r[1]; adeGaacsl := ExAssignments(r[2]);
-    r := ExFirstDerivOutput(Pd, gab, CancelRadical, gab, {}, {});
+    r := ExFirstDerivOutput(Pd, gab, GuardSigma, gab, {gaa, gbb}, {});
     deGab := r[1]; adeGabcsl := ExAssignments(r[2]);
-    r := ExFirstDerivOutput(Pd, gbb, CancelRadical, gbb, {}, {});
+    r := ExFirstDerivOutput(Pd, gbb, GuardSigma, gbb, {gaa, gab}, {});
     deGbb := r[1]; adeGbbcsl := ExAssignments(r[2]);
     r := ExFirstDerivOutput(Pd, ta, None, ta, {}, {});
     deDta := r[1]; adeDtacsl := ExAssignments(r[2]);

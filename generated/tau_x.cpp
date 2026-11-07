@@ -25,6 +25,9 @@ XcKernelValue TauXExchange(double rhoA,
 
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+    // The generator's sigma-edge guard.  Written here, not injected: the printer renders
+    // a number below 1e-16 as "0.", and 1e-300 leaves sigma + guard == sigma.
+    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;
 
@@ -147,16 +150,19 @@ void TauXExchangeSecondDerivatives(double rhoA,
 
     matrix.upper[1] = 0.;
 
-    matrix.upper[2] = -(C57 * -0.9305257363491 * std::pow(rhoA, C47) *
-                            (80. * std::pow(C44, C48) * C52 / std::pow(8. * C44, 2) -
-                             -10. * C48 * std::pow(C44, C48 - 1) * C52 / (8. * C44)) /
-                            (12. * std::pow(std::pow(C44, C48) * C52, 2)) +
-                        9.3052573634910001 * C47 * std::pow(rhoA, C47 - 1) /
-                            (96. * C44 * std::pow(C44, C48) * C52));
+    matrix.upper[2] =
+        -(C57 *
+              (0. * C44 * std::pow(C44, C48) * C52 -
+               9.3052573634910001 * std::pow(rhoA, C47) * 96. *
+                   (C44 * C48 * std::pow(C44, C48 - 1) * C52 + std::pow(C44, C48) * C52)) /
+              std::pow(96. * C44 * std::pow(C44, C48) * C52, 2) +
+          9.3052573634910001 * C47 * std::pow(rhoA, C47 - 1) /
+              (96. * C44 * std::pow(C44, C48) * C52));
 
-    matrix.upper[3] = 0.;
+    matrix.upper[3] = 0;
 
-    matrix.upper[4] = 0.;
+    const double C45 = rhoB + 1e-16;
+    matrix.upper[4] = 0;
 
     matrix.upper[5] =
         -(C57 * 0.9305257363491 * std::pow(rhoA, C47) * 10. * C48 * std::pow(C44, C48 - 1) * C52 /
@@ -165,7 +171,6 @@ void TauXExchangeSecondDerivatives(double rhoA,
 
     matrix.upper[6] = 0.;
 
-    const double C45 = rhoB + 1e-16;
     const double C58 = 1;
     matrix.upper[7] = -(
         (C58 *
@@ -194,16 +199,18 @@ void TauXExchangeSecondDerivatives(double rhoA,
          0.9305257363491 * C47 * (C47 - 1) * std::pow(rhoB, C47 - 2) *
              ((1. - 10. * (tauB - sigmaBb / (8. * C45)) / (std::pow(C45, C48) * C52)) / 12. + 1.)));
 
-    matrix.upper[8] = 0.;
+    matrix.upper[8] = 0;
 
-    matrix.upper[9] = 0.;
+    matrix.upper[9] = 0;
 
-    matrix.upper[10] = -(C58 * -0.9305257363491 * std::pow(rhoB, C47) *
-                             (80. * std::pow(C45, C48) * C52 / std::pow(8. * C45, 2) -
-                              -10. * C48 * std::pow(C45, C48 - 1) * C52 / (8. * C45)) /
-                             (12. * std::pow(std::pow(C45, C48) * C52, 2)) +
-                         9.3052573634910001 * C47 * std::pow(rhoB, C47 - 1) /
-                             (96. * C45 * std::pow(C45, C48) * C52));
+    matrix.upper[10] =
+        -(C58 *
+              (0. * C45 * std::pow(C45, C48) * C52 -
+               9.3052573634910001 * std::pow(rhoB, C47) * 96. *
+                   (C45 * C48 * std::pow(C45, C48 - 1) * C52 + std::pow(C45, C48) * C52)) /
+              std::pow(96. * C45 * std::pow(C45, C48) * C52, 2) +
+          9.3052573634910001 * C47 * std::pow(rhoB, C47 - 1) /
+              (96. * C45 * std::pow(C45, C48) * C52));
 
     matrix.upper[11] = 0.;
 

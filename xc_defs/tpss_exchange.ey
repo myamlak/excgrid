@@ -1,0 +1,19 @@
+// excgrid codegen source: the Tao-Perdew-Staroverov-Scuseria 2003 meta-GGA exchange.
+// Formula from the paper's eqs. (10)-(11).
+
+// <? WriteString("Auto-generated file, do not modify"); ?>
+#include "excgrid/kernel.hpp"
+
+<?
+    Builtin'Precision'Set(16);
+
+    Use("excgrid_defs.ys");
+    Use("excgrid_generate.ys");
+
+    e := X'TpssExchange(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, tauA, tauB);
+
+    // True, not TierGuard: the exchange's only square root is rationalised in sigma, so
+    // there is no sigma radical to shift and every sigma derivative is analytic at zero
+    // gradient.  The guard the meta path carries is exercised by tpss_correlation.ey.
+    ExKernelGenerate("TpssExchange", e, rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, tauA, tauB, True);
+?>

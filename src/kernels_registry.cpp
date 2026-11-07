@@ -32,6 +32,39 @@ void TauXExchangeSecondDerivatives(double rhoA,
                                    double tauB,
                                    PointSecondDerivativeMatrix& matrix);
 
+// The TPSS halves' generated kernels and tiers, from generated/tpss_exchange.cpp and
+// generated/tpss_correlation.cpp.
+XcKernelValue TpssExchange(double rhoA,
+                           double rhoB,
+                           double sigmaAa,
+                           double sigmaAb,
+                           double sigmaBb,
+                           double tauA,
+                           double tauB);
+void TpssExchangeSecondDerivatives(double rhoA,
+                                   double rhoB,
+                                   double sigmaAa,
+                                   double sigmaAb,
+                                   double sigmaBb,
+                                   double tauA,
+                                   double tauB,
+                                   PointSecondDerivativeMatrix& matrix);
+XcKernelValue TpssCorrelation(double rhoA,
+                              double rhoB,
+                              double sigmaAa,
+                              double sigmaAb,
+                              double sigmaBb,
+                              double tauA,
+                              double tauB);
+void TpssCorrelationSecondDerivatives(double rhoA,
+                                      double rhoB,
+                                      double sigmaAa,
+                                      double sigmaAb,
+                                      double sigmaBb,
+                                      double tauA,
+                                      double tauB,
+                                      PointSecondDerivativeMatrix& matrix);
+
 namespace {
 // The components each tier spans: a prefix of the identifier table, in identifier
 // order, so a component's kernel slot is its own identifier value.
@@ -44,8 +77,9 @@ static_assert(static_cast<std::size_t>(Component::RhoB) == kLdaTierComponents - 
 static_assert(static_cast<std::size_t>(Component::SigmaBb) == kGgaTierComponents - 1,
               "a GGA tier is emitted over rhoA..sigmaBb in identifier order");
 static_assert(ComponentMask::Collinear().ActiveCount() == kTauTierComponents,
-              "the tau tier's kernel is emitted over the seven collinear components; the collinear "
-              "set has changed, so xc_defs/tau_x.ey must be regenerated against it");
+              "the tau tier's kernels are emitted over the seven collinear components; the "
+              "collinear set has changed, so the tau-tier .ey files (tau_x, tpss_exchange, "
+              "tpss_correlation) must be regenerated against it");
 static_assert(static_cast<std::size_t>(Component::RhoA) == 0 &&
                   static_cast<std::size_t>(Component::TauB) == kTauTierComponents - 1,
               "the tau tier's kernel argument order is the identifier order RhoA..TauB");
@@ -350,10 +384,32 @@ private:
     GgaSecondDerivative _ggaSecondDerivative;
 };
 
-// The tau tier: the generated tau_x kernel and its second-derivative tier, packed
-// over the kernel's seven argument slots and intersected with the caller's mask.
+// The tau tier: one generated meta-GGA kernel and its second-derivative tier, packed
+// over the kernel's seven argument slots and intersected with the caller's mask.  The
+// seven-argument shape has no pointer type in kernel.hpp; these two do.
+using TauKernel = XcKernelValue (*)(double rhoA,
+                                    double rhoB,
+                                    double sigmaAa,
+                                    double sigmaAb,
+                                    double sigmaBb,
+                                    double tauA,
+                                    double tauB);
+using TauSecondDerivative = void (*)(double rhoA,
+                                     double rhoB,
+                                     double sigmaAa,
+                                     double sigmaAb,
+                                     double sigmaBb,
+                                     double tauA,
+                                     double tauB,
+                                     PointSecondDerivativeMatrix& matrix);
+
 class TauTierFunctional final : public XcFunctional {
 public:
+    constexpr TauTierFunctional(std::string_view name,
+                                TauKernel kernel,
+                                TauSecondDerivative secondDerivative) noexcept :
+        _name(name), _kernel(kernel), _secondDerivative(secondDerivative) {}
+
     [[nodiscard]] bool UsesGradient() const override {
         return true;
     }
@@ -430,28 +486,32 @@ public:
 
 private:
     /// The generated kernel's value at the point.
-    [[nodiscard]] static XcKernelValue Value(const PointInputs& inputs) noexcept {
-        return TauXExchange(inputs.Get(Component::RhoA),
-                            inputs.Get(Component::RhoB),
-                            inputs.Get(Component::SigmaAa),
-                            inputs.Get(Component::SigmaAb),
-                            inputs.Get(Component::SigmaBb),
-                            inputs.Get(Component::TauA),
-                            inputs.Get(Component::TauB));
+    [[nodiscard]] XcKernelValue Value(const PointInputs& inputs) const noexcept {
+        return _kernel(inputs.Get(Component::RhoA),
+                       inputs.Get(Component::RhoB),
+                       inputs.Get(Component::SigmaAa),
+                       inputs.Get(Component::SigmaAb),
+                       inputs.Get(Component::SigmaBb),
+                       inputs.Get(Component::TauA),
+                       inputs.Get(Component::TauB));
     }
 
     /// The generated matrix, in the generated tier's own packing.
-    static void FillGeneratedMatrix(const PointInputs& inputs,
-                                    PointSecondDerivativeMatrix& matrix) noexcept {
-        TauXExchangeSecondDerivatives(inputs.Get(Component::RhoA),
-                                      inputs.Get(Component::RhoB),
-                                      inputs.Get(Component::SigmaAa),
-                                      inputs.Get(Component::SigmaAb),
-                                      inputs.Get(Component::SigmaBb),
-                                      inputs.Get(Component::TauA),
-                                      inputs.Get(Component::TauB),
-                                      matrix);
+    void FillGeneratedMatrix(const PointInputs& inputs,
+                             PointSecondDerivativeMatrix& matrix) const noexcept {
+        _secondDerivative(inputs.Get(Component::RhoA),
+                          inputs.Get(Component::RhoB),
+                          inputs.Get(Component::SigmaAa),
+                          inputs.Get(Component::SigmaAb),
+                          inputs.Get(Component::SigmaBb),
+                          inputs.Get(Component::TauA),
+                          inputs.Get(Component::TauB),
+                          matrix);
     }
+
+    std::string_view _name;
+    TauKernel _kernel;
+    TauSecondDerivative _secondDerivative;
 };
 
 // The folding rule, checked by the compiler for every recipe below:
@@ -869,19 +929,23 @@ static_assert(FoldingRuleHolds(kB3P86Terms, 0.20),
 // Known open defect: the b3p86 composition leaves a 0.146 Ha residual against libxc 403.
 const HybridFunctional kB3P86("b3p86", 0.20, true, kB3P86Terms);
 
-// The tau tier: the only entry here that reads the kinetic-energy densities.
-const TauTierFunctional kTauX;
+// The tau tier: the entries here that read the kinetic-energy densities.
+const TauTierFunctional kTauX("tau_x", &TauXExchange, &TauXExchangeSecondDerivatives);
+const TauTierFunctional kTpssX("tpss_x", &TpssExchange, &TpssExchangeSecondDerivatives);
+const TauTierFunctional kTpssC("tpss_c", &TpssCorrelation, &TpssCorrelationSecondDerivatives);
 
-const std::array<const XcFunctional*, 24> kRegistry = {
+const std::array<const XcFunctional*, 26> kRegistry = {
     &kSlater, &kVwn5,   &kVwn3, &kPw92,   &kSvwn,     &kSpw92,     &kBecke88, &kPw91x,
     &kPbe,    &kRevPbe, &kRpbe, &kMPw91,  &kPbeSol,   &kLyp,       &kPbeC,    &kPw91c,
     &kP86,    &kB3Lyp,  &kPbe0, &kB3Pw91, &kMPw1Pw91, &kBHandHLyp, &kB3P86,   &kTauX,
+    &kTpssX,  &kTpssC,
 };
 
 const std::array<std::string_view, kRegistry.size()> kNames = {
     "slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
     "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
     "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
+    "tpss_x", "tpss_c",
 };
 
 } // namespace

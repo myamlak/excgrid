@@ -435,3 +435,129 @@ X'TauXChannel(rho, sigma, tau) :=
 // sigma, so the emitted kernel takes sigmaAb and never reads it.
 X'TauXExchange(rhoA, rhoB, gaa, gab, gbb, ta, tb) :=
     X'TauXChannel(rhoA, gaa, ta) + X'TauXChannel(rhoB, gbb, tb);
+
+// --- TPSS -------------------------------------------------------------------
+//
+// Tao, Perdew, Staroverov and Scuseria, Phys. Rev. Lett. 91, 146401 (2003).  The
+// equations below are read from the paper's text (arXiv:cond-mat/0306203) and each one
+// is cross-checked against Libxc 5.2.3's maple/mgga_exc/mgga_x_tpss.mpl and
+// mgga_c_tpss.mpl and against its compiled kernels.
+
+X'TpssKappa := 0.804;
+
+X'TpssB := 0.40;
+
+X'TpssC := 1.59096;
+
+X'TpssE := 1.537;
+
+X'TpssMu := 0.21951;
+
+// Exchange, eqs. (10)-(11), per spin channel:
+//   p = sigma / [4 (6 pi^2)^(2/3) rho^(8/3)],   z = sigma / (8 rho tau),
+//   alpha = tau_P / tau_unif.
+X'TpssP(rho, sigma) :=
+    sigma / (4. * (6. * Pi^2)^(2. / 3.) * (rho + X'Tiny)^(8. / 3.) + X'Tiny);
+
+X'TpssZ(rho, sigma, tau) := sigma / (8. * (rho + X'Tiny) * (tau + X'Tiny));
+
+X'TpssAlpha(rho, sigma, tau) := X'TauPauli(rho, sigma, tau) / X'TauUnif(rho);
+
+// q_b = (9/20)(alpha - 1) / sqrt(1 + b alpha (alpha - 1)) + 2p/3.  The radicand is a
+// parabola with minimum 1 - b/4 = 0.9, so it needs no spin-edge or large-alpha clamp.
+X'TpssQb(rho, sigma, tau) := [
+    Local(p, alpha);
+    p := X'TpssP(rho, sigma);
+    alpha := X'TpssAlpha(rho, sigma, tau);
+    9. / 20. * (alpha - 1.) / Sqrt(1. + X'TpssB * alpha * (alpha - 1.)) + 2. / 3. * p;
+];
+
+// The paper prints sqrt((3z/5)^2/2 + p^2/2).  With 3z/5 = p tau_unif/tau the radicand is
+// p^2 [(tau_unif/tau)^2 + 1]/2 exactly, so the root is p times a function of tau alone -
+// the form Libxc uses.  Rationalised, the exchange carries no sigma radical at all, and
+// its sigma derivatives are analytic at an exactly zero gradient.
+X'TpssRoot(rho, tau) :=
+    Sqrt(1. / 2. * ((X'TauUnif(rho) / (tau + X'Tiny))^2 + 1.));
+
+// x of eq. (10); the two sqrt(e) coefficients are 2 sqrt(e) (10/81) (3/5)^2 and e mu.
+X'TpssX(rho, sigma, tau) := [
+    Local(p, z, qb, root, ten81, roote);
+    p := X'TpssP(rho, sigma);
+    z := X'TpssZ(rho, sigma, tau);
+    qb := X'TpssQb(rho, sigma, tau);
+    root := X'TpssRoot(rho, tau);
+    ten81 := 10. / 81.;
+    roote := Sqrt(X'TpssE);
+    ((ten81 + X'TpssC * z^2 / (1. + z^2)^2) * p
+     + 146. / 2025. * qb^2
+     - 73. / 405. * qb * p * root
+     + ten81^2 / X'TpssKappa * p^2
+     + 2. * roote * ten81 * 9. / 25. * z^2
+     + X'TpssE * X'TpssMu * p^3) / (1. + roote * p)^2;
+];
+
+// F_x = 1 + kappa - kappa / (1 + x/kappa).
+X'TpssFx(rho, sigma, tau) :=
+    1. + X'TpssKappa - X'TpssKappa / (1. + X'TpssX(rho, sigma, tau) / X'TpssKappa);
+
+X'TpssXChannel(rho, sigma, tau) := -X'Cx * rho^(4. / 3.) * X'TpssFx(rho, sigma, tau);
+
+X'TpssExchange(rhoA, rhoB, gaa, gab, gbb, ta, tb) :=
+    X'TpssXChannel(rhoA, gaa, ta) + X'TpssXChannel(rhoB, gbb, tb);
+
+// Correlation, eqs. (12)-(14).  tau_W = gamma/(8n), so tau_W/tau is gamma/(8 n tau).
+X'TpssD := 2.8;
+
+// C(zeta, 0) of eq. (13).
+X'TpssCz(zeta) := 0.53 + 0.87 * zeta^2 + 0.50 * zeta^4 + 2.26 * zeta^6;
+
+// xi^2 = |grad zeta|^2 / [4 (3 pi^2)^(2/3) n^(8/3)].  With
+// |grad zeta|^2 = 4 (rhoB^2 gaa + rhoA^2 gbb - 2 rhoA rhoB gab) / n^4, the two 4s and
+// the n^4 cancel against the denominator, leaving n^(14/3) and no factor 4.
+X'TpssXi2(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(n);
+    n := rhoA + rhoB;
+    (rhoB^2 * gaa + rhoA^2 * gbb - 2. * rhoA * rhoB * gab) /
+        ((3. * Pi^2)^(2. / 3.) * (n + X'Tiny)^(14. / 3.));
+];
+
+// C(zeta, xi) of eq. (14).  The spin edges keep the tree's Tiny factor, as X'Fz and
+// X'Phi do.
+X'TpssC(rhoA, rhoB, gaa, gab, gbb) := [
+    Local(n, zeta, zz);
+    n := rhoA + rhoB;
+    zeta := (rhoA - rhoB) / n;
+    zz := zeta * (1. - X'Tiny);
+    X'TpssCz(zeta) /
+        (1. + X'TpssXi2(rhoA, rhoB, gaa, gab, gbb) / 2. *
+                  ((1. + zz)^(-4. / 3.) + (1. - zz)^(-4. / 3.)))^4;
+];
+
+X'TpssPbeEps(rhoA, rhoB, gaa, gab, gbb) :=
+    X'PbeCorrelation(rhoA, rhoB, gaa, gab, gbb) / (rhoA + rhoB + X'Tiny);
+
+// max(a, b), written so the differentiator sees it: yacas differentiates Abs and treats
+// its Sign as locally constant, while Max is opaque to Deriv.
+X'TpssMax(a, b) := (a + b + Abs(a - b)) / 2.;
+
+// e_c = n eps_revPKZB [1 + d eps_revPKZB (tau_W/tau)^3], with
+//   eps_revPKZB = eps_PBE [1 + C (tau_W/tau)^2]
+//                 - [1 + C] (tau_W/tau)^2 sum_sigma (rho_sigma/n) eps_tilde_sigma,
+//   eps_tilde_sigma = max[eps_PBE(n_sigma, 0, grad n_sigma, 0), eps_PBE(n, grad n)].
+X'TpssCorrelation(rhoA, rhoB, gaa, gab, gbb, ta, tb) := [
+    Local(n, gamma, aux, aux2, eps, epsA, epsB, par, cc, rev);
+    n := rhoA + rhoB;
+    gamma := gaa + 2. * gab + gbb;
+    aux := gamma / (8. * n * (ta + tb) + X'Tiny);
+    aux2 := aux^2;
+    eps := X'TpssPbeEps(rhoA, rhoB, gaa, gab, gbb);
+    // A channel must not reach PBE with a zero density: zeta there is 0/0, and the
+    // NaN would ride through the max into par.  The shift is X'Tiny, the same one
+    // the exchange's p and z already carry.
+    epsA := X'TpssPbeEps(rhoA + X'Tiny, 0., gaa, 0., 0.);
+    epsB := X'TpssPbeEps(0., rhoB + X'Tiny, 0., 0., gbb);
+    par := rhoA / n * X'TpssMax(epsA, eps) + rhoB / n * X'TpssMax(epsB, eps);
+    cc := X'TpssC(rhoA, rhoB, gaa, gab, gbb);
+    rev := eps * (1. + cc * aux2) - (1. + cc) * aux2 * par;
+    n * rev * (1. + X'TpssD * rev * aux2 * aux);
+];

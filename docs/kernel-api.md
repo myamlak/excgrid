@@ -59,7 +59,7 @@ composition is written in — one named field per derivative:
 | `exc` | exchange-correlation energy **density** e(r) (e_total = integral of exc d^3r) | Hartree / Bohr^3 |
 | `vrhoA`, `vrhoB` | de/d rhoA, de/d rhoB | Hartree |
 | `vsigmaAa`, `vsigmaAb`, `vsigmaBb` | de/d sigma_* | Hartree * Bohr^5 |
-| `vtauA`, `vtauB` | de/d tau_* | Hartree * Bohr^5 — zero from every shipped functional except `tau_x` |
+| `vtauA`, `vtauB` | de/d tau_* | Hartree * Bohr^5 — zero from every shipped functional except the tau-tier entries (`tau_x`, `tpss_x`, `tpss_c`) |
 
 A plain aggregate (public fields, default-initialized to zero), and it supports
 the algebra `+`, `+=`, scalar `*`, `*=` — functionals compose by these operators
@@ -150,8 +150,9 @@ namespace excgrid {
   functional has no tier, and a non-empty one names exactly the components its
   tier answers for. A tier is therefore narrower than the contract's capacity —
   two components for an LDA kernel (`rhoA`, `rhoB`), five for a GGA one (those
-  plus `sigmaAa`, `sigmaAb`, `sigmaBb`), seven for `tau_x` (those plus `tauA`,
-  `tauB`) — and a caller supplies its own mask, so the two need not agree.
+  plus `sigmaAa`, `sigmaAb`, `sigmaBb`), seven for a tau-tier kernel (those plus
+  `tauA`, `tauB`) — and a caller supplies its own mask, so the two need not
+  agree.
 - A second-derivative request is refused with `kRefusedUnsupportedCapability`
   when the functional ships no tier; with `kRefusedSecondDerivativeCoverage`
   when the request names a component the functional READS and the tier does not
@@ -178,14 +179,17 @@ repo releases; the consumer's schema carries the string). The shipped set:
 LDA: `slater`, `vwn5`, `vwn3`, `pw92`, `svwn` (= slater + vwn5), `spw92` (= slater + pw92).
 GGA exchange: `becke88`, `pw91`, `pbe`, `revpbe`, `rpbe`, `mpw91`, `pbesol`.
 GGA correlation: `lyp`, `pbe_c`, `pw91_c`, `p86`.
-Tau tier (meta-GGA): `tau_x`.
+Tau tier (meta-GGA): `tau_x`, `tpss_x`, `tpss_c` (TPSS exchange and correlation
+are separate entries: they are different functionals and a consumer composes
+them at its own weight).
 Hybrids (composition + an exact-exchange fraction; the HF part is the CONSUMER's
 Fock-side concern — `ExchangeFraction()` states the fraction): `b3lyp`, `pbe0`,
 `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86`.
 
-**`tau_x` is the tier's first kernel and the only shipped functional that reads
-the kinetic-energy densities.** It is the second-order gradient expansion of
-exchange in the iso-orbital (Pauli) variables, per spin channel: with
+**`tau_x` is the tier's first kernel and, with `tpss_x` and `tpss_c`, one of the
+three shipped entries that read the kinetic-energy densities.** `tau_x` itself
+is the second-order gradient expansion of exchange in the iso-orbital (Pauli)
+variables, per spin channel: with
 tau_P = tau - |grad rho|^2 / (8 rho) and
 tau_unif = (3/10)(6 pi^2)^(2/3) rho^(5/3),
 e = e_x^LSDA(rho) * (1 + (1 - tau_P/tau_unif)/12). Two limits follow from the
@@ -200,6 +204,22 @@ finite differences and exact conditions that travel with the tier, and the
 hand-written derivation of the same expansion
 ([`src/meta_gga_reference.cpp`](../src/meta_gga_reference.cpp)) that the
 registry's tests cross-check the generated kernel against.
+
+**`tpss_x` and `tpss_c` are the TPSS meta-GGA of Tao, Perdew, Staroverov and
+Scuseria (Phys. Rev. Lett. 91, 146401 (2003)), exchange and correlation as
+separate entries.** Each takes the seven collinear components, and the `tau`
+inputs are Libxc's: the spin kinetic-energy density, exactly the quantity
+`tau_x` takes. The point check is Libxc 5.2.3's `mgga_x_tpss` (202) and
+`mgga_c_tpss` (231) to 1e-8 — energy density, all seven first derivatives and
+all 28 tier entries — with the exact conditions (uniform gas, exchange scaling,
+one-electron cancellation) asserted beside deliberately broken cases. Both
+tiers stay finite at an exactly zero gradient: the correlation's tier squares
+the PBE radical before differentiating rather than shifting its radicand, which
+is what keeps the sigma-sigma entries analytic at `sigma = 0`. The publication's
+domain `z = tau_W/tau <= 1` with `tau_W = sigma / (8 rho)` is assumed, as in
+Libxc's formula: a consumer that feeds `tau` below `tau_W` gets the unclamped
+expression (the kernel carries no branch), where Libxc's driver instead caps
+`sigma` at `8 rho tau` before evaluating.
 
 **`pw91_c` and `p86` each differ from the point-check oracle, and both
 differences are deliberate and cited.** `pw91_c` implements the PW91
