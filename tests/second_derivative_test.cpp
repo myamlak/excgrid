@@ -195,17 +195,19 @@ std::array<std::pair<excgrid::Component, double>, excgrid::kComponentCapacity> G
              {excgrid::Component::TauB, TauUniform(kRhoB)}}};
 }
 
-const std::array<std::string_view, 24> kEveryShippedName = {
+const std::array<std::string_view, 26> kEveryShippedName = {
     "slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
     "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
     "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
+    "tpss_x", "tpss_c",
 };
 
 // Every shipped name carries a second-derivative tier; mpw91, and mpw1pw91 with it, is the one analytically divergent corner.
-const std::array<std::string_view, 24> kEveryTieredName = {
+const std::array<std::string_view, 26> kEveryTieredName = {
     "slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
     "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
     "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
+    "tpss_x", "tpss_c",
 };
 
 const std::array<std::string_view, 0> kEveryUntieredName = {};
@@ -373,6 +375,13 @@ TEST(SecondDerivativeTest, TheZeroGradientCornerIsAnOrdinaryPointOfTheTier) {
             inputs.Set(excgrid::Component::SigmaAa, sigma);
             inputs.Set(excgrid::Component::SigmaAb, sigma);
             inputs.Set(excgrid::Component::SigmaBb, sigma);
+            // A tau-tier kernel at a zero gradient still carries the kinetic-energy
+            // densities.  With tau = 0 the correlation's aux = gamma/(8 n tau) is set by
+            // Tiny rather than by a physical scale, so the zero-tau point is no
+            // neighbour of the finite-tau one; the corner this test is about is the
+            // gradient's, and the kinetic-energy densities stay at the uniform gas.
+            inputs.Set(excgrid::Component::TauA, TauUniform(kRhoA));
+            inputs.Set(excgrid::Component::TauB, TauUniform(kRhoB));
             return inputs;
         };
 

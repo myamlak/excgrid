@@ -67,7 +67,8 @@ FUNCTIONALS = [
     ("bhandhlyp", "bhandhlyp", set()),
 ]
 
-# The six probe outputs, in the probe's own order (tools/kernel_probe.cpp).
+# The six slots compared, in the probe's own order (tools/kernel_probe.cpp).  The probe also
+# prints the tau derivatives after them; those are zero for every LDA/GGA kernel here.
 SLOTS = ("exc", "vrhoA", "vrhoB", "vsigmaAa", "vsigmaAb", "vsigmaBb")
 
 TOLERANCE_EXC = 2e-6  # Relative on exc (|exc| can be tiny at low rho).

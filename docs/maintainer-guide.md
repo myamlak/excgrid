@@ -228,8 +228,9 @@ all** rather than one that would answer zeros; the cost of declining is that
 callers get the tier's own refusal, not a silently empty matrix. No shipped
 source declines any more — the owner ruling of 2026-10-19 funded the tier for
 every kernel — but the mechanism stays for a source whose differentiation is
-genuinely unaffordable. `tau_x` is not on this path — the meta-GGA generator
-takes no such flag and always emits its tier.
+genuinely unaffordable. The tau-tier sources (`tau_x`, `tpss_x`,
+`tpss_c`) are not on this path — the meta-GGA generator takes no such flag and
+always emits its tier.
 
 **The tier mode chooses which repair the differentiation needs.** The last
 element of `ExKernelGenerate`'s argument list is the mode:
@@ -337,8 +338,10 @@ the order-1 path applies to `vsigma` after the inner derivative and again after
 the outer one. Without it the tier's sigma entries are `NaN` at an exactly zero
 gradient. The mixed partials commute, so a mixed pair is differentiated with
 respect to the radical-carrying variable first; a pair with no radical variable
-is differentiated exactly as before, which is why `tau_x` — the one kernel whose
-argument list carries no radical — regenerates byte for byte.
+is differentiated exactly as before. A kernel whose expression carries no sigma
+radical keeps its values: `tau_x` regenerates with its kernel values
+bit-identical and every tier entry within 1.4e-17, and the file changes only in
+the form of its two mixed sigma entries and the guard declaration.
 
 Two things to know when reading that output. The skeleton emits the entries in
 the order of the components its kernel takes; which of them a caller's matrix is

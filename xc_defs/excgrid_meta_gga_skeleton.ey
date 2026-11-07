@@ -23,6 +23,9 @@ XcKernelValue <? WriteString(fname); ?>(double rhoA,
                                      adeDtacsl, adeDtbcsl})); ?>
     constexpr double eps = std::numeric_limits<double>::epsilon();
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+    // The generator's sigma-edge guard.  Written here, not injected: the printer renders
+    // a number below 1e-16 as "0.", and 1e-300 leaves sigma + guard == sigma.
+    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;
 
     XcKernelValue result;
 
@@ -74,6 +77,8 @@ void <? WriteString(fname); ?>SecondDerivatives(double rhoA,
                                     {aecsl, adeDracsl, adeDrbcsl, adeGaacsl, adeGabcsl, adeGbbcsl,
                                      adeDtacsl, adeDtbcsl})); ?>
     [[maybe_unused]] constexpr double Pi = 3.14159265358979323846;
+<?  // Declared only when the tier carries the guard, which is when it is referenced.
+    If (atierNeedsGuard, WriteString("    [[maybe_unused]] constexpr double SigmaGuard = 1e-300;" : Nl())); ?>
 
     if (rhoA + rhoB < 2. * std::numeric_limits<double>::epsilon())
     {

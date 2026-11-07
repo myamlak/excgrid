@@ -32,12 +32,13 @@ TEST(RegistryTest, ShippedSurface) {
     const std::vector<std::string_view> names(excgrid::FunctionalNames().begin(),
                                               excgrid::FunctionalNames().end());
 
-    EXPECT_EQ(names.size(), 24);
+    EXPECT_EQ(names.size(), 26);
 
     for (const char* expected :
          {"slater", "vwn5",   "vwn3", "pw92",   "svwn",     "spw92",     "becke88", "pw91",
           "pbe",    "revpbe", "rpbe", "mpw91",  "pbesol",   "lyp",       "pbe_c",   "pw91_c",
-          "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x"})
+          "p86",    "b3lyp",  "pbe0", "b3pw91", "mpw1pw91", "bhandhlyp", "b3p86",   "tau_x",
+          "tpss_x", "tpss_c"})
     {
         EXPECT_NE(std::find(names.begin(), names.end(), expected), names.end()) << expected;
     }

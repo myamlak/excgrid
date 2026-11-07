@@ -97,3 +97,11 @@ LocalSymbols(exCppFormMathFunctions) [
     (NrArgs(expr) = 1 And Contains(AssocIndices(ExCppFormMathFunctions()), Type(expr))) <--
     ConcatStrings(ExCppFormMathFunctions()[Type(expr)], "(",
                   ExCppForm(Listify(expr)[2], ExCppFormMaxPrec()), ")");
+
+// The sign yacas gives Deriv(x) Abs(x), printed as a comparison difference: the tree's
+// kernels carry no sign function, and the fully bracketed form is safe in any context.
+// Last among the 120s, because a rule defined later is tried first at equal precedence.
+// The argument prints twice; CSE has tagged every repeated subexpression it came from.
+120 # ExCppForm(expr_IsFunction, _p) _(NrArgs(expr) = 1 And Type(expr) = "Sign") <--
+    ConcatStrings("((0. < ", ExCppForm(Listify(expr)[2], ExCppFormMaxPrec()), ") - (",
+                  ExCppForm(Listify(expr)[2], ExCppFormMaxPrec()), " < 0.))");

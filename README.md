@@ -11,7 +11,8 @@ not basis sets, not density matrices, not a self-consistent field.
   Lebedev-Laikov angular quadrature, Becke/SSF fuzzy-cell partition,
   weight trimming, and spatially compact block re-batching.
 - **XC kernels** — the energy density and its first derivatives, for 23
-  LDA/GGA/hybrid recipes ([full list below](#functionals)).
+  LDA/GGA/hybrid recipes and three meta-GGA entries that also read the
+  kinetic-energy density ([full list below](#functionals)).
 - **D3 dispersion** — the Grimme DFT-D3 zero-damping energy and analytic
   coordinate gradients.
 
@@ -112,6 +113,8 @@ The target requires C++23 and carries its own include directory, so
 | `svwn`, `spw92` | LDA composite | Slater + VWN5, Slater + PW92 |
 | `becke88`, `pw91`, `pbe`, `revpbe`, `rpbe`, `mpw91`, `pbesol` | GGA exchange | |
 | `lyp`, `pbe_c`, `pw91_c`, `p86` | GGA correlation | |
+| `tau_x` | meta-GGA exchange | second-order tau expansion; internal evidence only |
+| `tpss_x`, `tpss_c` | meta-GGA exchange, correlation | TPSS; Libxc point-checked |
 | `b3lyp`, `pbe0`, `b3pw91`, `mpw1pw91`, `bhandhlyp`, `b3p86` | hybrid | see `ExchangeFraction()` |
 
 A hybrid's exact-exchange fraction is reported by `ExchangeFraction()`, which

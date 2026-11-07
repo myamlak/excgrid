@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 # Standalone boundary: no PCH, and no foreign targets, paths or types.
 
-project(excgrid VERSION 0.5.0 LANGUAGES CXX)
+project(excgrid VERSION 0.6.0 LANGUAGES CXX)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(EXCGRID_TOP_LEVEL ON)
@@ -42,6 +42,8 @@ add_library(excgrid
     generated/rpbe_exchange.cpp
     generated/slater_exchange.cpp
     generated/tau_x.cpp
+    generated/tpss_correlation.cpp
+    generated/tpss_exchange.cpp
     generated/vwn3_correlation.cpp
     generated/vwn5_correlation.cpp
 )
@@ -106,7 +108,8 @@ if (EXCGRID_BUILD_TESTS)
         tests/meta_gga_reference_test.cpp
         tests/radial_grid_test.cpp
         tests/registry_test.cpp
-        tests/second_derivative_test.cpp)
+        tests/second_derivative_test.cpp
+        tests/tpss_test.cpp)
     target_link_libraries(excgrid-tests PRIVATE excgrid gtest gtest_main)
 
     include(GoogleTest)
