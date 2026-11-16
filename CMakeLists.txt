@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.25)
 
 # Standalone boundary: no PCH, and no foreign targets, paths or types.
 
-project(excgrid VERSION 0.6.0 LANGUAGES CXX)
+project(excgrid VERSION 0.7.0 LANGUAGES CXX)
 
 if (CMAKE_SOURCE_DIR STREQUAL PROJECT_SOURCE_DIR)
     set(EXCGRID_TOP_LEVEL ON)
@@ -97,6 +97,7 @@ if (EXCGRID_BUILD_TESTS)
 
     add_executable(excgrid-tests
         tests/angular_grid_test.cpp
+        tests/asinh_over_x_test.cpp
         tests/block_grid_partition_test.cpp
         tests/block_grid_test.cpp
         tests/contract_test.cpp

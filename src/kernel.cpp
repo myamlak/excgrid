@@ -20,6 +20,8 @@ std::string_view DescribeStatus(KernelStatus status) noexcept {
             return "refused: this combination is not one this library answers";
         case KernelStatus::kRefusedSecondDerivativeCoverage:
             return "refused: the second-derivative tier does not span the components requested";
+        case KernelStatus::kRefusedThirdDerivativeCoverage:
+            return "refused: the third-derivative tier does not span the components requested";
     }
     return "refused: unrecognised status";
 }
@@ -61,6 +63,13 @@ KernelStatus XcFunctional::EvaluatePointWithSecondDerivatives(const PointInputs&
 
 KernelStatus XcFunctional::EvaluatePointMaterialising(const PointInputs&, PointResult&,
                                                       PointSecondDerivativeMatrix&) const {
+    return KernelStatus::kRefusedUnsupportedCapability;
+}
+
+KernelStatus XcFunctional::EvaluatePointWithThirdDerivatives(const PointInputs&,
+                                                             std::span<const double>,
+                                                             PointResult&,
+                                                             std::span<double>) const {
     return KernelStatus::kRefusedUnsupportedCapability;
 }
 
