@@ -16,8 +16,50 @@
     eLow := X'P86CorrelationLow(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
     eHigh := X'P86CorrelationHigh(rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb);
 
+    // The six rho-sigma tier entries have finite limits at zero gradient:
+    //   d/dsigma_i (A gamma e^{-a s}) = u_i A e^{-a s} (1 - a s/2),
+    //   d/drho_p of that               = u_i (A_p f + A a_p g),
+    // with s = sqrt(gamma), A = Cc/(rho^(4/3) DD), a = K0/(Cc rho^(7/6)),
+    // f = e^{-a s}(1 - a s/2) and g = -(s/2) e^{-a s}(3 - a s).  g carries
+    // sqrt(gamma) only in its numerator, so the entry is finite at gamma = 0 and
+    // equals u_i A_p there.  The PZ81 piece carries no sigma, so it contributes
+    // nothing to these entries, and the gradient half is the same on both branches.
+    X'P86GradA(rhoA, rhoB) := [
+        Local(rho, z);
+        rho := rhoA + rhoB;
+        z := (rhoA - rhoB) / rho;
+        X'P86Cc(rho) / (rho^(4. / 3.) * X'P86DD(z));
+    ];
+    X'P86GradAExp(rhoA, rhoB) := [
+        Local(rho);
+        rho := rhoA + rhoB;
+        1.745 * X'P86F * X'P86Cinf / (X'P86Cc(rho) * rho^(7. / 6.));
+    ];
+    X'P86MixedRhoSigma(rhoA, rhoB, rhoP, u) := [
+        Local(gamma, s, AA, aa, Ap, ap, f, g);
+        gamma := sigmaAa + 2. * sigmaAb + sigmaBb;
+        s := Sqrt(gamma);
+        AA := X'P86GradA(rhoA, rhoB);
+        aa := X'P86GradAExp(rhoA, rhoB);
+        Ap := Deriv(rhoP) AA;
+        ap := Deriv(rhoP) aa;
+        f := Exp(-aa * s) * (1. - aa * s / 2.);
+        g := -(s / 2.) * Exp(-aa * s) * (3. - aa * s);
+        u * (Ap * f + AA * ap * g);
+    ];
+    ahandDerivedEntries := {
+        {rhoA, sigmaAa, X'P86MixedRhoSigma(rhoA, rhoB, rhoA, 1.)},
+        {rhoA, sigmaAb, X'P86MixedRhoSigma(rhoA, rhoB, rhoA, 2.)},
+        {rhoA, sigmaBb, X'P86MixedRhoSigma(rhoA, rhoB, rhoA, 1.)},
+        {rhoB, sigmaAa, X'P86MixedRhoSigma(rhoA, rhoB, rhoB, 1.)},
+        {rhoB, sigmaAb, X'P86MixedRhoSigma(rhoA, rhoB, rhoB, 2.)},
+        {rhoB, sigmaBb, X'P86MixedRhoSigma(rhoA, rhoB, rhoB, 1.)}
+    };
+
     // TierGuard: both branches carry the total-gradient radical, guarded in order 1
-    // and in the tier so each answers the finite limit at zero gradient.
+    // and in the tier so each answers the finite limit at zero gradient.  The six
+    // rho-sigma pairs above are supplied verbatim; the sigma-sigma pairs stay
+    // differentiated and keep their genuine divergence.
     ExPiecewiseKernelGenerate("P86Correlation", cond, eLow, eHigh,
                               {rhoA, rhoB, sigmaAa, sigmaAb, sigmaBb, TierGuard});
 ?>
