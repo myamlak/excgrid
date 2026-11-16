@@ -26,10 +26,15 @@ using excgrid::PointInputs;
 using excgrid::PointResult;
 using excgrid::PointSecondDerivative;
 using excgrid::PointSecondDerivativeMatrix;
+using excgrid::Request;
 using excgrid::SecondDerivativeStatus;
 using excgrid::XcFunctional;
 
 constexpr std::uint8_t kComponentCount = 32;
+
+// A request selector and a status value are append-only API, pinned here.
+static_assert(static_cast<std::uint8_t>(Request::kThirdDerivativeContraction) == 3);
+static_assert(static_cast<std::uint8_t>(KernelStatus::kRefusedThirdDerivativeCoverage) == 7);
 
 class StubFunctional final : public XcFunctional {
 public:
@@ -228,6 +233,24 @@ TEST(ContractTest, AnAbsentSecondDerivativeTierIsRefusedByName) {
               KernelStatus::kRefusedUnsupportedCapability);
 }
 
+TEST(ContractTest, AnAbsentThirdDerivativeTierIsRefusedByName) {
+    const StubFunctional functional;
+
+    PointInputs inputs;
+    inputs.Set(Component::RhoA, 0.3);
+    inputs.Set(Component::RhoB, 0.4);
+
+    PointResult result;
+    const std::span<const double> rightHandSide;
+    std::span<double> contracted;
+
+    EXPECT_EQ(
+        functional.EvaluatePointWithThirdDerivatives(inputs, rightHandSide, result, contracted),
+        KernelStatus::kRefusedUnsupportedCapability);
+    EXPECT_NE(KernelStatus::kRefusedThirdDerivativeCoverage,
+              KernelStatus::kRefusedUnsupportedCapability);
+}
+
 TEST(ContractTest, EachRefusalHasItsOwnName) {
     const std::vector<KernelStatus> refusals{
         KernelStatus::kRefusedUnsupportedCapability,
@@ -236,6 +259,7 @@ TEST(ContractTest, EachRefusalHasItsOwnName) {
         KernelStatus::kRefusedVersionMismatch,
         KernelStatus::kRefusedUnsupportedCombination,
         KernelStatus::kRefusedSecondDerivativeCoverage,
+        KernelStatus::kRefusedThirdDerivativeCoverage,
     };
 
     std::vector<std::string> seen;

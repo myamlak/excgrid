@@ -97,6 +97,7 @@ if (EXCGRID_BUILD_TESTS)
 
     add_executable(excgrid-tests
         tests/angular_grid_test.cpp
+        tests/asinh_over_x_test.cpp
         tests/block_grid_partition_test.cpp
         tests/block_grid_test.cpp
         tests/contract_test.cpp

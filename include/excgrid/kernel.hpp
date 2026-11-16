@@ -92,6 +92,7 @@ enum class Request : std::uint8_t {
     kFirstDerivatives = 0, ///< The energy density and the first derivatives.
     kSecondDerivativeContraction = 1, ///< Additionally the second derivatives, contracted.
     kSecondDerivativeMatrix = 2, ///< Additionally the second derivatives, materialised.
+    kThirdDerivativeContraction = 3, ///< Additionally the third derivatives, contracted.
 };
 
 /// How an evaluation ended; every refusal is named.
@@ -104,6 +105,8 @@ enum class KernelStatus : std::uint8_t {
     kRefusedVersionMismatch = 4, ///< The version differs, or the mask carries an unknown component.
     kRefusedUnsupportedCombination = 5, ///< The combination is not one this library answers.
     kRefusedSecondDerivativeCoverage = 6, ///< The tier exists but does not span the request.
+    kRefusedThirdDerivativeCoverage = 7, ///< The third-derivative tier exists but does not
+                                         ///< span the request.
 };
 
 /// One status's name, for a refusal message.
@@ -314,6 +317,20 @@ public:
     [[nodiscard]] virtual KernelStatus EvaluatePointMaterialising(
         const PointInputs& inputs, PointResult& result,
         PointSecondDerivativeMatrix& matrix) const;
+
+    /// One per-point evaluation including a third-derivative contraction; the
+    /// default refuses with kRefusedUnsupportedCapability.  No third-derivative
+    /// tier is built yet, so the layout of `contracted` is defined with the
+    /// future tier.
+    /// \param inputs The point's components.
+    /// \param rightHandSide The vector to contract with, by active component.
+    /// \param result Filled on kOk; untouched otherwise.
+    /// \param contracted The contracted output; its layout is defined with the
+    /// future tier, and the default leaves it untouched.
+    /// \returns kOk, or a named refusal.
+    [[nodiscard]] virtual KernelStatus EvaluatePointWithThirdDerivatives(
+        const PointInputs& inputs, std::span<const double> rightHandSide, PointResult& result,
+        std::span<double> contracted) const;
 
     /// The positional adapter for consumers not yet on EvaluatePoint: a refusal
     /// is reported as a zero-filled value with the status lost.

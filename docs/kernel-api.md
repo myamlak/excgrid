@@ -129,8 +129,12 @@ namespace excgrid {
   weighted sum. The tier reports the non-finite entries rather than a finite
   substitute, and `tests/second_derivative_test.cpp` pins the names rather
   than the numbers.
-  Nothing above the second tier is built: the third derivative has no contract
-  type to cross in.
+  The third-derivative tier is planned but not funded. The seam is carried now:
+  `XcFunctional::EvaluatePointWithThirdDerivatives` is the last virtual entry
+  point and returns `kRefusedUnsupportedCapability` by default,
+  `Request::kThirdDerivativeContraction` is reserved with value 3, and
+  `KernelStatus::kRefusedThirdDerivativeCoverage` is reserved for a future tier
+  that exists but does not span the request.
 - **The refusal path remains, exercised by a stub and by any future source that
   declines.** A tier costs a full symbolic second differentiation of the energy
   density, and it owes finiteness wherever its order-1 kernel is finite with a
